@@ -22,7 +22,10 @@ STORAGE_PATH = os.getenv('STORAGE_PATH', '/tmp/kagaz/storage')
 MAX_STORAGE_DAYS = int(os.getenv('MAX_STORAGE_DAYS', '3'))
 
 # Server Configuration
-PORT = int(os.getenv('PORT', '5000'))
+# PORT is now only used for the health/monitoring Flask server (default 5001)
+# The main communication is via WebSocket to BACKEND_URL
+PORT = int(os.getenv('PORT', '5001'))
+HEALTH_PORT = int(os.getenv('HEALTH_PORT', '5001'))
 FLASK_ENV = os.getenv('FLASK_ENV', 'production')
 
 # Application Constants
