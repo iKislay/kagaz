@@ -22,6 +22,7 @@ export interface PrinterRegistrationData {
     maxPageSize?: string
   }
   status?: 'online' | 'offline' | 'busy'
+  isDefault?: boolean
 }
 
 export interface NearbyPrinter {
@@ -38,6 +39,7 @@ export interface NearbyPrinter {
   }
   distance: number
   distanceText: string
+  isDefault: boolean
 }
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -55,45 +57,64 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c
 }
 
+function formatPrinter(printer: InstanceType<typeof Printer>, lat: number, lng: number): NearbyPrinter {
+  const [pLng, pLat] = printer.location.coordinates.coordinates
+  const distance = calculateDistance(lat, lng, pLat, pLng)
+  return {
+    _id: printer._id.toString(),
+    printerId: printer.printerId,
+    name: printer.name,
+    address: printer.location.address,
+    city: printer.location.city,
+    status: printer.status,
+    capabilities: printer.capabilities,
+    isDefault: printer.isDefault ?? false,
+    distance: Math.round(distance),
+    distanceText:
+      distance < 1000
+        ? `${Math.round(distance)}m away`
+        : `${(distance / 1000).toFixed(1)}km away`,
+  }
+}
+
 export async function findNearbyPrinters(
-  lat: number,
-  lng: number,
+  lat: number | null,
+  lng: number | null,
   radiusMeters = 5000
 ): Promise<NearbyPrinter[]> {
   await connectDB()
 
-  const printers = await Printer.find({
-    status: 'online',
-    'location.coordinates': {
-      $near: {
-        $geometry: {
-          type: 'Point',
-          coordinates: [lng, lat], // MongoDB expects [longitude, latitude]
+  // No coordinates — return all online printers sorted by default first
+  if (lat === null || lng === null) {
+    const all = await Printer.find({ status: 'online' }).sort({ isDefault: -1, name: 1 })
+    return all.map((p) => formatPrinter(p, 0, 0))
+  }
+
+  const [nearby, defaults] = await Promise.all([
+    Printer.find({
+      status: 'online',
+      'location.coordinates': {
+        $near: {
+          $geometry: { type: 'Point', coordinates: [lng, lat] },
+          $maxDistance: radiusMeters,
         },
-        $maxDistance: radiusMeters,
       },
-    },
-  }).limit(10)
+    }).limit(10),
+    Printer.find({ isDefault: true, status: 'online' }),
+  ])
 
-  return printers.map((printer) => {
-    const [pLng, pLat] = printer.location.coordinates.coordinates
-    const distance = calculateDistance(lat, lng, pLat, pLng)
+  // Merge defaults first, then nearby — deduplicate by printerId
+  const seen = new Set<string>()
+  const merged: NearbyPrinter[] = []
 
-    return {
-      _id: printer._id.toString(),
-      printerId: printer.printerId,
-      name: printer.name,
-      address: printer.location.address,
-      city: printer.location.city,
-      status: printer.status,
-      capabilities: printer.capabilities,
-      distance: Math.round(distance),
-      distanceText:
-        distance < 1000
-          ? `${Math.round(distance)}m away`
-          : `${(distance / 1000).toFixed(1)}km away`,
+  for (const p of [...defaults, ...nearby]) {
+    if (!seen.has(p.printerId)) {
+      seen.add(p.printerId)
+      merged.push(formatPrinter(p, lat, lng))
     }
-  })
+  }
+
+  return merged
 }
 
 export async function findByPrinterId(printerId: string) {
@@ -124,6 +145,7 @@ export async function registerOrUpdatePrinter(data: PrinterRegistrationData) {
     apiKey: data.apiKey,
     capabilities: data.capabilities || { color: false, duplex: false, maxPageSize: 'A4' },
     status: data.status || 'online',
+    isDefault: data.isDefault ?? false,
     lastSeen: new Date(),
   }
 

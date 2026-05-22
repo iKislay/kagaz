@@ -7,67 +7,78 @@ export default function HomePage() {
   const { token, userId, loading, error } = useGuestAuth()
 
   return (
-    <main className="flex-1 flex flex-col">
+    <main className="flex-1 flex flex-col bg-canvas min-h-screen text-white">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-gray-900">Kagaz</span>
-          </div>
-          <span className="text-sm text-gray-400">Print Anywhere</span>
+      <header className="w-full max-w-[1280px] mx-auto px-6 py-6 flex flex-col items-start justify-between border-b-0 relative z-10">
+        <div className="flex flex-col md:flex-row items-baseline gap-4 md:gap-12 w-full">
+          {/* Huge Wordmark Hero scale */}
+          <span className="text-[60px] md:text-[107px] font-display leading-[0.80] tracking-[1.07px] uppercase mt-4">
+            Kagaz
+          </span>
+          <nav className="flex items-center gap-6 mt-4 pb-2">
+            <span className="font-mono text-[12px] md:text-[14px] uppercase tracking-[1.5px] hover:text-deepblue cursor-pointer transition-colors">
+              Features
+            </span>
+            <span className="font-mono text-[12px] md:text-[14px] uppercase tracking-[1.5px] hover:text-deepblue cursor-pointer transition-colors">
+              Locations
+            </span>
+          </nav>
         </div>
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-start px-4 py-8">
-        <div className="w-full max-w-2xl">
+      <div className="flex-1 flex flex-col items-center justify-start px-6 py-12 md:py-16 w-full max-w-[1280px] mx-auto relative z-10">
+        <div className="w-full flex flex-col items-center">
           {/* Hero text */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
-              Print from your phone
+          <div className="text-center mb-16 md:mb-24 flex flex-col items-center w-full">
+            {/* capitalized thin-weight poly-sans label equivalent */}
+            <span className="block font-sans font-light text-[19px] uppercase tracking-[1.9px] text-mint mb-6">
+              Print Kiosks Without Apps
+            </span>
+            <h1 className="text-[50px] md:text-[90px] font-display leading-[0.80] uppercase w-full">
+              Print From Your Phone
             </h1>
-            <p className="mt-3 text-lg text-gray-500">
+            <p className="mt-10 text-[16px] md:text-[20px] font-sans text-muted md:w-3/5 leading-relaxed">
               Upload your documents and print at a nearby kiosk — no app needed.
             </p>
           </div>
 
-          {/* Auth loading / error states */}
-          {loading && (
-            <div className="flex items-center justify-center py-12">
-              <span className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <span className="ml-3 text-gray-500">Setting up your session...</span>
-            </div>
-          )}
+          <div className="w-full max-w-4xl">
+            {/* Auth loading / error states */}
+            {loading && (
+              <div className="flex items-center justify-center py-20">
+                <span className="w-8 h-8 border-2 border-mint border-t-transparent rounded-full animate-spin" />
+                <span className="ml-4 font-mono text-[12px] uppercase tracking-[1.5px] text-muted">Establishing Secure Link...</span>
+              </div>
+            )}
 
-          {error && !loading && (
-            <div className="p-6 bg-red-50 border border-red-200 rounded-2xl text-center">
-              <p className="text-red-600 font-semibold">Failed to start session</p>
-              <p className="text-red-500 text-sm mt-1">{error}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
-              >
-                Retry
-              </button>
-            </div>
-          )}
+            {error && !loading && (
+              <div className="p-8 bg-slate/50 border border-ultraviolet rounded-[20px] text-center w-full shadow-[0px_0px_0px_1px_rgba(0,0,0,0.33)] max-w-lg mx-auto">
+                <p className="text-ultraviolet font-mono font-bold uppercase tracking-[1.5px]">Failed to start session</p>
+                <p className="text-muted text-sm mt-3 font-sans">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-8 px-6 py-3 border border-ultraviolet text-ultraviolet rounded-[30px] font-mono text-[12px] font-semibold uppercase tracking-[1.5px] hover:bg-ultraviolet hover:text-white transition-colors"
+                >
+                  Retry Connection
+                </button>
+              </div>
+            )}
 
-          {/* Main wizard — shown once auth is ready */}
-          {!loading && !error && token && userId && (
-            <PrintWizard token={token} userId={userId} />
-          )}
+            {/* Main wizard — shown once auth is ready */}
+            {!loading && !error && token && userId && (
+              <PrintWizard token={token} userId={userId} />
+            )}
+          </div>
         </div>
       </div>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-100 py-4">
-        <div className="max-w-4xl mx-auto px-4 text-center text-xs text-gray-400">
-          Kagaz — Your files are encrypted and deleted after 24 hours.
+      <footer className="w-full border-t border-slate py-8 mt-auto">
+        <div className="max-w-[1280px] mx-auto px-6 text-center">
+          <span className="font-mono text-[11px] uppercase text-muted tracking-[1.1px]">
+            KAGAZ — YOUR FILES ARE ENCRYPTED AND DELETED AFTER 24 HOURS.
+          </span>
         </div>
       </footer>
     </main>

@@ -27,6 +27,7 @@ export interface IPrinter extends Document {
     failedJobs: number
     lastJobAt?: Date
   }
+  isDefault: boolean
   lastSeen: Date
   createdAt: Date
   updatedAt: Date
@@ -93,6 +94,11 @@ const PrinterSchema = new Schema<IPrinter>(
       successfulJobs: { type: Number, default: 0 },
       failedJobs: { type: Number, default: 0 },
       lastJobAt: Date,
+    },
+    isDefault: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
     lastSeen: {
       type: Date,

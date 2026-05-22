@@ -1,19 +1,26 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Archivo_Black, Space_Grotesk, Space_Mono } from 'next/font/google'
 import './globals.css'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const fontDisplay = Archivo_Black({
+  weight: '400',
+  variable: '--font-display',
   subsets: ['latin'],
 })
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const fontSans = Space_Grotesk({
+  variable: '--font-sans',
+  subsets: ['latin'],
+})
+
+const fontMono = Space_Mono({
+  weight: ['400', '700'],
+  variable: '--font-mono',
   subsets: ['latin'],
 })
 
 export const metadata: Metadata = {
-  title: 'Kagaz - Print Anywhere',
+  title: 'KAGAZ - Print Anywhere',
   description: 'Upload your documents and print at a nearby kiosk',
 }
 
@@ -25,9 +32,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${fontDisplay.variable} ${fontSans.variable} ${fontMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-gray-50 flex flex-col">{children}</body>
+      <body className="min-h-full bg-canvas text-white flex flex-col font-sans">{children}</body>
     </html>
   )
 }

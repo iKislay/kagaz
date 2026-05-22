@@ -17,19 +17,16 @@ export async function GET(request: NextRequest) {
     const lngStr = searchParams.get('lng')
     const radiusStr = searchParams.get('radius')
 
-    if (!latStr || !lngStr) {
-      return NextResponse.json({ error: 'lat and lng query parameters are required' }, { status: 400 })
-    }
+    let lat: number | null = null
+    let lng: number | null = null
 
-    const lat = parseFloat(latStr)
-    const lng = parseFloat(lngStr)
+    if (latStr && lngStr) {
+      lat = parseFloat(latStr)
+      lng = parseFloat(lngStr)
 
-    if (isNaN(lat) || isNaN(lng)) {
-      return NextResponse.json({ error: 'lat and lng must be valid numbers' }, { status: 400 })
-    }
-
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 })
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 })
+      }
     }
 
     const radiusMeters = radiusStr ? parseInt(radiusStr) : 5000
