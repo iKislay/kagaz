@@ -9,6 +9,9 @@ import { ApiExceptionFilter } from './common/http/api-exception.filter.js';
 import { PrismaModule } from './common/prisma/prisma.module.js';
 import { HealthController } from './health/health.controller.js';
 import { FilesModule } from './modules/files/files.module.js';
+import { OrdersModule } from './modules/orders/orders.module.js';
+import { PickupModule } from './modules/pickup/pickup.module.js';
+import { ShopsModule } from './modules/shops/shops.module.js';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
@@ -54,6 +57,9 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
     }),
     PrismaModule,
     FilesModule,
+    PickupModule,
+    ShopsModule,
+    OrdersModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],
