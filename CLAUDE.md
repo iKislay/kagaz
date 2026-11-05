@@ -116,17 +116,17 @@ Do **not** introduce without an explicit decision: microservices, Kubernetes, Re
 
 Every surface — customer website, admin dashboard and the Windows shop app — looks like a **native macOS app**, with one shared look. Don't invent per-screen colors; use these tokens (web: CSS variables in `apps/web/src/app/globals.css`; WPF: resources in `apps/shop-agent/src/Kagaz.ShopAgent.App/App.xaml`).
 
-| Token | Light | Dark | Use |
-| --- | --- | --- | --- |
-| `bg` | `#F5F5F7` | `#1C1C1E` | window background |
-| `surface` | `#FFFFFF` | `#2C2C2E` | cards, sheets, inputs |
-| `sidebar` | `#ECECEF` (translucent on web) | `#232325` | source-list sidebar |
-| `text` | `#1D1D1F` | `#F5F5F7` | primary text |
-| `text-secondary` | `#6E6E73` | `#A1A1A6` | labels, captions |
-| `separator` | `rgba(0,0,0,.10)` | `rgba(255,255,255,.12)` | hairlines (1px) |
-| `selection` | `rgba(0,0,0,.07)` | `rgba(255,255,255,.10)` | sidebar selection pill |
-| `accent` | `#007AFF` | `#0A84FF` | primary buttons, links, focus rings |
-| `green` / `orange` / `red` | `#34C759` / `#FF9500` / `#FF3B30` | `#30D158` / `#FF9F0A` / `#FF453A` | status only |
+| Token                      | Light                             | Dark                              | Use                                 |
+| -------------------------- | --------------------------------- | --------------------------------- | ----------------------------------- |
+| `bg`                       | `#F5F5F7`                         | `#1C1C1E`                         | window background                   |
+| `surface`                  | `#FFFFFF`                         | `#2C2C2E`                         | cards, sheets, inputs               |
+| `sidebar`                  | `#ECECEF` (translucent on web)    | `#232325`                         | source-list sidebar                 |
+| `text`                     | `#1D1D1F`                         | `#F5F5F7`                         | primary text                        |
+| `text-secondary`           | `#6E6E73`                         | `#A1A1A6`                         | labels, captions                    |
+| `separator`                | `rgba(0,0,0,.10)`                 | `rgba(255,255,255,.12)`           | hairlines (1px)                     |
+| `selection`                | `rgba(0,0,0,.07)`                 | `rgba(255,255,255,.10)`           | sidebar selection pill              |
+| `accent`                   | `#007AFF`                         | `#0A84FF`                         | primary buttons, links, focus rings |
+| `green` / `orange` / `red` | `#34C759` / `#FF9500` / `#FF3B30` | `#30D158` / `#FF9F0A` / `#FF453A` | status only                         |
 
 - **Type:** SF-style stack: web `-apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI Variable Text", system-ui`; WPF `Segoe UI Variable Text, Segoe UI`. Large bold page titles (26–28px, -0.02em), 13–15px body, secondary text in `text-secondary`.
 - **Shape:** cards 12px radius, controls 8px, buttons pill (fully rounded) or 8px; 1px hairline borders; soft shadows (`0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06)`).
