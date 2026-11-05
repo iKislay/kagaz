@@ -6,12 +6,14 @@ import { DemoMockProvider } from './demo-mock.provider.js';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.js';
 import { PaymentsController } from './payments.controller.js';
 import { PaymentsService } from './payments.service.js';
+import { RefundsService } from './refunds.service.js';
 
 @Module({
   imports: [OrdersModule],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,
+    RefundsService,
     {
       provide: PAYMENT_PROVIDER,
       inject: [APP_CONFIG],
@@ -27,6 +29,6 @@ import { PaymentsService } from './payments.service.js';
       },
     },
   ],
-  exports: [PaymentsService, PAYMENT_PROVIDER],
+  exports: [PaymentsService, RefundsService, PAYMENT_PROVIDER],
 })
 export class PaymentsModule {}

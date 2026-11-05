@@ -1,0 +1,422 @@
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  type CreateOrderResponse,
+  type EnrollDeviceResponse,
+  type LeaseResponse,
+  type PublicOrder,
+  type ShopJob,
+} from '@kagaz/shared';
+import { randomCode, sha256Hex } from '../../src/common/crypto/tokens.js';
+import { makePdf } from '../fixtures/pdfs.js';
+import {
+  MONO,
+  type Harness,
+  createHarness,
+  createOrder,
+  createShop,
+  uploadPdf,
+} from './harness.js';
+
+let h: Harness;
+beforeAll(async () => {
+  h = await createHarness();
+});
+afterAll(async () => {
+  await h.close();
+});
+
+/** A shop with one paired device and one confirmed printer. */
+async function pairedShop(caps: { colour?: boolean; duplex?: boolean } = {}) {
+  const shop = await createShop(h.prisma);
+  const code = randomCode(8);
+  await h.prisma.enrollmentCode.create({
+    data: { shopId: shop.id, codeHash: sha256Hex(code), expiresAt: new Date(Date.now() + 60_000) },
+  });
+  const enrolled = (
+    await h
+      .http()
+      .post('/api/devices/enroll')
+      .send({ code: `${code.slice(0, 4)}-${code.slice(4)}`.toLowerCase(), name: 'Counter PC' })
+      .expect(201)
+  ).body as EnrollDeviceResponse;
+  const auth = { Authorization: `Bearer ${enrolled.deviceToken}` };
+  const printers = await h
+    .http()
+    .put('/api/shop/printers')
+    .set(auth)
+    .send({
+      printers: [
+        {
+          printerName: `HP LaserJet ${randomCode(4)}`,
+          colourCapable: caps.colour ?? false,
+          duplexCapable: caps.duplex ?? true,
+          capabilitiesConfirmed: true,
+          isDefault: true,
+        },
+      ],
+    })
+    .expect(200);
+  return { shop, auth, device: enrolled, printerId: printers.body[0].id as string };
+}
+
+async function paidOrder(shopId: string, pages = 3, options = MONO): Promise<CreateOrderResponse> {
+  const created = await createOrder(h, shopId, options);
+  expect((await uploadPdf(h, created, await makePdf(pages))).status).toBe(200);
+  await h
+    .http()
+    .post(`/api/orders/${created.order.id}/pay`)
+    .set('x-tracking-token', created.trackingToken)
+    .expect(200);
+  return created;
+}
+
+const customerView = async (c: CreateOrderResponse) =>
+  (await h.http().get(`/api/orders/${c.order.id}`).set('x-tracking-token', c.trackingToken))
+    .body as PublicOrder;
+
+describe('device enrollment', () => {
+  it('pairs once with a one-time code; reuse and bad tokens are refused', async () => {
+    const shop = await createShop(h.prisma);
+    const code = randomCode(8);
+    await h.prisma.enrollmentCode.create({
+      data: {
+        shopId: shop.id,
+        codeHash: sha256Hex(code),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const first = await h.http().post('/api/devices/enroll').send({ code, name: 'PC' }).expect(201);
+    expect(first.body.shop.id).toBe(shop.id);
+    const again = await h
+      .http()
+      .post('/api/devices/enroll')
+      .send({ code, name: 'PC2' })
+      .expect(400);
+    expect(again.body.error.code).toBe('ENROLLMENT_CODE_INVALID');
+
+    await h.http().get('/api/shop/jobs').expect(401);
+    await h
+      .http()
+      .get('/api/shop/jobs')
+      .set('Authorization', 'Bearer nope-nope-nope-nope-nope')
+      .expect(401);
+    await h
+      .http()
+      .get('/api/shop/jobs')
+      .set('Authorization', `Bearer ${first.body.deviceToken}`)
+      .expect(200);
+  });
+});
+
+describe('vertical slice lifecycle (T07, T10, T15)', () => {
+  it('pay → accept → lease → submit → ready → customer sees code → pickup → collected', async () => {
+    const { shop, auth, printerId } = await pairedShop({ duplex: true });
+    const created = await paidOrder(shop.id, 3, { ...MONO, copies: 2, duplex: true });
+
+    // Operator sees the paid order, without the customer's phone number.
+    const list = await h.http().get('/api/shop/jobs').set(auth).expect(200);
+    const listed = (list.body.jobs as ShopJob[]).find((j) => j.orderId === created.order.id)!;
+    expect(listed).toMatchObject({
+      status: 'PENDING_REVIEW',
+      pageCount: 3,
+      simulatedPayment: true,
+    });
+    expect(JSON.stringify(list.body)).not.toContain('customerPhone');
+
+    const detail = await h.http().get(`/api/shop/jobs/${created.order.id}`).set(auth).expect(200);
+    expect(detail.body.previewUrl).toMatch(/^http/);
+
+    // Accept: packet built, code generated, job queued.
+    const accepted = await h
+      .http()
+      .post(`/api/shop/jobs/${created.order.id}/accept`)
+      .set(auth)
+      .send({})
+      .expect(200);
+    expect(accepted.body).toMatchObject({
+      status: 'QUEUED',
+      printJob: { attempt: 1, status: 'READY' },
+    });
+    expect((await customerView(created)).pickupCode).toBeNull(); // not before READY
+
+    // Lease: one combined packet, checksum, document name, settings.
+    const lease = (
+      await h
+        .http()
+        .post(`/api/shop/print-jobs/${accepted.body.printJob.id}/lease`)
+        .set(auth)
+        .expect(200)
+    ).body as LeaseResponse;
+    expect(lease).toMatchObject({
+      printerName: expect.stringContaining('HP LaserJet'),
+      documentName: `KAGAZ-${created.order.publicRef}-A1`,
+      settings: { colour: false, duplex: true, paperSize: 'A4' },
+      pageCount: 9, // (3 + spacer) × 2 + slip
+    });
+    const packet = Buffer.from(await (await fetch(lease.downloadUrl)).arrayBuffer());
+    expect(sha256Hex(packet)).toBe(lease.sha256);
+
+    // The slip is the last page and carries the code the customer will see.
+    const task = getDocument({ data: new Uint8Array(packet), verbosity: 0 });
+    const doc = await task.promise;
+    const slipText = (await (await doc.getPage(doc.numPages)).getTextContent()).items
+      .map((it) => ('str' in it ? it.str : ''))
+      .join('');
+    await task.destroy();
+
+    // Can't mark ready before the job reached the printer.
+    const early = await h
+      .http()
+      .post(`/api/shop/jobs/${created.order.id}/ready`)
+      .set(auth)
+      .send({ confirmed: true })
+      .expect(409);
+    expect(early.body.error.code).toBe('PRINT_NOT_SUBMITTED');
+
+    await h
+      .http()
+      .post(`/api/shop/print-jobs/${lease.printJobId}/status`)
+      .set(auth)
+      .send({ status: 'SUBMITTED', spoolerJobId: 42 })
+      .expect(200);
+    await h
+      .http()
+      .post(`/api/shop/print-jobs/${lease.printJobId}/status`)
+      .set(auth)
+      .send({ status: 'SUBMITTED', spoolerJobId: 42 })
+      .expect(200); // idempotent replay
+    const complete = await h
+      .http()
+      .post(`/api/shop/print-jobs/${lease.printJobId}/status`)
+      .set(auth)
+      .send({ status: 'SPOOLER_COMPLETE' })
+      .expect(200);
+    expect(complete.body.status).toBe('PRINTING'); // spooler success is not READY (invariant 9)
+    const printer = await h.prisma.printer.findUniqueOrThrow({ where: { id: printerId } });
+    expect(printer.activeJobId).toBeNull(); // lease released for the next job
+
+    await h.http().post(`/api/shop/jobs/${created.order.id}/ready`).set(auth).send({}).expect(400);
+    await h
+      .http()
+      .post(`/api/shop/jobs/${created.order.id}/ready`)
+      .set(auth)
+      .send({ confirmed: true })
+      .expect(200);
+
+    const ready = await customerView(created);
+    expect(ready.status).toBe('READY_FOR_PICKUP');
+    expect(ready.pickupCode).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    expect(slipText.replace(/\s/g, '')).toContain(ready.pickupCode);
+
+    // Pickup: lowercase with a dash is fine; second use is refused (T15).
+    const code = ready.pickupCode!;
+    const verified = await h
+      .http()
+      .post('/api/shop/pickups/verify')
+      .set(auth)
+      .send({ code: `${code.slice(0, 4)}-${code.slice(4)}`.toLowerCase() })
+      .expect(200);
+    expect(verified.body).toMatchObject({
+      publicRef: created.order.publicRef,
+      status: 'COLLECTED',
+    });
+    const reused = await h
+      .http()
+      .post('/api/shop/pickups/verify')
+      .set(auth)
+      .send({ code })
+      .expect(409);
+    expect(reused.body.error.code).toBe('PICKUP_ALREADY_USED');
+
+    const collected = await customerView(created);
+    expect(collected.status).toBe('COLLECTED');
+    expect(collected.pickupCode).toBeNull();
+    expect(collected.timeline.map((e) => e.status)).toEqual([
+      'DRAFT',
+      'AWAITING_PAYMENT',
+      'PENDING_REVIEW',
+      'QUEUED',
+      'PRINTING',
+      'READY_FOR_PICKUP',
+      'COLLECTED',
+    ]);
+    const audit = await h.prisma.auditLog.findMany({ where: { orderId: created.order.id } });
+    expect(audit.map((a) => a.action)).toEqual(
+      expect.arrayContaining([
+        'order.accepted',
+        'print.started',
+        'order.ready',
+        'pickup.verified',
+        'pickup.reused',
+      ]),
+    );
+  });
+
+  it('wrong pickup codes are rejected and audited', async () => {
+    const { auth, shop } = await pairedShop();
+    const res = await h
+      .http()
+      .post('/api/shop/pickups/verify')
+      .set(auth)
+      .send({ code: 'ZZZZ-ZZZZ' })
+      .expect(404);
+    expect(res.body.error.code).toBe('PICKUP_CODE_INVALID');
+    expect(
+      await h.prisma.auditLog.count({ where: { shopId: shop.id, action: 'pickup.failed' } }),
+    ).toBe(1);
+  });
+
+  it('reject records the reason and a simulated refund (T07, T20)', async () => {
+    const { shop, auth } = await pairedShop();
+    const created = await paidOrder(shop.id);
+    const res = await h
+      .http()
+      .post(`/api/shop/jobs/${created.order.id}/reject`)
+      .set(auth)
+      .send({ reasonCode: 'CONTENT_NOT_ALLOWED', note: 'Blank pages only' })
+      .expect(200);
+    expect(res.body).toMatchObject({
+      status: 'REFUNDED',
+      rejection: { code: 'CONTENT_NOT_ALLOWED', note: 'Blank pages only' },
+    });
+    const payment = await h.prisma.payment.findFirstOrThrow({
+      where: { orderId: created.order.id },
+      include: { refunds: true },
+    });
+    expect(payment.status).toBe('REFUNDED');
+    expect(payment.refunds).toEqual([
+      expect.objectContaining({
+        status: 'SUCCEEDED',
+        isSimulated: true,
+        amountPaise: payment.amountPaise,
+        providerRefundId: `DEMO-RFD-${created.order.publicRef}`,
+      }),
+    ]);
+    const view = await customerView(created);
+    expect(view.timeline.map((e) => e.status).slice(-3)).toEqual([
+      'REJECTED',
+      'REFUND_PENDING',
+      'REFUNDED',
+    ]);
+  });
+});
+
+describe('printer queue (T11, T12)', () => {
+  it('leases strictly in FIFO order, one job per printer at a time', async () => {
+    const { shop, auth } = await pairedShop();
+    const a = await paidOrder(shop.id, 1);
+    const b = await paidOrder(shop.id, 1);
+    const accept = async (c: CreateOrderResponse) =>
+      (await h.http().post(`/api/shop/jobs/${c.order.id}/accept`).set(auth).send({}).expect(200))
+        .body as ShopJob;
+    const jobA = await accept(a);
+    const jobB = await accept(b);
+
+    const outOfOrder = await h
+      .http()
+      .post(`/api/shop/print-jobs/${jobB.printJob!.id}/lease`)
+      .set(auth)
+      .expect(409);
+    expect(outOfOrder.body.error.code).toBe('NOT_NEXT_IN_QUEUE');
+
+    await h.http().post(`/api/shop/print-jobs/${jobA.printJob!.id}/lease`).set(auth).expect(200);
+    // A is still printing: B must wait even though it's now first in the READY queue.
+    const busy = await h
+      .http()
+      .post(`/api/shop/print-jobs/${jobB.printJob!.id}/lease`)
+      .set(auth)
+      .expect(409);
+    expect(busy.body.error.code).toBe('PRINTER_BUSY');
+
+    await h
+      .http()
+      .post(`/api/shop/print-jobs/${jobA.printJob!.id}/status`)
+      .set(auth)
+      .send({ status: 'SPOOLER_COMPLETE' })
+      .expect(200);
+    await h.http().post(`/api/shop/print-jobs/${jobB.printJob!.id}/lease`).set(auth).expect(200);
+  });
+
+  it('a failed print goes to the operator, never READY or auto-reprint', async () => {
+    const { shop, auth } = await pairedShop();
+    const created = await paidOrder(shop.id, 1);
+    const job = (
+      await h
+        .http()
+        .post(`/api/shop/jobs/${created.order.id}/accept`)
+        .set(auth)
+        .send({})
+        .expect(200)
+    ).body as ShopJob;
+    await h.http().post(`/api/shop/print-jobs/${job.printJob!.id}/lease`).set(auth).expect(200);
+    const failed = await h
+      .http()
+      .post(`/api/shop/print-jobs/${job.printJob!.id}/status`)
+      .set(auth)
+      .send({ status: 'FAILED', error: 'Paper out' })
+      .expect(200);
+    expect(failed.body).toMatchObject({
+      status: 'NEEDS_OPERATOR_CHECK',
+      printJob: { status: 'FAILED', error: 'Paper out' },
+    });
+    expect((await customerView(created)).pickupCode).toBeNull();
+    expect(await h.prisma.printJob.count({ where: { orderId: created.order.id } })).toBe(1);
+  });
+});
+
+describe('tenant isolation (T09)', () => {
+  it("shop B's device cannot see or act on shop A's orders", async () => {
+    const a = await pairedShop();
+    const b = await pairedShop();
+    const created = await paidOrder(a.shop.id);
+
+    const listB = await h.http().get('/api/shop/jobs').set(b.auth).expect(200);
+    expect((listB.body.jobs as ShopJob[]).map((j) => j.orderId)).not.toContain(created.order.id);
+
+    const id = created.order.id;
+    await h.http().get(`/api/shop/jobs/${id}`).set(b.auth).expect(404);
+    await h.http().post(`/api/shop/jobs/${id}/accept`).set(b.auth).send({}).expect(404);
+    await h
+      .http()
+      .post(`/api/shop/jobs/${id}/reject`)
+      .set(b.auth)
+      .send({ reasonCode: 'OTHER' })
+      .expect(404);
+
+    const job = (
+      await h.http().post(`/api/shop/jobs/${id}/accept`).set(a.auth).send({}).expect(200)
+    ).body as ShopJob;
+    await h.http().post(`/api/shop/print-jobs/${job.printJob!.id}/lease`).set(b.auth).expect(404);
+    // B can't use A's printer for its own orders either.
+    const bOrder = await paidOrder(b.shop.id);
+    await h
+      .http()
+      .post(`/api/shop/jobs/${bOrder.order.id}/accept`)
+      .set(b.auth)
+      .send({ printerId: a.printerId })
+      .expect(409);
+
+    await h.http().post(`/api/shop/print-jobs/${job.printJob!.id}/lease`).set(a.auth).expect(200);
+    await h
+      .http()
+      .post(`/api/shop/print-jobs/${job.printJob!.id}/status`)
+      .set(a.auth)
+      .send({ status: 'SUBMITTED' })
+      .expect(200);
+    await h
+      .http()
+      .post(`/api/shop/jobs/${id}/ready`)
+      .set(a.auth)
+      .send({ confirmed: true })
+      .expect(200);
+    const code = (await customerView(created)).pickupCode!;
+    const wrongShop = await h
+      .http()
+      .post('/api/shop/pickups/verify')
+      .set(b.auth)
+      .send({ code })
+      .expect(404);
+    expect(wrongShop.body.error.code).toBe('PICKUP_CODE_INVALID');
+  });
+});

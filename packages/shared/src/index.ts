@@ -5,3 +5,4 @@ export * from './page-range.js';
 export * from './constants.js';
 export * from './schemas.js';
 export * from './api.js';
+export * from './shop-api.js';
