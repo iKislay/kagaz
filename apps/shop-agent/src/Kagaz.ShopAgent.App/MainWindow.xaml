@@ -6,71 +6,79 @@
         xmlns:views="clr-namespace:Kagaz.ShopAgent.App.Views"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}"
-        Width="1080" Height="720"
+        Width="1080" Height="720" MinWidth="820" MinHeight="560"
         WindowStartupLocation="CenterScreen"
-        Background="#111827"
+        Background="{StaticResource BgBrush}"
+        FontFamily="{StaticResource UiFont}"
+        TextOptions.TextFormattingMode="Ideal"
+        UseLayoutRounding="True"
         d:DesignHeight="720" d:DesignWidth="1080">
-    <!-- Resources must be declared before the content that uses them via StaticResource. -->
-    <Window.Resources>
-        <Style x:Key="NavItemStyle" TargetType="ListBoxItem">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="12,8" />
-            <Setter Property="Foreground" Value="#D1D5DB" />
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#374151" />
-                    <Setter Property="Foreground" Value="#F9FAFB" />
-                    <Setter Property="FontWeight" Value="SemiBold" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Window.Resources>
-
+    <!-- macOS-style layout (CLAUDE.md "Design language"): source-list sidebar + content. -->
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260" />
+            <ColumnDefinition Width="232" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Left nav: header (top), connection status (bottom), nav list fills the rest. -->
-        <Border Grid.Column="0" Background="#1F2937">
-            <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Top" Orientation="Vertical" Margin="16,24,16,16">
-                    <TextBlock Text="Kagaz Shop" Foreground="#F9FAFB" FontSize="18" FontWeight="Bold" />
-                    <TextBlock Text="{Binding Version}" Foreground="#9CA3AF" FontSize="12" Margin="0,4,0,0" />
+        <!-- Sidebar: header (top), connection status (bottom), nav list fills the rest. -->
+        <Border Grid.Column="0" Background="{StaticResource SidebarBrush}"
+                BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="True" Margin="10,0">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,22,8,18">
+                    <Border Width="30" Height="30" CornerRadius="8" Background="{StaticResource AccentBrush}">
+                        <TextBlock Text="K" Foreground="White" FontWeight="Bold" FontSize="16"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="Kagaz Shop" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" />
+                        <TextBlock Text="{Binding Version, StringFormat=Version {0}}" Style="{StaticResource SecondaryText}"
+                                   FontSize="11" />
+                    </StackPanel>
                 </StackPanel>
 
-                <Border DockPanel.Dock="Bottom" Background="#111827" Padding="12" Margin="12">
+                <Border DockPanel.Dock="Bottom" Margin="0,8,0,14" Padding="10,8" CornerRadius="8"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="10" Height="10" Fill="{Binding ConnectionBrush}" Margin="0,0,8,0" />
-                        <TextBlock Text="{Binding ConnectionText}" Foreground="#F9FAFB"
-                                   FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center"
-                                   MaxWidth="200" />
+                        <Ellipse Width="8" Height="8" Fill="{Binding ConnectionBrush}" Margin="0,0,8,0"
+                                 VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ConnectionText}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"
+                                   MaxWidth="170" />
                     </StackPanel>
                 </Border>
 
-                <ListBox ItemsSource="{Binding NavigationItems}" SelectedItem="{Binding SelectedNavigation, Mode=TwoWay}"
-                         Background="Transparent" BorderThickness="0" Foreground="#D1D5DB"
-                         ItemContainerStyle="{StaticResource NavItemStyle}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Title}" Padding="12,8" />
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                <StackPanel>
+                    <TextBlock Text="SHOP" Style="{StaticResource SidebarHeading}" Margin="10,0,0,6" />
+                    <ListBox ItemsSource="{Binding NavigationItems}"
+                             SelectedItem="{Binding SelectedNavigation, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0" Padding="0"
+                             ItemContainerStyle="{StaticResource SidebarItem}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Icon}" FontFamily="{StaticResource IconFont}"
+                                               FontSize="15" Width="20" Margin="0,0,8,0"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
             </DockPanel>
         </Border>
 
         <!-- Content -->
-        <Border Grid.Column="1" Background="#111827" Padding="24">
-            <ContentControl Content="{Binding SelectedNavigation}">
-                <ContentControl.ContentTemplate>
-                    <DataTemplate>
-                        <views:PlaceholderView />
-                    </DataTemplate>
-                </ContentControl.ContentTemplate>
-            </ContentControl>
-        </Border>
+        <ContentControl Grid.Column="1" Margin="36,32,36,32" Content="{Binding SelectedNavigation}">
+            <ContentControl.ContentTemplate>
+                <DataTemplate>
+                    <views:PlaceholderView />
+                </DataTemplate>
+            </ContentControl.ContentTemplate>
+        </ContentControl>
     </Grid>
 </Window>

@@ -8,9 +8,10 @@ namespace Kagaz.ShopAgent.App.ViewModels;
 
 public sealed class ShellViewModel : ObservableObject
 {
-    private static readonly Brush ConnectedBrush = new SolidColorBrush(Color.FromRgb(0x22, 0xC5, 0x5E));
-    private static readonly Brush DisconnectedBrush = new SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44));
-    private static readonly Brush CheckingBrush = new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B));
+    // macOS system status colors (CLAUDE.md "Design language").
+    private static readonly Brush ConnectedBrush = new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59));
+    private static readonly Brush DisconnectedBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
+    private static readonly Brush CheckingBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x95, 0x00));
 
     private string _connectionText = "Checking connection...";
     private Brush _connectionBrush = CheckingBrush;
@@ -22,11 +23,11 @@ public sealed class ShellViewModel : ObservableObject
         WindowTitle = $"Kagaz Shop v{Version}";
         NavigationItems =
         [
-            new NavigationItem("Pairing"),
-            new NavigationItem("Jobs"),
-            new NavigationItem("Pickup"),
-            new NavigationItem("Printers"),
-            new NavigationItem("Settings"),
+            new NavigationItem("Pairing", "", "Connect this PC to your Kagaz shop."),
+            new NavigationItem("Jobs", "", "Paid orders waiting for you, in queue and printing."),
+            new NavigationItem("Pickup", "", "Verify a customer's pickup code and hand over."),
+            new NavigationItem("Printers", "", "Printers on this PC and what they can do."),
+            new NavigationItem("Settings", "", "Connection and app preferences."),
         ];
         SelectedNavigation = NavigationItems[0];
     }
