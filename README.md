@@ -18,7 +18,7 @@ apps/api/          NestJS API (TypeScript, Prisma, PostgreSQL)
 apps/web/          Next.js customer website + admin dashboard
 apps/shop-agent/   .NET WPF Windows shop app
 packages/shared/   Shared enums, schemas and helpers
-infra/             Local Postgres + MinIO (docker compose)
+infra/             Local Postgres + SeaweedFS S3 (docker compose)
 ```
 
 ## Quick start

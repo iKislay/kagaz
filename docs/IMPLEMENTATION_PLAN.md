@@ -74,7 +74,7 @@ kagaz/
 ├─ packages/
 │  └─ shared/                 TS enums, zod schemas, DTO types, money helpers
 ├─ infra/
-│  ├─ docker-compose.yml      postgres + minio (local)
+│  ├─ docker-compose.yml      postgres + seaweedfs S3 (local)
 │  └─ deploy/                 Dockerfiles, env templates per environment
 ├─ scripts/                   load/seed/demo scripts
 ├─ test-assets/pdfs/          test PDF corpus (Appendix C)
@@ -95,9 +95,9 @@ kagaz/
 - TypeScript strict base config; ESLint + Prettier; `.editorconfig`; `.nvmrc` (Node LTS).
 - **Done when:** `pnpm install && pnpm lint && pnpm typecheck` pass on the empty workspace.
 
-### P0.2 — Local infrastructure `[~]` (written; not yet run: Docker engine unavailable)
+### P0.2 — Local infrastructure `[x]`
 
-- `infra/docker-compose.yml`: PostgreSQL 16 (port 5432) and MinIO (S3 API 9000, console 9001) with a private bucket `kagaz-local` created by an init container.
+- `infra/docker-compose.yml`: PostgreSQL 16 (port 5432) and SeaweedFS (S3 API on 9000) with a private bucket `kagaz-local` created by an init container. (Originally MinIO; switched because MinIO no longer publishes community images.)
 - `.env.example` with every variable from [Appendix B](#appendix-b--environment-variables).
 - **Done when:** `docker compose -f infra/docker-compose.yml up -d` starts both; bucket exists and is not publicly readable.
 
@@ -107,7 +107,7 @@ kagaz/
 - Unit tests for page-range parser (empty, overlaps, reversed ranges, out of bounds, whitespace).
 - **Done when:** `pnpm --filter @kagaz/shared test` passes.
 
-### P0.4 — API skeleton `[x]` (live db/storage "ok" pending P0.2)
+### P0.4 — API skeleton `[x]`
 
 - NestJS app under `apps/api`; global prefix `/api`; config module with **zod-validated env** (fails fast on missing/invalid vars).
 - **Startup guard:** if `APP_ENV=production` and `PAYMENT_PROVIDER=demo` → throw and exit (FR-PAY-03). Unit-test it now.
@@ -155,12 +155,12 @@ kagaz/
 
 ### P1.3 — Storage + upload + PDF validation `[ ]`
 
-- `StorageService` interface (`createUploadUrl`, `createDownloadUrl`, `head`, `getObject`, `putObject`, `delete`) with S3 implementation (works with MinIO and R2).
+- `StorageService` interface (`createUploadUrl`, `createDownloadUrl`, `head`, `getObject`, `putObject`, `delete`) with S3 implementation (works with SeaweedFS locally and R2/S3).
 - `POST /api/orders/{id}/upload-url` → signed PUT (TTL 10 min, content-length limit, `application/pdf`), object key `orders/{orderId}/original/{uuid}.pdf` (no customer filename in key).
 - `POST /api/orders/{id}/upload-complete` → download object, check size, `%PDF-` magic bytes, load with pdf-lib (reject encrypted), parse with pdf.js for readability, count pages, enforce limits, compute SHA-256, create `FileAsset(ORIGINAL)`.
 - Error codes: `FILE_NOT_PDF`, `FILE_ENCRYPTED`, `FILE_CORRUPT`, `FILE_TOO_LARGE`, `FILE_TOO_MANY_PAGES`, `FILE_MISSING`.
 - Tests against [test corpus](#appendix-c--test-pdf-corpus).
-- **Done when:** valid PDF → page count + checksum stored; each invalid sample returns its specific error (T01, T02); direct unsigned GET to MinIO returns 403.
+- **Done when:** valid PDF → page count + checksum stored; each invalid sample returns its specific error (T01, T02); direct unsigned GET to the bucket returns 403.
 
 ### P1.4 — Order state machine + order endpoints `[ ]`
 
@@ -636,7 +636,7 @@ verify(shopId, input):
 | `PORT`                                      | `4000`                                          | API                                 |
 | `DATABASE_URL`                              | `postgresql://kagaz:kagaz@localhost:5432/kagaz` |                                     |
 | `PUBLIC_WEB_URL`                            | `http://localhost:3000`                         | CORS + links                        |
-| `S3_ENDPOINT`                               | `http://localhost:9000`                         | MinIO locally; R2 endpoint in cloud |
+| `S3_ENDPOINT`                               | `http://localhost:9000`                         | SeaweedFS locally; R2 endpoint in cloud |
 | `S3_REGION`                                 | `auto`                                          |                                     |
 | `S3_BUCKET`                                 | `kagaz-local`                                   | Private                             |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | —                                               | Secret                              |

@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "kagaz-local",
+      "credentials": [
+        {
+          "accessKey": "kagaz-local",
+          "secretKey": "kagaz-local-secret"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

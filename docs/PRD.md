@@ -714,7 +714,7 @@ Events are emitted **after** the DB transaction commits. Missing an event must n
 
 - **Modular monolith** NestJS API (single deployable) with internal modules: Identity & tenancy, Shop & printer registry, Pricing, Orders, Files, Payments, Print orchestration, Pickup, Notifications, Audit & operations.
 - **PostgreSQL** is the source of truth, including the durable print-job queue (row-level locking / conditional updates; no Redis in v1).
-- **Private object storage** (Cloudflare R2 or AWS S3; MinIO locally) for originals and packets; short-lived signed URLs.
+- **Private object storage** (Cloudflare R2 or AWS S3; SeaweedFS locally) for originals and packets; short-lived signed URLs.
 - **PDF processing** inside the API (pdf-lib + a parser such as pdf.js) to validate, count pages, build packets and slips.
 - **Realtime** via Socket.IO gateway + HTTPS polling fallback.
 - **Windows agent** (.NET / WPF) with outbound-only connections, local per-printer queue, printing via installed drivers and the Windows Print Spooler.
@@ -727,7 +727,7 @@ Events are emitted **after** the DB transaction commits. Missing an event must n
 | Customer + admin web | Next.js + React + TypeScript + Tailwind CSS                                 |
 | Cloud API            | NestJS + TypeScript (REST + WebSocket gateway)                              |
 | Database             | PostgreSQL + Prisma ORM                                                     |
-| File storage         | Cloudflare R2 private bucket (S3-compatible) or AWS S3; MinIO for local dev |
+| File storage         | Cloudflare R2 private bucket (S3-compatible) or AWS S3; SeaweedFS for local dev |
 | Realtime             | Socket.IO (NestJS gateway) + HTTPS polling fallback                         |
 | Windows app          | C# / .NET (LTS) / WPF                                                       |
 | PDF processing       | pdf-lib for merge/slip; parser for validation                               |
