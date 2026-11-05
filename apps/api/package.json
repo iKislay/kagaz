@@ -1,0 +1,42 @@
+{
+  "name": "@kagaz/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Kagaz cloud API (NestJS modular monolith).",
+  "type": "module",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "build": "pnpm prisma:generate && tsc -p tsconfig.build.json",
+    "dev": "pnpm build && concurrently -k -n tsc,api -c blue,green \"tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch --enable-source-maps dist/main.js\"",
+    "start": "node --enable-source-maps dist/main.js",
+    "typecheck": "pnpm prisma:generate && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm prisma:generate && vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1162.0",
+    "@kagaz/shared": "workspace:^",
+    "@nestjs/common": "^12",
+    "@nestjs/core": "^12",
+    "@nestjs/platform-express": "^12",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "nestjs-pino": "^5.3.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^12",
+    "@swc/core": "^1.16.22",
+    "@types/express": "^5",
+    "@types/supertest": "^7.2.1",
+    "concurrently": "^10.0.6",
+    "pino-pretty": "^13.2.0",
+    "prisma": "7.10.1",
+    "supertest": "^7.3.1",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^5"
+  }
+}
