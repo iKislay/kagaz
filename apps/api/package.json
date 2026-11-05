@@ -10,7 +10,11 @@
     "dev": "pnpm build && concurrently -k -n tsc,api -c blue,green \"tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch --enable-source-maps dist/main.js\"",
     "start": "node --enable-source-maps dist/main.js",
     "typecheck": "pnpm prisma:generate && tsc -p tsconfig.json --noEmit",
-    "test": "pnpm prisma:generate && vitest run"
+    "test": "pnpm prisma:generate && vitest run",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1162.0",
@@ -36,6 +40,7 @@
     "pino-pretty": "^13.2.0",
     "prisma": "7.10.1",
     "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
     "unplugin-swc": "^2.0.0",
     "vitest": "^5"
   }
