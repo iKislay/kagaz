@@ -131,6 +131,6 @@ Do **not** introduce without an explicit decision: microservices, Kubernetes, Re
 
 ## Status
 
-- Current phase: **Phase 0 — Foundation** (scaffold in place; see stage markers in the implementation plan).
+- Current phase: **Phase 0 — Foundation** complete (P0.1–P0.6). Next: Phase 1 vertical slice.
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
 - Payments: **DEMO only**; live gateway gated by **D6** (merchant of record).

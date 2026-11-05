@@ -123,7 +123,7 @@ kagaz/
 - Route stubs: `/` (shops), `/order/new`, `/order/[id]`, `/admin`.
 - **Done when:** `pnpm --filter web dev` shows the banner fetched from the running API.
 
-### P0.6 — Windows agent skeleton `[~]`
+### P0.6 — Windows agent skeleton `[x]`
 
 - `apps/shop-agent/Kagaz.ShopAgent.sln` (.NET LTS, WPF, x64) with projects `App`, `Core`, `Printing`, `Tests`.
 - CommunityToolkit.Mvvm, Serilog (rolling file in `%LOCALAPPDATA%\Kagaz\logs`), typed `HttpClient` with base URL from `appsettings.json`.
