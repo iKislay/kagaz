@@ -15,7 +15,7 @@ export interface TransitionParams {
   reason?: string;
   metadata?: Prisma.InputJsonValue;
   /** Extra columns to write in the same update (e.g. paidAt, quote, rejectionCode). */
-  data?: Omit<Prisma.OrderUpdateManyMutationInput, 'status' | 'version'>;
+  data?: Omit<Prisma.OrderUncheckedUpdateManyInput, 'id' | 'status' | 'version'>;
   /** Audit action name for human actors (defaults to order.<to lowercase>). */
   auditAction?: string;
 }
