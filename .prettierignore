@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+coverage
+pnpm-lock.yaml
+apps/shop-agent
+apps/api/src/generated
+docs/architecture.png
+.claude
+apps/web/next-env.d.ts

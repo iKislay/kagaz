@@ -1,0 +1,26 @@
+{
+  "name": "@kagaz/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Kagaz customer website and admin dashboard (Next.js).",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@kagaz/shared": "workspace:^",
+    "next": "^16",
+    "react": "^19",
+    "react-dom": "^19",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4"
+  }
+}

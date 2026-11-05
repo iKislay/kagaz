@@ -1,0 +1,29 @@
+{
+  "name": "kagaz",
+  "private": true,
+  "description": "Kagaz — multi-shop print-order orchestration platform",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @kagaz/shared build && pnpm --parallel --filter @kagaz/api --filter @kagaz/web dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "pnpm --filter @kagaz/shared build && pnpm -r typecheck",
+    "test": "pnpm --filter @kagaz/shared build && pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10",
+    "@types/node": "^24",
+    "eslint": "^10",
+    "globals": "^17.14.0",
+    "prettier": "^3",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72"
+  }
+}

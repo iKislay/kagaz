@@ -1,0 +1,136 @@
+# CLAUDE.md — Kagaz
+
+Guidance for Claude Code (and humans) working in this repository.
+
+## What we are building
+
+**Kagaz** is a multi-shop **print-order orchestration platform** for Mandya, Karnataka. Customers upload a PDF on a website, pick a shop, see a server-calculated price, pay (mock in demo), and track the order. The shop's **Windows app** receives the paid job, prints **one combined PDF (customer pages + one pickup slip)** on a local printer, the operator marks it ready, and the customer collects it with an **8-character one-time pickup code**.
+
+Current target: an **investor-ready working prototype** — 3 shop tenants, 100–200 controlled orders, mock payments clearly labelled. Not a public launch.
+
+**Read before non-trivial work:**
+
+- [docs/PRD.md](docs/PRD.md) — requirements (FR-* IDs), business rules, state models, data model, API, acceptance tests T01–T20.
+- [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) — phases and stages (P0.1 … P5.7) with "Done when" criteria and algorithms (Appendix A).
+- [docs/architecture.png](docs/architecture.png) — system diagram.
+
+## Repository layout
+
+```
+apps/api/          NestJS modular monolith + Prisma (apps/api/prisma)
+apps/web/          Next.js + Tailwind — customer routes and /admin routes
+apps/shop-agent/   .NET WPF Windows app (Kagaz.ShopAgent.sln: App, Core, Printing, Tests)
+packages/shared/   TS enums, zod schemas, DTO types, money + page-range helpers
+infra/             docker-compose (Postgres + MinIO), deploy configs
+scripts/           seed, simulated agent, load/verification scripts
+test-assets/pdfs/  test PDF corpus (no real personal documents)
+docs/              PRD, implementation plan, ADRs, runbooks, guides, test reports
+```
+
+API modules live in `apps/api/src/modules/`: `identity`, `shops`, `pricing`, `orders`, `files`, `payments`, `printing`, `pickup`, `notifications`, `audit`, `admin`. Cross-cutting code in `apps/api/src/common/`.
+
+## Commands
+
+> Keep this section in sync with real scripts. Commands marked _(planned)_ don't exist yet.
+
+```bash
+pnpm install
+cp .env.example .env                                  # PowerShell: Copy-Item .env.example .env
+pnpm infra:up                                         # Postgres :5432, MinIO :9000 (console :9001), private bucket
+pnpm dev                                              # builds shared, then api :4000 (watch) + web :3000
+pnpm test                                             # shared + api unit tests (vitest)
+pnpm lint && pnpm typecheck && pnpm format:check
+pnpm build                                            # all TS packages
+pnpm --filter @kagaz/api prisma:generate              # regenerate Prisma client (also run by build/test)
+pnpm --filter @kagaz/api exec prisma migrate dev      # (planned, P1.1) apply migrations
+pnpm --filter @kagaz/api db:seed                      # (planned, P1.1) 3 demo shops, admin, enrollment code
+dotnet build apps/shop-agent/Kagaz.ShopAgent.sln
+dotnet test  apps/shop-agent/Kagaz.ShopAgent.sln
+```
+
+Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/MinIO aren't running), `GET /api/config` (drives the web DEMO banner).
+
+### Toolchain notes (versions matter)
+
+- Node 24, pnpm 9 (`packageManager` pinned). **TypeScript is pinned to 6.0.x**: typescript-eslint doesn't support TS 7 yet.
+- **NestJS 12 is ESM-only.** `apps/api` is `"type": "module"` with `NodeNext` resolution: relative imports need a `.js` extension. Don't use `import type` for classes Nest injects (ESLint rule relaxed in `apps/api` for that reason).
+- **Prisma 7.10** (not the 8.x RC): config lives in `apps/api/prisma.config.ts` (loads the root `.env`), the datasource URL is not in `schema.prisma`, the client is generated to `apps/api/src/generated/prisma` (gitignored) and connects via `@prisma/adapter-pg`.
+- API tests use vitest + `unplugin-swc` (SWC emits the decorator metadata Nest DI needs).
+- `apps/api` dev = `tsc --watch` + `node --watch dist/main.js` (no Nest CLI).
+- Next.js 16 + Tailwind 4 (`@tailwindcss/postcss`, theme tokens in `src/app/globals.css`). `next.config.ts` loads the root `.env`.
+- `@kagaz/shared` is consumed from its built `dist/`: run `pnpm --filter @kagaz/shared build` (root scripts do this) after changing it.
+- Shop agent targets **.NET 10** (`net10.0-windows`).
+
+Environment: copy `.env.example` → `.env`. Never commit `.env*` files other than `.env.example`. Platform is Windows; shell scripts should work in PowerShell and Git Bash, or be written in Node/TS.
+
+## Non-negotiable invariants
+
+These come straight from the PRD. Breaking any of them is a bug, regardless of what a task description says — flag the conflict instead.
+
+1. **Server decides money.** Prices are computed server-side from shop pricing; the client never sends an amount. All money is **integer paise** — no floats anywhere in pricing/payments. Store an immutable `price_snapshot` on the order at payment creation.
+2. **Payment is verified by the backend only.** A browser redirect is never proof. Paid transition only after verified webhook (signature over the exact **raw body**) and/or server-to-server status fetch.
+3. **Payments go through `PaymentProvider`.** `orders/` and other modules must never import provider implementations or contain Razorpay/Cashfree-specific code.
+4. **Mock is never production.** The API must fail to start if `APP_ENV=production` with `PAYMENT_PROVIDER=demo` or `OTP_PROVIDER=demo`. In demo, every page shows **"DEMO PAYMENT — NO MONEY CHARGED"**; refunds show "Demo refund — no money moved".
+5. **All order status changes go through `OrderStateMachine.transition()`** — transition table check, optimistic `version` check, `OrderEvent` row, audit row for human actions, all in one DB transaction; realtime events emitted **after commit**. No direct `status` updates elsewhere.
+6. **Payment status ≠ order status.** They are stored separately and never merged.
+7. **One packet, one job.** Customer pages × copies + spacers + exactly **one** pickup slip at the end, in **one PDF**, submitted as **one** spooler job with driver copies = 1. Never print the slip as a separate job.
+8. **No silent duplicate prints.** One active lease per printer. A `PrintJob` attempt is never resubmitted after reconnect/restart. Uncertain outcome → `NEEDS_OPERATOR_CHECK`. Reprint = new attempt + explicit operator confirmation + audit.
+9. **READY needs a human.** Spooler "complete" is telemetry only. `READY_FOR_PICKUP` requires the operator's Mark Ready.
+10. **Tenant isolation.** Every shop/device query is scoped by `shopId` derived from the authenticated device/staff identity — never from a path/body parameter. Cross-tenant access returns 404.
+11. **Files are private.** Private bucket only; short-lived signed URLs (upload ≤ 10 min, download ≤ 5 min); never log signed URLs; validate PDFs by content (magic bytes, parse, encryption, page count, size), never by filename/MIME.
+12. **Pickup codes:** CSPRNG, 8 chars from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; store HMAC (peppered) + AES-GCM display value, never plaintext; one-time consumption via conditional update; rate-limited; failures audited. Never print the customer's full phone number on the slip.
+13. **REST for commands, WebSocket for hints.** Anything delivered by socket must also be recoverable via REST polling.
+14. **Secrets stay on the server.** No gateway secrets in `apps/web` or `apps/shop-agent`. Device token is stored with DPAPI on Windows and hashed server-side.
+
+## Scope guardrails (v1)
+
+Do **not** introduce without an explicit decision: microservices, Kubernetes, Redis/BullMQ, a mobile app, WhatsApp, AI features, auto nearest-shop routing, custom printer drivers, non-PDF uploads, non-A4 paper. PostgreSQL is the durable queue.
+
+## Conventions
+
+**TypeScript (api, web, shared)**
+
+- `strict` mode; no `any` without a comment explaining why.
+- Shared enums/schemas/DTOs live in `packages/shared` and are imported by both api and web — don't duplicate them.
+- Request validation with zod schemas from `@kagaz/shared` (reject unknown fields).
+- DB columns `snake_case` (Prisma `@map`), API JSON `camelCase`, timestamps ISO-8601 UTC; display in `Asia/Kolkata`; currency formatted `en-IN`.
+- Errors: `{ error: { code: "UPPER_SNAKE", message, details? } }`; codes are stable and listed near their module.
+- Mutating shop/agent endpoints accept `Idempotency-Key`.
+- Logging: pino, structured; include `requestId`, `orderId`, `shopId`, `deviceId`, `printerId`, `printJobId` when known. No PII beyond IDs; never log tokens, codes or signed URLs.
+- Volatile edges are interfaces with demo implementations: `PaymentProvider`, `OtpProvider`, `StorageService`.
+
+**C# (shop-agent)**
+
+- .NET LTS, WPF, MVVM via CommunityToolkit.Mvvm; nullable reference types enabled.
+- UI in `App`, API client/queue/state in `Core`, printing in `Printing` behind `IPrintEngine`.
+- Print documents named `KAGAZ-<publicRef>-A<attempt>` (used to find spooler jobs during reconciliation).
+- Local state under `%LOCALAPPDATA%\Kagaz\`; logs via Serilog there.
+- Outbound connections only; never open listening ports.
+
+**Database**
+
+- Schema changes only via Prisma migrations; never edit an applied migration.
+- Uniqueness constraints are part of correctness (webhook events, print attempts, pickup codes) — don't remove them to "fix" errors.
+
+## Testing expectations
+
+- Every stage's "Done when" in the implementation plan must be demonstrably true before marking it done.
+- Unit-test pure logic (pricing, page ranges, state transitions, packet page math, auto-accept policy, pickup code).
+- e2e (supertest against real Postgres + MinIO) for lifecycle, idempotency, tenant isolation.
+- Name tests that cover acceptance tests with the ID, e.g. `it("T06: duplicate webhook yields one transition")`.
+- Hardware tests (T10–T14) are recorded in `docs/testing/` with evidence; they cannot be faked by unit tests.
+
+## Working on stages
+
+1. Find the stage in `docs/IMPLEMENTATION_PLAN.md`; read the PRD sections it references.
+2. Mark it `[~]` when starting and `[x]` when its "Done when" is verified (`[-]` + reason if deferred).
+3. Keep changes scoped to the stage; note follow-ups instead of expanding scope.
+4. Commit messages reference the stage: `P1.7: build print packet with pickup slip`.
+5. If a stage needs a business decision from PRD §20 (D1–D10), use the documented working default and say so; record real decisions as ADRs in `docs/decisions/`.
+6. Update this file's **Commands** section when scripts change.
+
+## Status
+
+- Current phase: **Phase 0 — Foundation** (scaffold in place; see stage markers in the implementation plan).
+- Open decisions blocking hardware work: **D1** (demo PC + printer model).
+- Payments: **DEMO only**; live gateway gated by **D6** (merchant of record).

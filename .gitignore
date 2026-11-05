@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+coverage/
+apps/api/src/generated/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# PDFs (only the test corpus is committed)
+*.pdf
+!test-assets/pdfs/**/*.pdf
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+*.log
