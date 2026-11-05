@@ -4,7 +4,7 @@ import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
 
 /**
- * Private S3-compatible object storage (MinIO locally, Cloudflare R2 / AWS S3 in cloud).
+ * Private S3-compatible object storage (SeaweedFS locally, Cloudflare R2 / AWS S3 in cloud).
  * Phase 0: connectivity only. Signed URLs, upload validation and deletion arrive in P1.3.
  * The bucket must never be public; signed URLs are bearer secrets and must never be logged.
  */

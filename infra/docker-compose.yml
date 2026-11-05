@@ -1,5 +1,6 @@
 # Local development infrastructure for Kagaz.
-# Postgres = source of truth; MinIO = S3-compatible private object storage (R2/S3 in cloud envs).
+# Postgres = source of truth; SeaweedFS = S3-compatible private object storage (R2/S3 in cloud envs).
+# MinIO was the original choice, but its community images are no longer published.
 name: kagaz
 
 services:
@@ -20,40 +21,42 @@ services:
       timeout: 3s
       retries: 20
 
-  minio:
-    # Pinned: MinIO no longer publishes new community images; this release is sufficient for local S3.
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+  # S3 API on host port 9000 (container 8333). Only the identity in seaweedfs/s3.json can
+  # access buckets; there is no anonymous identity, so every bucket is private.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.51
     restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: kagaz-local
-      MINIO_ROOT_PASSWORD: kagaz-local-secret
+    command: >
+      server -dir=/data -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=128
+      -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '9000:8333'
     volumes:
-      - miniodata:/data
-    healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
-      interval: 5s
-      timeout: 3s
-      retries: 20
+      - seaweeddata:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
 
-  # One-shot: creates the private bucket. Anonymous access stays disabled (private by default).
-  minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+  # One-shot: waits for the S3 API, then creates the private bucket (idempotent).
+  storage-init:
+    image: amazon/aws-cli:2.39.2
     depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 kagaz-local kagaz-local-secret &&
-      mc mb --ignore-existing local/kagaz-local &&
-      mc anonymous set none local/kagaz-local &&
-      echo 'bucket kagaz-local ready (private)'
-      "
+      - seaweedfs
+    environment:
+      AWS_ACCESS_KEY_ID: kagaz-local
+      AWS_SECRET_ACCESS_KEY: kagaz-local-secret
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        for i in $$(seq 1 60); do
+          if aws --endpoint-url http://seaweedfs:8333 s3api head-bucket --bucket kagaz-local 2>/dev/null; then
+            echo 'bucket kagaz-local ready (private)'; exit 0
+          fi
+          aws --endpoint-url http://seaweedfs:8333 s3api create-bucket --bucket kagaz-local >/dev/null 2>&1 || true
+          sleep 2
+        done
+        echo 'storage-init: S3 API did not become ready' >&2; exit 1
     restart: 'no'
 
 volumes:
   pgdata:
-  miniodata:
+  seaweeddata:

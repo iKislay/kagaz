@@ -21,7 +21,7 @@ apps/api/          NestJS modular monolith + Prisma (apps/api/prisma)
 apps/web/          Next.js + Tailwind — customer routes and /admin routes
 apps/shop-agent/   .NET WPF Windows app (Kagaz.ShopAgent.sln: App, Core, Printing, Tests)
 packages/shared/   TS enums, zod schemas, DTO types, money + page-range helpers
-infra/             docker-compose (Postgres + MinIO), deploy configs
+infra/             docker-compose (Postgres + SeaweedFS S3), deploy configs
 scripts/           seed, simulated agent, load/verification scripts
 test-assets/pdfs/  test PDF corpus (no real personal documents)
 docs/              PRD, implementation plan, ADRs, runbooks, guides, test reports
@@ -36,7 +36,7 @@ API modules live in `apps/api/src/modules/`: `identity`, `shops`, `pricing`, `or
 ```bash
 pnpm install
 cp .env.example .env                                  # PowerShell: Copy-Item .env.example .env
-pnpm infra:up                                         # Postgres :5432, MinIO :9000 (console :9001), private bucket
+pnpm infra:up                                         # Postgres :5432, SeaweedFS S3 API :9000, private bucket
 pnpm dev                                              # builds shared, then api :4000 (watch) + web :3000
 pnpm test                                             # shared + api unit tests (vitest)
 pnpm lint && pnpm typecheck && pnpm format:check
@@ -48,7 +48,7 @@ dotnet build apps/shop-agent/Kagaz.ShopAgent.sln
 dotnet test  apps/shop-agent/Kagaz.ShopAgent.sln
 ```
 
-Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/MinIO aren't running), `GET /api/config` (drives the web DEMO banner).
+Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/SeaweedFS aren't running), `GET /api/config` (drives the web DEMO banner).
 
 ### Toolchain notes (versions matter)
 
@@ -116,7 +116,7 @@ Do **not** introduce without an explicit decision: microservices, Kubernetes, Re
 
 - Every stage's "Done when" in the implementation plan must be demonstrably true before marking it done.
 - Unit-test pure logic (pricing, page ranges, state transitions, packet page math, auto-accept policy, pickup code).
-- e2e (supertest against real Postgres + MinIO) for lifecycle, idempotency, tenant isolation.
+- e2e (supertest against real Postgres + SeaweedFS) for lifecycle, idempotency, tenant isolation.
 - Name tests that cover acceptance tests with the ID, e.g. `it("T06: duplicate webhook yields one transition")`.
 - Hardware tests (T10–T14) are recorded in `docs/testing/` with evidence; they cannot be faked by unit tests.
 
