@@ -722,17 +722,17 @@ Events are emitted **after** the DB transaction commits. Missing an event must n
 
 ### 15.1 Technology stack
 
-| Layer                | Choice                                                                      |
-| -------------------- | --------------------------------------------------------------------------- |
-| Customer + admin web | Next.js + React + TypeScript + Tailwind CSS                                 |
-| Cloud API            | NestJS + TypeScript (REST + WebSocket gateway)                              |
-| Database             | PostgreSQL + Prisma ORM                                                     |
+| Layer                | Choice                                                                          |
+| -------------------- | ------------------------------------------------------------------------------- |
+| Customer + admin web | Next.js + React + TypeScript + Tailwind CSS                                     |
+| Cloud API            | NestJS + TypeScript (REST + WebSocket gateway)                                  |
+| Database             | PostgreSQL + Prisma ORM                                                         |
 | File storage         | Cloudflare R2 private bucket (S3-compatible) or AWS S3; SeaweedFS for local dev |
-| Realtime             | Socket.IO (NestJS gateway) + HTTPS polling fallback                         |
-| Windows app          | C# / .NET (LTS) / WPF                                                       |
-| PDF processing       | pdf-lib for merge/slip; parser for validation                               |
-| Deployment           | Docker; managed PostgreSQL; managed object storage; HTTPS domain            |
-| Monitoring           | Structured logs + error tracking + uptime/health checks                     |
+| Realtime             | Socket.IO (NestJS gateway) + HTTPS polling fallback                             |
+| Windows app          | C# / .NET (LTS) / WPF                                                           |
+| PDF processing       | pdf-lib for merge/slip; parser for validation                                   |
+| Deployment           | Docker; managed PostgreSQL; managed object storage; HTTPS domain                |
+| Monitoring           | Structured logs + error tracking + uptime/health checks                         |
 
 **Explicitly avoided in v1:** microservices, Kubernetes, student mobile app, Redis, AI, automatic nearest-printer routing, custom printer driver.
 
