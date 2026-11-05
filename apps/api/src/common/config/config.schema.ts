@@ -12,7 +12,8 @@ const secret = (name: string) =>
  */
 export const EnvSchema = z.object({
   APP_ENV: AppEnvSchema,
-  PORT: int(4000),
+  // Not PORT: dev tooling sets PORT for the web server, which would hijack the API port.
+  API_PORT: int(4000),
   PUBLIC_WEB_URL: z.url(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 

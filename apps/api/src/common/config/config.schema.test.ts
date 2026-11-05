@@ -19,7 +19,7 @@ const base = {
 describe('loadConfig', () => {
   it('accepts a valid local config and applies defaults', () => {
     const config = loadConfig(base);
-    expect(config.PORT).toBe(4000);
+    expect(config.API_PORT).toBe(4000);
     expect(config.MAX_UPLOAD_BYTES).toBe(26_214_400);
     expect(config.S3_FORCE_PATH_STYLE).toBe(false);
   });
