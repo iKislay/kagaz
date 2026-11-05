@@ -42,8 +42,10 @@ pnpm test                                             # shared + api unit tests 
 pnpm lint && pnpm typecheck && pnpm format:check
 pnpm build                                            # all TS packages
 pnpm --filter @kagaz/api prisma:generate              # regenerate Prisma client (also run by build/test)
-pnpm --filter @kagaz/api exec prisma migrate dev      # (planned, P1.1) apply migrations
-pnpm --filter @kagaz/api db:seed                      # (planned, P1.1) 3 demo shops, admin, enrollment code
+pnpm --filter @kagaz/api db:migrate                   # apply/create migrations (dev DB)
+pnpm --filter @kagaz/api db:seed                      # 3 demo shops, staff, prints a device pairing code
+pnpm --filter @kagaz/api test:e2e                     # e2e vs real Postgres + S3 (isolated <db>_test DB)
+pnpm --filter @kagaz/api demo:order -- --pages 3 --copies 2   # place a paid DEMO order via the API
 dotnet build apps/shop-agent/Kagaz.ShopAgent.sln
 dotnet test  apps/shop-agent/Kagaz.ShopAgent.sln
 ```
