@@ -630,32 +630,32 @@ verify(shopId, input):
 
 ## Appendix B — Environment variables
 
-| Variable                                    | Example                                         | Notes                               |
-| ------------------------------------------- | ----------------------------------------------- | ----------------------------------- |
-| `APP_ENV`                                   | `local` \| `demo` \| `staging` \| `production`  | Drives guards                       |
-| `PORT`                                      | `4000`                                          | API                                 |
-| `DATABASE_URL`                              | `postgresql://kagaz:kagaz@localhost:5432/kagaz` |                                     |
-| `PUBLIC_WEB_URL`                            | `http://localhost:3000`                         | CORS + links                        |
+| Variable                                    | Example                                         | Notes                                   |
+| ------------------------------------------- | ----------------------------------------------- | --------------------------------------- |
+| `APP_ENV`                                   | `local` \| `demo` \| `staging` \| `production`  | Drives guards                           |
+| `PORT`                                      | `4000`                                          | API                                     |
+| `DATABASE_URL`                              | `postgresql://kagaz:kagaz@localhost:5432/kagaz` |                                         |
+| `PUBLIC_WEB_URL`                            | `http://localhost:3000`                         | CORS + links                            |
 | `S3_ENDPOINT`                               | `http://localhost:9000`                         | SeaweedFS locally; R2 endpoint in cloud |
-| `S3_REGION`                                 | `auto`                                          |                                     |
-| `S3_BUCKET`                                 | `kagaz-local`                                   | Private                             |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | —                                               | Secret                              |
-| `UPLOAD_URL_TTL_SECONDS`                    | `600`                                           |                                     |
-| `DOWNLOAD_URL_TTL_SECONDS`                  | `300`                                           |                                     |
-| `MAX_UPLOAD_BYTES`                          | `26214400`                                      | 25 MB                               |
-| `MAX_PAGES` / `MAX_COPIES` / `MAX_SIDES`    | `300` / `20` / `1000`                           |                                     |
-| `PAYMENT_PROVIDER`                          | `demo` \| `razorpay` \| `cashfree`              | `demo` forbidden in production      |
-| `DEMO_WEBHOOK_SECRET`                       | —                                               | Mock webhook signing                |
-| `OTP_PROVIDER`                              | `demo`                                          | `demo` forbidden in production      |
-| `SESSION_JWT_SECRET`                        | —                                               | Secret                              |
-| `PICKUP_CODE_PEPPER`                        | —                                               | Secret, 32+ bytes                   |
-| `PICKUP_CODE_ENC_KEY`                       | —                                               | Secret, 32 bytes base64             |
-| `PRINTER_LEASE_TTL_SECONDS`                 | `60`                                            |                                     |
-| `DEVICE_ONLINE_THRESHOLD_SECONDS`           | `45`                                            |                                     |
-| `RETENTION_AFTER_COLLECTED_HOURS`           | `24`                                            |                                     |
-| `UNPAID_ORDER_EXPIRY_HOURS`                 | `24`                                            |                                     |
-| `SENTRY_DSN`                                | —                                               | Optional                            |
-| `NEXT_PUBLIC_API_URL`                       | `http://localhost:4000/api`                     | Web                                 |
+| `S3_REGION`                                 | `auto`                                          |                                         |
+| `S3_BUCKET`                                 | `kagaz-local`                                   | Private                                 |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | —                                               | Secret                                  |
+| `UPLOAD_URL_TTL_SECONDS`                    | `600`                                           |                                         |
+| `DOWNLOAD_URL_TTL_SECONDS`                  | `300`                                           |                                         |
+| `MAX_UPLOAD_BYTES`                          | `26214400`                                      | 25 MB                                   |
+| `MAX_PAGES` / `MAX_COPIES` / `MAX_SIDES`    | `300` / `20` / `1000`                           |                                         |
+| `PAYMENT_PROVIDER`                          | `demo` \| `razorpay` \| `cashfree`              | `demo` forbidden in production          |
+| `DEMO_WEBHOOK_SECRET`                       | —                                               | Mock webhook signing                    |
+| `OTP_PROVIDER`                              | `demo`                                          | `demo` forbidden in production          |
+| `SESSION_JWT_SECRET`                        | —                                               | Secret                                  |
+| `PICKUP_CODE_PEPPER`                        | —                                               | Secret, 32+ bytes                       |
+| `PICKUP_CODE_ENC_KEY`                       | —                                               | Secret, 32 bytes base64                 |
+| `PRINTER_LEASE_TTL_SECONDS`                 | `60`                                            |                                         |
+| `DEVICE_ONLINE_THRESHOLD_SECONDS`           | `45`                                            |                                         |
+| `RETENTION_AFTER_COLLECTED_HOURS`           | `24`                                            |                                         |
+| `UNPAID_ORDER_EXPIRY_HOURS`                 | `24`                                            |                                         |
+| `SENTRY_DSN`                                | —                                               | Optional                                |
+| `NEXT_PUBLIC_API_URL`                       | `http://localhost:4000/api`                     | Web                                     |
 
 Windows agent `appsettings.json`: `ApiBaseUrl`, `PollIntervalSeconds` (10), `HeartbeatSeconds` (15), `PrintEngine` (`Pdfium` | `Sumatra`), `MaxRenderDpi` (300). Device token is **not** in this file — it's in the DPAPI store.
 
