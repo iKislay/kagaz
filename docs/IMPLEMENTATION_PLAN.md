@@ -139,21 +139,21 @@ kagaz/
 
 **Simplifications allowed in this phase (removed later):** guest customer with tracking link (no OTP), polling instead of WebSocket, device token from seed/enrollment code without operator login, single printer per shop, no lease expiry handling, synchronous packet build.
 
-### P1.1 — Database schema v1 + seed `[ ]`
+### P1.1 — Database schema v1 + seed `[x]`
 
 - Prisma schema with **all** PRD §10 entities, enums, constraints and indexes (unique `public_ref`, `(provider, provider_event_id)`, `(order_id, attempt)`, `pickup_code.order_id`; `shop_id` indexes; `Order.version` for optimistic locking).
 - Initial migration.
 - Seed script: 3 demo shops in Mandya (e.g. "Kagaz Demo — PES College Gate", "Kagaz Demo — Mandya Bus Stand", "Kagaz Demo — VV Nagar"), `is_demo=true`, `OPEN`, `MANUAL` mode; pricing (e.g. mono ₹2/side = 200 paise, colour ₹10/side, min ₹5); one admin user; one owner + one operator per shop; one printer record for Shop 1; a one-time enrollment code for Shop 1 printed to console.
 - **Done when:** `pnpm --filter api prisma migrate dev && pnpm --filter api db:seed` produces 3 shops; re-running seed is idempotent.
 
-### P1.2 — Pricing module + quote `[ ]`
+### P1.2 — Pricing module + quote `[x]`
 
 - Pure function `calculateQuote(pricing, options, pageCount)` implementing PRD §8.2 in integer paise.
 - `PricingService.getEffectivePricing(shopId, at)`.
 - Unit tests: mono/colour, copies, page ranges, minimum charge, duplex rules, zero/negative/overflow guards, no floats.
 - **Done when:** tests cover every branch of the formula (T03 logic).
 
-### P1.3 — Storage + upload + PDF validation `[ ]`
+### P1.3 — Storage + upload + PDF validation `[x]`
 
 - `StorageService` interface (`createUploadUrl`, `createDownloadUrl`, `head`, `getObject`, `putObject`, `delete`) with S3 implementation (works with SeaweedFS locally and R2/S3).
 - `POST /api/orders/{id}/upload-url` → signed PUT (TTL 10 min, content-length limit, `application/pdf`), object key `orders/{orderId}/original/{uuid}.pdf` (no customer filename in key).
@@ -162,7 +162,7 @@ kagaz/
 - Tests against [test corpus](#appendix-c--test-pdf-corpus).
 - **Done when:** valid PDF → page count + checksum stored; each invalid sample returns its specific error (T01, T02); direct unsigned GET to the bucket returns 403.
 
-### P1.4 — Order state machine + order endpoints `[ ]`
+### P1.4 — Order state machine + order endpoints `[x]`
 
 - `OrderStateMachine.transition(orderId, to, actor, {reason, metadata, expectedVersion})`: validates against the transition table (PRD §9.1), conditional update on `version`, writes `OrderEvent`, all inside one Prisma transaction; emits domain event after commit.
 - `POST /api/orders` (shopId, options) → `DRAFT`, `public_ref` (`KGZ-` + 6 chars from the pickup alphabet), tracking token (random 32 bytes, stored hashed, returned once).
@@ -172,7 +172,7 @@ kagaz/
 - Unit tests: every allowed transition, every forbidden transition throws, concurrent transition (stale version) fails cleanly.
 - **Done when:** draft → upload → awaiting payment works via HTTP; forbidden transitions rejected.
 
-### P1.5 — Payment interface + DemoMockProvider `[ ]`
+### P1.5 — Payment interface + DemoMockProvider `[x]`
 
 - `PaymentProvider` interface exactly as PRD §8.7; `PAYMENT_PROVIDER` token resolved by config.
 - `DemoMockProvider.createPayment` → returns `{ providerOrderId: "DEMO-ORD-<ref>", mode: "DEMO_AUTO_APPROVE" }`; then `PaymentsService` records verification via `fetchPaymentStatus` (mock returns PAID, `providerPaymentId: "DEMO-PAY-<ref>"`) **inside the backend**.
@@ -189,7 +189,7 @@ kagaz/
 - Mobile-first layout (360 px).
 - **Done when:** a full order reaches `PENDING_REVIEW` from a phone-sized browser with no console errors.
 
-### P1.7 — Pickup code + slip + packet builder `[ ]`
+### P1.7 — Pickup code + slip + packet builder `[x]`
 
 - `PickupCodeService.generate()` — CSPRNG over `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, 8 chars; store `HMAC-SHA256(pepper, code)` and AES-256-GCM encrypted display value.
 - `SlipRenderer` (pdf-lib, embedded font + logo) per PRD §8.6.
@@ -197,7 +197,7 @@ kagaz/
 - Unit tests: page count of packet for simplex/duplex × odd/even × copies; slip is last page; slip text contains code & ref; no phone number.
 - **Done when:** a generated packet opened in a PDF viewer shows pages × copies, correct spacers and one slip at the end.
 
-### P1.8 — Shop/device API (slice) `[ ]`
+### P1.8 — Shop/device API (slice) `[x]`
 
 - `POST /api/devices/enroll` (enrollment code → device token; store SHA-256 hash; code single-use).
 - `DeviceAuthGuard` resolves `shopId` + `deviceId` from `Authorization: Bearer <deviceToken>`; every shop endpoint uses that `shopId` (never a path param).
