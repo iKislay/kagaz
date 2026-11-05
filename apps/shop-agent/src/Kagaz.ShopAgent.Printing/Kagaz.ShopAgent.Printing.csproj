@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Kagaz.ShopAgent.Printing</RootNamespace>
+    <AssemblyName>Kagaz.ShopAgent.Printing</AssemblyName>
+  </PropertyGroup>
+</Project>
