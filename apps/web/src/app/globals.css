@@ -1,14 +1,120 @@
 @import 'tailwindcss';
 
-@theme {
-  --color-brand: #1f4e79;
-  --color-brand-ink: #0f2a44;
-  --color-demo: #b45309;
-  --color-demo-bg: #fef3c7;
+/*
+ * Kagaz design language — macOS-style, shared with the Windows shop app.
+ * Source of truth: CLAUDE.md "Design language". Use these tokens; don't add ad-hoc colors.
+ */
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --sidebar: rgba(236, 236, 239, 0.72);
+  --toolbar: rgba(245, 245, 247, 0.72);
+  --text: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --separator: rgba(0, 0, 0, 0.1);
+  --selection: rgba(0, 0, 0, 0.07);
+  --accent: #007aff;
+  --accent-hover: #0068d9;
+  --green: #34c759;
+  --orange: #ff9500;
+  --red: #ff3b30;
+  --notice-bg: rgba(255, 204, 0, 0.16);
+  --notice-text: #8a5a00;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1e;
+    --surface: #2c2c2e;
+    --sidebar: rgba(35, 35, 37, 0.72);
+    --toolbar: rgba(28, 28, 30, 0.72);
+    --text: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --separator: rgba(255, 255, 255, 0.12);
+    --selection: rgba(255, 255, 255, 0.1);
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --green: #30d158;
+    --orange: #ff9f0a;
+    --red: #ff453a;
+    --notice-bg: rgba(255, 214, 10, 0.14);
+    --notice-text: #ffd60a;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
+  --color-toolbar: var(--toolbar);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-separator: var(--separator);
+  --color-selection: var(--selection);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-green: var(--green);
+  --color-orange: var(--orange);
+  --color-red: var(--red);
+  --color-notice: var(--notice-bg);
+  --color-notice-text: var(--notice-text);
+  --shadow-card: var(--shadow-card);
+  --radius-card: 12px;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', var(--font-inter), 'Segoe UI Variable Text',
+    system-ui, sans-serif;
 }
 
 html,
 body {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Reusable macOS-style primitives */
+@layer components {
+  .mac-card {
+    background: var(--surface);
+    border: 1px solid var(--separator);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .mac-title {
+    font-size: 28px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .mac-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 9999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 9px 20px;
+    transition:
+      background-color 120ms ease,
+      transform 120ms ease;
+  }
+  .mac-button:hover {
+    background: var(--accent-hover);
+  }
+  .mac-button:active {
+    transform: scale(0.98);
+  }
+  .mac-button:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    outline-offset: 2px;
+  }
 }

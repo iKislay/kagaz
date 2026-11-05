@@ -2,8 +2,9 @@ import { DEMO_PAYMENT_BANNER, PaymentMode } from '@kagaz/shared';
 import { getPublicConfig } from '@/lib/api';
 
 /**
- * Persistent banner driven by GET /api/config (PRD FR-CUST-09).
- * While payments are simulated it is always shown; it cannot be dismissed.
+ * Persistent notice driven by GET /api/config (PRD FR-CUST-09).
+ * While payments are simulated it is always shown and cannot be dismissed — styled as a calm
+ * macOS-style notice bar (CLAUDE.md "Design language"), not an alarm.
  * If the API is unreachable we cannot prove payments are live, so we say so instead.
  */
 export async function DemoBanner() {
@@ -19,8 +20,9 @@ export async function DemoBanner() {
       <div
         role="status"
         data-testid="demo-banner"
-        className="sticky top-0 z-50 border-b border-demo/30 bg-demo-bg px-4 py-2 text-center text-sm font-semibold tracking-wide text-demo"
+        className="border-t border-separator bg-notice px-4 py-1.5 text-center text-[12px] font-semibold tracking-wide text-notice-text"
       >
+        <span className="mr-2 rounded-full bg-notice-text/15 px-2 py-0.5 text-[10px]">DEMO</span>
         {DEMO_PAYMENT_BANNER}
       </div>
     );
@@ -30,9 +32,9 @@ export async function DemoBanner() {
     <div
       role="alert"
       data-testid="api-unreachable-banner"
-      className="sticky top-0 z-50 border-b border-red-300 bg-red-50 px-4 py-2 text-center text-sm font-semibold text-red-700"
+      className="border-t border-separator bg-red/10 px-4 py-1.5 text-center text-[12px] font-semibold text-red"
     >
-      Cannot reach the Kagaz service right now. Ordering is unavailable.
+      Can&apos;t reach the Kagaz service right now. Ordering is unavailable.
     </div>
   );
 }

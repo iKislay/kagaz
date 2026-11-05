@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
 import Link from 'next/link';
 import { DemoBanner } from '@/components/DemoBanner';
 import './globals.css';
+
+// Fallback for non-Apple devices; Apple devices use SF via -apple-system (see globals.css).
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Kagaz — print it, pick it up',
@@ -11,6 +15,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f5f5f7' },
+    { media: '(prefers-color-scheme: dark)', color: '#1c1c1e' },
+  ],
 };
 
 // The banner reads live config from the API on every request.
@@ -18,18 +26,22 @@ export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-IN">
-      <body className="min-h-screen antialiased">
-        <DemoBanner />
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-            <Link href="/" className="text-xl font-bold tracking-tight text-brand">
-              Kagaz
+    <html lang="en-IN" className={inter.variable}>
+      <body className="min-h-screen">
+        {/* macOS-style translucent toolbar */}
+        <header className="sticky top-0 z-40 border-b border-separator bg-toolbar backdrop-blur-xl backdrop-saturate-150">
+          <div className="mx-auto flex h-13 max-w-3xl items-center justify-between px-4">
+            <Link href="/" className="flex items-center gap-2.5">
+              <span className="grid size-7 place-items-center rounded-lg bg-accent text-sm font-bold text-white">
+                K
+              </span>
+              <span className="text-[15px] font-semibold tracking-tight">Kagaz</span>
             </Link>
-            <span className="text-xs text-slate-500">Mandya</span>
+            <span className="text-[13px] text-text-secondary">Mandya</span>
           </div>
+          <DemoBanner />
         </header>
-        <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
+        <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>
       </body>
     </html>
   );
