@@ -12,6 +12,8 @@
   <ItemGroup>
     <ProjectReference Include="../Kagaz.ShopAgent.Core/Kagaz.ShopAgent.Core.csproj" />
     <ProjectReference Include="../Kagaz.ShopAgent.Printing/Kagaz.ShopAgent.Printing.csproj" />
+    <!-- Ships Kagaz.ShopAgent.PrintHost.exe next to the app; printing runs in that process. -->
+    <ProjectReference Include="../Kagaz.ShopAgent.PrintHost/Kagaz.ShopAgent.PrintHost.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
