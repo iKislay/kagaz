@@ -21,6 +21,7 @@ const config = loadConfig({
   OTP_PROVIDER: 'demo',
   SESSION_JWT_SECRET: 'x'.repeat(32),
   PICKUP_CODE_PEPPER: 'y'.repeat(32),
+  PICKUP_CODE_ENC_KEY: Buffer.alloc(32, 1).toString('base64'),
 });
 
 async function makeApp(dbOk: boolean, storageOk: boolean): Promise<INestApplication> {

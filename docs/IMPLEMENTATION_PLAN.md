@@ -139,21 +139,21 @@ kagaz/
 
 **Simplifications allowed in this phase (removed later):** guest customer with tracking link (no OTP), polling instead of WebSocket, device token from seed/enrollment code without operator login, single printer per shop, no lease expiry handling, synchronous packet build.
 
-### P1.1 — Database schema v1 + seed `[ ]`
+### P1.1 — Database schema v1 + seed `[x]`
 
 - Prisma schema with **all** PRD §10 entities, enums, constraints and indexes (unique `public_ref`, `(provider, provider_event_id)`, `(order_id, attempt)`, `pickup_code.order_id`; `shop_id` indexes; `Order.version` for optimistic locking).
 - Initial migration.
 - Seed script: 3 demo shops in Mandya (e.g. "Kagaz Demo — PES College Gate", "Kagaz Demo — Mandya Bus Stand", "Kagaz Demo — VV Nagar"), `is_demo=true`, `OPEN`, `MANUAL` mode; pricing (e.g. mono ₹2/side = 200 paise, colour ₹10/side, min ₹5); one admin user; one owner + one operator per shop; one printer record for Shop 1; a one-time enrollment code for Shop 1 printed to console.
 - **Done when:** `pnpm --filter api prisma migrate dev && pnpm --filter api db:seed` produces 3 shops; re-running seed is idempotent.
 
-### P1.2 — Pricing module + quote `[ ]`
+### P1.2 — Pricing module + quote `[x]`
 
 - Pure function `calculateQuote(pricing, options, pageCount)` implementing PRD §8.2 in integer paise.
 - `PricingService.getEffectivePricing(shopId, at)`.
 - Unit tests: mono/colour, copies, page ranges, minimum charge, duplex rules, zero/negative/overflow guards, no floats.
 - **Done when:** tests cover every branch of the formula (T03 logic).
 
-### P1.3 — Storage + upload + PDF validation `[ ]`
+### P1.3 — Storage + upload + PDF validation `[x]`
 
 - `StorageService` interface (`createUploadUrl`, `createDownloadUrl`, `head`, `getObject`, `putObject`, `delete`) with S3 implementation (works with SeaweedFS locally and R2/S3).
 - `POST /api/orders/{id}/upload-url` → signed PUT (TTL 10 min, content-length limit, `application/pdf`), object key `orders/{orderId}/original/{uuid}.pdf` (no customer filename in key).
@@ -162,7 +162,7 @@ kagaz/
 - Tests against [test corpus](#appendix-c--test-pdf-corpus).
 - **Done when:** valid PDF → page count + checksum stored; each invalid sample returns its specific error (T01, T02); direct unsigned GET to the bucket returns 403.
 
-### P1.4 — Order state machine + order endpoints `[ ]`
+### P1.4 — Order state machine + order endpoints `[x]`
 
 - `OrderStateMachine.transition(orderId, to, actor, {reason, metadata, expectedVersion})`: validates against the transition table (PRD §9.1), conditional update on `version`, writes `OrderEvent`, all inside one Prisma transaction; emits domain event after commit.
 - `POST /api/orders` (shopId, options) → `DRAFT`, `public_ref` (`KGZ-` + 6 chars from the pickup alphabet), tracking token (random 32 bytes, stored hashed, returned once).
@@ -172,7 +172,7 @@ kagaz/
 - Unit tests: every allowed transition, every forbidden transition throws, concurrent transition (stale version) fails cleanly.
 - **Done when:** draft → upload → awaiting payment works via HTTP; forbidden transitions rejected.
 
-### P1.5 — Payment interface + DemoMockProvider `[ ]`
+### P1.5 — Payment interface + DemoMockProvider `[x]`
 
 - `PaymentProvider` interface exactly as PRD §8.7; `PAYMENT_PROVIDER` token resolved by config.
 - `DemoMockProvider.createPayment` → returns `{ providerOrderId: "DEMO-ORD-<ref>", mode: "DEMO_AUTO_APPROVE" }`; then `PaymentsService` records verification via `fetchPaymentStatus` (mock returns PAID, `providerPaymentId: "DEMO-PAY-<ref>"`) **inside the backend**.
@@ -180,7 +180,7 @@ kagaz/
 - Price snapshot written when payment is created.
 - **Done when:** paying twice yields one payment and one `PENDING_REVIEW` event (T04 core); request body `amount` is ignored.
 
-### P1.6 — Customer website flow `[ ]`
+### P1.6 — Customer website flow `[x]`
 
 - `/`: shop cards (name, address, status, rates, DEMO tag).
 - `/order/new?shop=`: upload (direct PUT with progress) → validation result → options form (copies, B/W/colour; duplex + page range may be shown if ready) → live server quote with breakdown.
@@ -189,7 +189,7 @@ kagaz/
 - Mobile-first layout (360 px).
 - **Done when:** a full order reaches `PENDING_REVIEW` from a phone-sized browser with no console errors.
 
-### P1.7 — Pickup code + slip + packet builder `[ ]`
+### P1.7 — Pickup code + slip + packet builder `[x]`
 
 - `PickupCodeService.generate()` — CSPRNG over `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, 8 chars; store `HMAC-SHA256(pepper, code)` and AES-256-GCM encrypted display value.
 - `SlipRenderer` (pdf-lib, embedded font + logo) per PRD §8.6.
@@ -197,7 +197,7 @@ kagaz/
 - Unit tests: page count of packet for simplex/duplex × odd/even × copies; slip is last page; slip text contains code & ref; no phone number.
 - **Done when:** a generated packet opened in a PDF viewer shows pages × copies, correct spacers and one slip at the end.
 
-### P1.8 — Shop/device API (slice) `[ ]`
+### P1.8 — Shop/device API (slice) `[x]`
 
 - `POST /api/devices/enroll` (enrollment code → device token; store SHA-256 hash; code single-use).
 - `DeviceAuthGuard` resolves `shopId` + `deviceId` from `Authorization: Bearer <deviceToken>`; every shop endpoint uses that `shopId` (never a path param).
@@ -211,7 +211,7 @@ kagaz/
 - e2e tests (supertest) for the full happy path and double-pickup rejection (T15).
 - **Done when:** the whole lifecycle can be driven by HTTP calls alone.
 
-### P1.9 — Windows app: pairing + job list + actions `[ ]`
+### P1.9 — Windows app: pairing + job list + actions `[x]`
 
 - Pairing screen: API URL + enrollment code → stores device token via DPAPI.
 - Jobs screen: polls `GET /api/shop/jobs` every 5 s; tabs Pending / Queue / Printing / Ready; toast + sound on new pending job.
@@ -219,7 +219,7 @@ kagaz/
 - Printer setup: list installed printers (`PrinterSettings.InstalledPrinters`), operator picks the shop printer and confirms colour/duplex; `PUT /api/shop/printers`.
 - **Done when:** a paid web order appears within 5 s and can be accepted/rejected from the app.
 
-### P1.10 — Windows app: print engine + ready + pickup `[ ]`
+### P1.10 — Windows app: print engine + ready + pickup `[~]`
 
 - `IPrintEngine.PrintAsync(pdfPath, PrintRequest{ printerName, colour, duplex, paper=A4, copies=1, documentName })`.
 - Implementation (see [Appendix A.4](#a4-windows-print-engine)): render PDF pages with PDFium and print through a single `PrintDocument` job with explicit `PrinterSettings` (duplex, colour, A4, copies=1) and `DocumentName = KAGAZ-<ref>-A<attempt>`. Keep a fallback engine (SumatraPDF CLI) behind config for the demo if PDFium rendering misbehaves on the chosen printer.
@@ -228,6 +228,7 @@ kagaz/
 - **Mark Ready** button with confirmation "I have checked the printed stack and the pickup slip".
 - **Verify Pickup** screen: 8-char input (auto-uppercase, strips spaces/dashes) → shows order summary → success / error states.
 - **Done when:** a real printer outputs customer pages followed by exactly one slip (T10 manual run), and the code on the slip verifies the order to `COLLECTED`.
+- **Status (2026-11-06):** everything verified end to end on the virtual _Microsoft Print to PDF_ printer — one 7-page job for 3 pages × 2 copies with the slip last, Mark Ready with confirmation, pickup success then `PICKUP_ALREADY_USED`, crash → reconciliation → NEEDS_OPERATOR_CHECK without reprint ([run notes](testing/p1-10-shop-app-virtual-printer.md)). Printing runs in a separate `Kagaz.ShopAgent.PrintHost.exe` so a driver/renderer crash only fails that attempt. **Open:** the real-printer T10 run (blocked on **D1**) and the SumatraPDF fallback engine (only if PDFium misbehaves on that printer).
 
 ### P1.11 — End-to-end rehearsal + demo assets `[ ]`
 
@@ -630,32 +631,32 @@ verify(shopId, input):
 
 ## Appendix B — Environment variables
 
-| Variable                                    | Example                                         | Notes                                   |
-| ------------------------------------------- | ----------------------------------------------- | --------------------------------------- |
-| `APP_ENV`                                   | `local` \| `demo` \| `staging` \| `production`  | Drives guards                           |
-| `PORT`                                      | `4000`                                          | API                                     |
-| `DATABASE_URL`                              | `postgresql://kagaz:kagaz@localhost:5432/kagaz` |                                         |
-| `PUBLIC_WEB_URL`                            | `http://localhost:3000`                         | CORS + links                            |
-| `S3_ENDPOINT`                               | `http://localhost:9000`                         | SeaweedFS locally; R2 endpoint in cloud |
-| `S3_REGION`                                 | `auto`                                          |                                         |
-| `S3_BUCKET`                                 | `kagaz-local`                                   | Private                                 |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | —                                               | Secret                                  |
-| `UPLOAD_URL_TTL_SECONDS`                    | `600`                                           |                                         |
-| `DOWNLOAD_URL_TTL_SECONDS`                  | `300`                                           |                                         |
-| `MAX_UPLOAD_BYTES`                          | `26214400`                                      | 25 MB                                   |
-| `MAX_PAGES` / `MAX_COPIES` / `MAX_SIDES`    | `300` / `20` / `1000`                           |                                         |
-| `PAYMENT_PROVIDER`                          | `demo` \| `razorpay` \| `cashfree`              | `demo` forbidden in production          |
-| `DEMO_WEBHOOK_SECRET`                       | —                                               | Mock webhook signing                    |
-| `OTP_PROVIDER`                              | `demo`                                          | `demo` forbidden in production          |
-| `SESSION_JWT_SECRET`                        | —                                               | Secret                                  |
-| `PICKUP_CODE_PEPPER`                        | —                                               | Secret, 32+ bytes                       |
-| `PICKUP_CODE_ENC_KEY`                       | —                                               | Secret, 32 bytes base64                 |
-| `PRINTER_LEASE_TTL_SECONDS`                 | `60`                                            |                                         |
-| `DEVICE_ONLINE_THRESHOLD_SECONDS`           | `45`                                            |                                         |
-| `RETENTION_AFTER_COLLECTED_HOURS`           | `24`                                            |                                         |
-| `UNPAID_ORDER_EXPIRY_HOURS`                 | `24`                                            |                                         |
-| `SENTRY_DSN`                                | —                                               | Optional                                |
-| `NEXT_PUBLIC_API_URL`                       | `http://localhost:4000/api`                     | Web                                     |
+| Variable                                    | Example                                         | Notes                                                    |
+| ------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| `APP_ENV`                                   | `local` \| `demo` \| `staging` \| `production`  | Drives guards                                            |
+| `API_PORT`                                  | `4000`                                          | API (not `PORT`, which dev tools set for the web server) |
+| `DATABASE_URL`                              | `postgresql://kagaz:kagaz@localhost:5432/kagaz` |                                                          |
+| `PUBLIC_WEB_URL`                            | `http://localhost:3000`                         | CORS + links                                             |
+| `S3_ENDPOINT`                               | `http://localhost:9000`                         | SeaweedFS locally; R2 endpoint in cloud                  |
+| `S3_REGION`                                 | `auto`                                          |                                                          |
+| `S3_BUCKET`                                 | `kagaz-local`                                   | Private                                                  |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | —                                               | Secret                                                   |
+| `UPLOAD_URL_TTL_SECONDS`                    | `600`                                           |                                                          |
+| `DOWNLOAD_URL_TTL_SECONDS`                  | `300`                                           |                                                          |
+| `MAX_UPLOAD_BYTES`                          | `26214400`                                      | 25 MB                                                    |
+| `MAX_PAGES` / `MAX_COPIES` / `MAX_SIDES`    | `300` / `20` / `1000`                           |                                                          |
+| `PAYMENT_PROVIDER`                          | `demo` \| `razorpay` \| `cashfree`              | `demo` forbidden in production                           |
+| `DEMO_WEBHOOK_SECRET`                       | —                                               | Mock webhook signing                                     |
+| `OTP_PROVIDER`                              | `demo`                                          | `demo` forbidden in production                           |
+| `SESSION_JWT_SECRET`                        | —                                               | Secret                                                   |
+| `PICKUP_CODE_PEPPER`                        | —                                               | Secret, 32+ bytes                                        |
+| `PICKUP_CODE_ENC_KEY`                       | —                                               | Secret, 32 bytes base64                                  |
+| `PRINTER_LEASE_TTL_SECONDS`                 | `60`                                            |                                                          |
+| `DEVICE_ONLINE_THRESHOLD_SECONDS`           | `45`                                            |                                                          |
+| `RETENTION_AFTER_COLLECTED_HOURS`           | `24`                                            |                                                          |
+| `UNPAID_ORDER_EXPIRY_HOURS`                 | `24`                                            |                                                          |
+| `SENTRY_DSN`                                | —                                               | Optional                                                 |
+| `NEXT_PUBLIC_API_URL`                       | `http://localhost:4000/api`                     | Web                                                      |
 
 Windows agent `appsettings.json`: `ApiBaseUrl`, `PollIntervalSeconds` (10), `HeartbeatSeconds` (15), `PrintEngine` (`Pdfium` | `Sumatra`), `MaxRenderDpi` (300). Device token is **not** in this file — it's in the DPAPI store.
 

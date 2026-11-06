@@ -1,8 +1,13 @@
 # Kagaz Shop Agent
 
-Windows desktop app skeleton for Kagaz print shops (Phase 0 — stage P0.6). The app runs on a shop's Windows machine and is the host for future pairing, job-list, and printing logic.
+Windows app for Kagaz print shops (stages P1.9–P1.10): pair the PC with a shop, register printers, review and
+accept paid orders, print each order as **one** spooler job (customer pages × copies + one pickup slip), Mark Ready
+after an explicit operator check, and verify pickup codes. Same macOS-style design language as the web app
+(tokens and shared styles in `src/Kagaz.ShopAgent.App/App.xaml`).
 
-This is a skeleton only: it shows the shell, navigation placeholders, health polling, single-instance guard, DPAPI device-token store, and structured logging. No pairing, job list, or printing logic is implemented yet.
+Projects: `App` (WPF UI, view models, background services), `Core` (shop API client, local state, reconciliation),
+`Printing` (`IPrintEngine`, PDFium engine, spooler lookup), `PrintHost` (helper exe the app runs for each print so
+a driver/renderer crash can't take the app down), `Tests`.
 
 ## Prerequisites
 - Windows 10/11 x64
@@ -28,9 +33,19 @@ dotnet run --project apps/shop-agent/src/Kagaz.ShopAgent.App -c Release
 - Logs: `%LOCALAPPDATA%\Kagaz\logs\agent-<date>.log` (rolling daily, 14 files retained, plus Debug output). Never contains the device token.
 - Device token: `%LOCALAPPDATA%\Kagaz\device.token` (DPAPI-encrypted; never plaintext; never in `appsettings.json`)
 
+- Local print state: `%LOCALAPPDATA%\Kagaz\state.json` (per-attempt phase for crash reconciliation, chosen API URL, pause flag)
+- "Microsoft Print to PDF" output: `%LOCALAPPDATA%\Kagaz\print-to-pdf\KAGAZ-<ref>-A<attempt>.pdf` (no Save dialog)
+
+## How printing works (Appendix A.3/A.4)
+- Worker leases the next QUEUED job for a printer installed on this PC, downloads the packet, verifies SHA-256,
+  persists the local phase, then prints it through `Kagaz.ShopAgent.PrintHost.exe` (PDFium render → one
+  `PrintDocument`, copies = 1, A4, explicit duplex/colour, `DocumentName = KAGAZ-<ref>-A<attempt>`).
+- Reports SUBMITTED, watches the spooler, reports SPOOLER_COMPLETE (telemetry only). READY only via Mark Ready.
+- On start/reconnect it reconciles: anything leased here that can't be confirmed is reported FAILED
+  (→ NEEDS_OPERATOR_CHECK). An attempt is never printed twice.
+
 ## Notes
-- Single-instance guard via named Mutex `Kagaz.ShopAgent.SingleInstance`.
-- Window title shows "Kagaz Shop" plus the app version.
-- Left nav: Pairing, Jobs, Pickup, Printers, Settings (each shows title + "Coming in Phase 1").
-- Connection indicator polls `GET {ApiBaseUrl}/health` on startup and every 15 s; shows "Connected" (green) or "Disconnected: <short reason>" (red).
-- Configuration: `appsettings.json` — `ApiBaseUrl`, `PollIntervalSeconds`, `HeartbeatSeconds`, `PrintEngine`, `MaxRenderDpi`.
+- Single-instance guard via named Mutex `Kagaz.ShopAgent.SingleInstance`. Outbound HTTPS/HTTP only; no listening ports.
+- Jobs poll every 5 s; heartbeat every 15 s (reports this PC's printers by server id).
+- Configuration: `appsettings.json` — `ApiBaseUrl` (overridden by the address used when pairing), `PollIntervalSeconds`,
+  `HeartbeatSeconds`, `MaxRenderDpi`, `PrintToFileFolder` (testing only: print every job to PDF files).

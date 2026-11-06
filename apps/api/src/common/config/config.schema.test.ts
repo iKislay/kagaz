@@ -13,12 +13,13 @@ const base = {
   OTP_PROVIDER: 'demo',
   SESSION_JWT_SECRET: 'x'.repeat(32),
   PICKUP_CODE_PEPPER: 'y'.repeat(32),
+  PICKUP_CODE_ENC_KEY: Buffer.alloc(32, 1).toString('base64'),
 } satisfies NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {
   it('accepts a valid local config and applies defaults', () => {
     const config = loadConfig(base);
-    expect(config.PORT).toBe(4000);
+    expect(config.API_PORT).toBe(4000);
     expect(config.MAX_UPLOAD_BYTES).toBe(26_214_400);
     expect(config.S3_FORCE_PATH_STYLE).toBe(false);
   });
@@ -58,6 +59,17 @@ describe('loadConfig', () => {
         SESSION_JWT_SECRET: 'change-me-session-secret-at-least-32-chars',
       }),
     ).toThrow(/placeholder/);
+  });
+
+  it('requires a 32-byte pickup encryption key and refuses the dev key in staging', () => {
+    expect(() => loadConfig({ ...base, PICKUP_CODE_ENC_KEY: 'c2hvcnQ=' })).toThrow(
+      /32 random bytes/,
+    );
+    const devKey = Buffer.from('change-me-local-dev-key-32bytes!').toString('base64');
+    expect(loadConfig({ ...base, PICKUP_CODE_ENC_KEY: devKey }).APP_ENV).toBe('local');
+    expect(() => loadConfig({ ...base, APP_ENV: 'staging', PICKUP_CODE_ENC_KEY: devKey })).toThrow(
+      /local development key/,
+    );
   });
 
   it('exposes DEMO payment mode in public config', () => {

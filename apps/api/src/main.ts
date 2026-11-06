@@ -17,14 +17,15 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: [config.PUBLIC_WEB_URL], credentials: true });
+  // maxAge: browsers cache the preflight, so status polling isn't doubled by OPTIONS requests.
+  app.enableCors({ origin: [config.PUBLIC_WEB_URL], credentials: true, maxAge: 600 });
   app.enableShutdownHooks();
 
-  await app.listen(config.PORT);
+  await app.listen(config.API_PORT);
 
   const logger = app.get(Logger);
   logger.log(
-    `Kagaz API listening on :${config.PORT} | APP_ENV=${config.APP_ENV} | PAYMENT=${
+    `Kagaz API listening on :${config.API_PORT} | APP_ENV=${config.APP_ENV} | PAYMENT=${
       paymentModeOf(config) === 'DEMO' ? 'DEMO (SIMULATED)' : 'LIVE'
     }`,
     'Bootstrap',

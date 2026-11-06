@@ -32,3 +32,6 @@ TestResults/
 Thumbs.db
 .idea/
 *.log
+
+# Next.js generated types (rewritten by dev/build)
+next-env.d.ts

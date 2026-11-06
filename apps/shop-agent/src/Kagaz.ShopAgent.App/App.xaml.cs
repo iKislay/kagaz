@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using Kagaz.ShopAgent.Core;
+using Kagaz.ShopAgent.App.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -51,6 +52,11 @@ public sealed partial class App : Application
 
             MainWindow = _host.Services.GetRequiredService<MainWindow>();
             MainWindow.Show();
+
+            // Jobs poller runs on the UI thread (its awaits resume on the dispatcher); the print
+            // worker and heartbeat are hosted services.
+            var lifetime = _host.Services.GetRequiredService<IHostApplicationLifetime>();
+            _ = _host.Services.GetRequiredService<JobsViewModel>().RunAsync(lifetime.ApplicationStopping);
         }
         catch (Exception ex)
         {

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Separate process for PDFium rendering + GDI printing, so a printer-driver or renderer crash
+       fails one print attempt instead of taking down the shop app (see OutOfProcessPrintEngine). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Kagaz.ShopAgent.PrintHost</RootNamespace>
+    <AssemblyName>Kagaz.ShopAgent.PrintHost</AssemblyName>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Kagaz.ShopAgent.Printing/Kagaz.ShopAgent.Printing.csproj" />
+  </ItemGroup>
+</Project>

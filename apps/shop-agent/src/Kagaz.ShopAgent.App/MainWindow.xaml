@@ -3,16 +3,17 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
+        xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
         xmlns:views="clr-namespace:Kagaz.ShopAgent.App.Views"
         mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:ShellViewModel}"
         Title="{Binding WindowTitle}"
-        Width="1080" Height="720" MinWidth="820" MinHeight="560"
+        Width="1180" Height="760" MinWidth="900" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BgBrush}"
         FontFamily="{StaticResource UiFont}"
         TextOptions.TextFormattingMode="Ideal"
-        UseLayoutRounding="True"
-        d:DesignHeight="720" d:DesignWidth="1080">
+        UseLayoutRounding="True">
     <!-- macOS-style layout (CLAUDE.md "Design language"): source-list sidebar + content. -->
     <Grid>
         <Grid.ColumnDefinitions>
@@ -30,10 +31,10 @@
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="Kagaz Shop" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextBrush}" />
-                        <TextBlock Text="{Binding Version, StringFormat=Version {0}}" Style="{StaticResource SecondaryText}"
-                                   FontSize="11" />
+                        <TextBlock Text="{Binding Status.ShopName, TargetNullValue=Kagaz Shop, FallbackValue=Kagaz Shop}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="160" />
+                        <TextBlock Text="{Binding Version, StringFormat=Kagaz Shop {0}}" Style="{StaticResource SecondaryText}" FontSize="11" />
                     </StackPanel>
                 </StackPanel>
 
@@ -41,11 +42,10 @@
                         Background="{StaticResource SurfaceBrush}"
                         BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="8" Height="8" Fill="{Binding ConnectionBrush}" Margin="0,0,8,0"
-                                 VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding ConnectionText}" FontSize="12" TextWrapping="Wrap"
-                                   Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"
-                                   MaxWidth="170" />
+                        <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center"
+                                 Fill="{Binding Status.Connection, Converter={StaticResource ConnectionBrush}}" />
+                        <TextBlock Text="{Binding Status.ConnectionText}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" MaxWidth="170" />
                     </StackPanel>
                 </Border>
 
@@ -57,12 +57,11 @@
                              ItemContainerStyle="{StaticResource SidebarItem}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemTemplate>
-                            <DataTemplate>
+                            <DataTemplate DataType="{x:Type vm:NavigationItem}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Icon}" FontFamily="{StaticResource IconFont}"
+                                    <TextBlock Text="{Binding Icon}" Style="{StaticResource IconText}"
                                                FontSize="15" Width="20" Margin="0,0,8,0"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               VerticalAlignment="Center" />
+                                               Foreground="{StaticResource AccentBrush}" />
                                     <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
                                 </StackPanel>
                             </DataTemplate>
@@ -73,12 +72,70 @@
         </Border>
 
         <!-- Content -->
-        <ContentControl Grid.Column="1" Margin="36,32,36,32" Content="{Binding SelectedNavigation}">
-            <ContentControl.ContentTemplate>
-                <DataTemplate>
-                    <views:PlaceholderView />
-                </DataTemplate>
-            </ContentControl.ContentTemplate>
-        </ContentControl>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- DEMO notice (invariant 4): always visible for demo shops, calm amber bar. -->
+            <Border Grid.Row="0" Style="{StaticResource NoticeBar}"
+                    Visibility="{Binding Status.ShopIsDemo, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="13" Foreground="{StaticResource OrangeBrush}" Margin="0,0,8,0" />
+                    <TextBlock Text="DEMO PAYMENT — NO MONEY CHARGED" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AmberTextBrush}" />
+                </StackPanel>
+            </Border>
+
+            <ContentControl Grid.Row="1" Margin="36,28,36,28" Content="{Binding CurrentPage}" Focusable="False">
+                <ContentControl.Resources>
+                    <DataTemplate DataType="{x:Type vm:PairingViewModel}">
+                        <views:PairingView />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:PrintersViewModel}">
+                        <views:PrintersView />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:JobsViewModel}">
+                        <views:JobsView />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:PickupViewModel}">
+                        <views:PickupView />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+                        <views:SettingsView />
+                    </DataTemplate>
+                </ContentControl.Resources>
+            </ContentControl>
+
+            <!-- Toasts: top-right notification banners -->
+            <ItemsControl Grid.Row="1" ItemsSource="{Binding Status.Toasts}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                          Margin="0,16,20,0" Width="320" Focusable="False" IsHitTestVisible="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Padding="14,12" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="Icon" Text="&#xE73E;" Style="{StaticResource IconText}" FontSize="14"
+                                           Foreground="{StaticResource GreenBrush}" VerticalAlignment="Top" Margin="0,2,10,0" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Title}" Style="{StaticResource HeadlineText}" FontSize="13" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0"
+                                               Visibility="{Binding Detail, Converter={StaticResource NullToVisibility}}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                <Setter TargetName="Icon" Property="Text" Value="&#xE7BA;" />
+                                <Setter TargetName="Icon" Property="Foreground" Value="{StaticResource OrangeBrush}" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Grid>
     </Grid>
 </Window>
