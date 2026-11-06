@@ -156,6 +156,6 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 
 ## Status
 
-- Current phase: **Phase 0 — Foundation** complete (P0.1–P0.6). Next: Phase 1 vertical slice.
+- Current phase: **Phase 1 — vertical slice** in progress on `phase-1-vertical-slice` (draft PR #3). Done: P1.1–P1.9. P1.10 verified on a virtual printer; real-printer run (T10) and P1.11 rehearsal wait on **D1**.
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
 - Payments: **DEMO only**; live gateway gated by **D6** (merchant of record).
