@@ -45,6 +45,11 @@ export const EnvSchema = z.object({
 
   PRINTER_LEASE_TTL_SECONDS: int(60),
   DEVICE_ONLINE_THRESHOLD_SECONDS: int(45),
+  /** Oldest shop-agent version without an upgrade warning, e.g. 0.3.0 (contract §1). */
+  MIN_AGENT_VERSION: z
+    .string()
+    .regex(/^\d+\.\d+\.\d+$/, 'MIN_AGENT_VERSION must look like 1.2.3')
+    .optional(),
   RETENTION_AFTER_COLLECTED_HOURS: int(24),
   UNPAID_ORDER_EXPIRY_HOURS: int(24),
 

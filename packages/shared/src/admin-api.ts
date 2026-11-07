@@ -212,6 +212,8 @@ export const AdminOrderEventSchema = z.object({
   toStatus: OrderStatusSchema,
   actorType: ActorTypeSchema,
   actorId: z.string().nullable(),
+  /** Display name of the operator/admin/device that made the transition. */
+  actorName: z.string().nullable().optional(),
   reason: z.string().nullable(),
   createdAt: z.string(),
 });
