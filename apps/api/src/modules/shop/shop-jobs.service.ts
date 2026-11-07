@@ -1,7 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   OrderStatus,
-  type PrintOptions,
   type RejectJobRequest,
   ResolveAction,
   type ResolveJobRequest,
@@ -19,12 +18,13 @@ import { StorageService } from '../files/storage.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
 import { RefundsService } from '../payments/refunds.service.js';
+import { OrderAcceptanceService } from '../approval/order-acceptance.service.js';
 import { PickupAttemptsService } from '../pickup/pickup-attempts.service.js';
 import { PickupCrypto } from '../pickup/pickup-crypto.js';
 import { PrintLeaseService, releaseLease } from '../printing/print-leases.service.js';
 import { PrintPreparationService } from '../printing/print-preparation.service.js';
 import { SHOP_JOB_INCLUDE, toShopJob } from './shop-job-view.js';
-import { findShopOrder, shopPrinterWhere } from './shop-scope.js';
+import { findShopOrder } from './shop-scope.js';
 
 /** What the shop sees by default: everything from payment to pickup. */
 const ACTIVE_STATUSES: OrderStatus[] = [
@@ -58,7 +58,7 @@ export class ShopJobsService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly stateMachine: OrderStateMachine,
-    private readonly preparation: PrintPreparationService,
+    private readonly acceptance: OrderAcceptanceService,
     private readonly refunds: RefundsService,
     private readonly pickup: PickupCrypto,
     private readonly pickupAttempts: PickupAttemptsService,
@@ -86,62 +86,18 @@ export class ShopJobsService {
     return { ...toShopJob(order), previewUrl: preview?.url ?? null };
   }
 
-  /** Accept a paid order: build the packet, then atomically queue it (FR-SHOP-07). */
+  /**
+   * Accept a paid order (FR-SHOP-07): the shared accept path also used by guarded auto-accept
+   * (P2.6) — build the packet, then atomically queue it.
+   */
   async accept(device: DeviceContext, orderId: string, printerId?: string): Promise<ShopJob> {
-    const order = await this.findScoped(device, orderId);
-    if (order.status !== OrderStatus.PENDING_REVIEW) throw invalidState(order.status, 'accepted');
-    const options = parseOptions(order.options);
-    const printer = await this.choosePrinter(device.shopId, options, printerId);
-
-    const packet = await this.preparation.prepare(order.id, options);
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        // Transition FIRST: it locks the order row, so a concurrent duplicate accept fails
-        // cleanly with 409 here instead of colliding on the packet/pickup-code inserts.
-        await this.stateMachine.transition(tx, {
-          orderId: order.id,
-          to: OrderStatus.QUEUED,
-          from: OrderStatus.PENDING_REVIEW,
-          actor: deviceActor(device),
-          auditAction: 'order.accepted',
-          metadata: { printerId: printer.id },
-          data: { printerId: printer.id, queuedAt: new Date() },
-        });
-        const packetFile = await tx.fileAsset.create({
-          data: {
-            orderId: order.id,
-            kind: 'PACKET',
-            status: 'VALID',
-            objectKey: packet.objectKey,
-            bytes: packet.bytes,
-            pageCount: packet.pageCount,
-            sha256: packet.sha256,
-          },
-        });
-        await tx.pickupCode.create({
-          data: {
-            orderId: order.id,
-            codeHmac: this.pickup.hmac(packet.code),
-            encryptedDisplayValue: this.pickup.encrypt(packet.code),
-          },
-        });
-        const job = await tx.printJob.create({
-          data: {
-            orderId: order.id,
-            printerId: printer.id,
-            packetFileId: packetFile.id,
-            attempt: 1,
-            status: 'READY',
-            checksum: packet.sha256,
-            createdById: device.deviceId,
-          },
-        });
-        this.leases.publishJob(tx, job, device.shopId, 'READY');
-      });
-    } catch (err) {
-      await this.preparation.discard(packet.objectKey);
-      throw err;
-    }
+    await this.findScoped(device, orderId);
+    await this.acceptance.accept({
+      orderId,
+      shopId: device.shopId,
+      actor: deviceActor(device),
+      ...(printerId ? { printerId } : {}),
+    });
     return toShopJob(await this.findScoped(device, orderId));
   }
 
@@ -403,28 +359,6 @@ export class ShopJobsService {
 
   private findScoped(device: DeviceContext, orderId: string) {
     return findShopOrder(this.prisma, device.shopId, orderId, SHOP_JOB_INCLUDE);
-  }
-
-  /** PRD §8.5: explicit printer, else an enabled capable printer, default first. */
-  private async choosePrinter(shopId: string, options: PrintOptions, printerId?: string) {
-    const printers = await this.prisma.printer.findMany({
-      where: {
-        ...shopPrinterWhere(shopId, printerId),
-        enabled: true,
-        ...(options.colour ? { colourCapable: true } : {}),
-        ...(options.duplex ? { duplexCapable: true } : {}),
-      },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
-    });
-    const printer = printers[0];
-    if (!printer) {
-      throw new AppError(
-        'NO_SUITABLE_PRINTER',
-        'No enabled printer in this shop supports these print options',
-        HttpStatus.CONFLICT,
-      );
-    }
-    return printer;
   }
 
   /** FR-PICK-06: the code is valid for 7 days from READY. */

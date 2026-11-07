@@ -25,6 +25,7 @@ import {
   ApiRequestError,
   completeUpload,
   createOrder,
+  getOrder,
   payOrder,
   requestUploadUrl,
   updateOptions,
@@ -151,6 +152,10 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
       router.push(`/order/${res.order.id}#t=${encodeURIComponent(token)}`);
     } catch (err) {
       setError(messageOf(err));
+      // P2.5: the shop changed its prices — show the new server quote before paying again.
+      if (err instanceof ApiRequestError && err.code === 'PRICE_CHANGED') {
+        await getOrder(order.id, token).then(setOrder, () => undefined);
+      }
       setPhase('ready');
     }
   };

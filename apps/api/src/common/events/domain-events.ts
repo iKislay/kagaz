@@ -18,6 +18,10 @@ export const DomainEvent = {
   DEVICE_STATUS_CHANGED: 'device.status_changed',
   /** A printer's reported status changed (heartbeat). */
   PRINTER_STATUS_CHANGED: 'printer.status_changed',
+  /** A shop's approval mode or auto-pause changed (PATCH /api/shop/mode, admin). */
+  SHOP_MODE_CHANGED: 'shop.mode_changed',
+  /** A device token was revoked; live sockets of that device must be dropped. */
+  DEVICE_REVOKED: 'device.revoked',
 } as const;
 export type DomainEventName = (typeof DomainEvent)[keyof typeof DomainEvent];
 
@@ -59,11 +63,24 @@ export interface PrinterStatusChangedEvent {
   at: string;
 }
 
+export interface ShopModeChangedEvent {
+  shopId: string;
+  approvalMode: 'MANUAL' | 'AUTO';
+  autoPaused: boolean;
+}
+
+export interface DeviceRevokedEvent {
+  shopId: string;
+  deviceId: string;
+}
+
 export interface DomainEventPayloads {
   [DomainEvent.ORDER_STATUS_CHANGED]: OrderStatusChangedEvent;
   [DomainEvent.PRINT_JOB_STATUS_CHANGED]: PrintJobStatusChangedEvent;
   [DomainEvent.DEVICE_STATUS_CHANGED]: DeviceStatusChangedEvent;
   [DomainEvent.PRINTER_STATUS_CHANGED]: PrinterStatusChangedEvent;
+  [DomainEvent.SHOP_MODE_CHANGED]: ShopModeChangedEvent;
+  [DomainEvent.DEVICE_REVOKED]: DeviceRevokedEvent;
 }
 
 interface QueuedEvent {

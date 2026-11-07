@@ -36,6 +36,10 @@ export const EnvSchema = z.object({
   PAYMENT_PROVIDER: z.enum(['demo', 'razorpay', 'cashfree']),
   OTP_PROVIDER: z.enum(['demo']),
   DEMO_WEBHOOK_SECRET: z.string().optional(),
+  /** Demo gateway only: delay before simulated webhooks are delivered (P3.5). */
+  DEMO_WEBHOOK_DELAY_MS: z.coerce.number().int().nonnegative().default(300),
+  /** Demo gateway only: PENDING outcome resolves to PAID after this many seconds. */
+  DEMO_PENDING_RESOLVE_SECONDS: int(10),
 
   SESSION_JWT_SECRET: secret('SESSION_JWT_SECRET'),
   PICKUP_CODE_PEPPER: secret('PICKUP_CODE_PEPPER'),
@@ -111,7 +115,66 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     }
   }
 
+  const profile = environmentProfile(config.APP_ENV);
+  if (config.PAYMENT_PROVIDER === 'demo' && config.APP_ENV !== AppEnv.LOCAL) {
+    if (!config.DEMO_WEBHOOK_SECRET || config.DEMO_WEBHOOK_SECRET.length < 32) {
+      throw new ConfigError(
+        `Refusing to start: DEMO_WEBHOOK_SECRET (≥ 32 chars) is required for demo payments in APP_ENV=${config.APP_ENV}.`,
+      );
+    }
+  }
+  if (!profile.demoPaymentsAllowed && config.PAYMENT_PROVIDER === 'demo') {
+    throw new ConfigError(`Refusing to start: demo payments are not allowed in ${config.APP_ENV}.`);
+  }
+
   return config;
+}
+
+/**
+ * Environment matrix (P3.2). Each environment also has its own database, bucket, domain and
+ * keys — configured by its env vars, never shared.
+ *
+ * | APP_ENV    | demo payments | demo OTP | demo controls | Secure cookies |
+ * | ---------- | ------------- | -------- | ------------- | -------------- |
+ * | local      | yes           | yes      | yes           | no             |
+ * | demo       | yes           | yes      | yes           | yes            |
+ * | staging    | yes           | yes      | yes           | yes            |
+ * | production | **never**     | **never**| **never**     | yes            |
+ */
+export interface EnvironmentProfile {
+  demoPaymentsAllowed: boolean;
+  demoOtpAllowed: boolean;
+  /** Admin demo controls (OTP inbox, payment outcome simulation). */
+  demoControlsAllowed: boolean;
+  secureCookies: boolean;
+}
+
+export function environmentProfile(appEnv: AppEnv): EnvironmentProfile {
+  const production = appEnv === AppEnv.PRODUCTION;
+  return {
+    demoPaymentsAllowed: !production,
+    demoOtpAllowed: !production,
+    demoControlsAllowed: !production,
+    secureCookies: appEnv !== AppEnv.LOCAL,
+  };
+}
+
+/** Demo controls are on only when allowed AND something is actually simulated. */
+export function demoControlsEnabled(config: AppConfig): boolean {
+  return (
+    environmentProfile(config.APP_ENV).demoControlsAllowed &&
+    (config.PAYMENT_PROVIDER === 'demo' || config.OTP_PROVIDER === 'demo')
+  );
+}
+
+/** One line logged at boot so operators can see the mode at a glance. */
+export function startupSummary(config: AppConfig): string {
+  return [
+    `APP_ENV=${config.APP_ENV}`,
+    `PAYMENT=${paymentModeOf(config) === PaymentMode.DEMO ? 'DEMO (SIMULATED)' : 'LIVE'}`,
+    `OTP=${config.OTP_PROVIDER === 'demo' ? 'DEMO (NO SMS)' : 'LIVE'}`,
+    `DEMO_CONTROLS=${demoControlsEnabled(config) ? 'ON' : 'OFF'}`,
+  ].join(' | ');
 }
 
 export function paymentModeOf(config: AppConfig): PaymentMode {
@@ -122,6 +185,8 @@ export function toPublicConfig(config: AppConfig): PublicConfig {
   return {
     appEnv: config.APP_ENV,
     paymentMode: paymentModeOf(config),
+    otpMode: config.OTP_PROVIDER === 'demo' ? PaymentMode.DEMO : PaymentMode.LIVE,
+    demoControls: demoControlsEnabled(config),
     limits: {
       maxUploadBytes: config.MAX_UPLOAD_BYTES,
       maxPages: config.MAX_PAGES,

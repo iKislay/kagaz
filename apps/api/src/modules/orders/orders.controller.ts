@@ -7,10 +7,11 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { type Response } from 'express';
+import { type Request, type Response } from 'express';
 import {
   type CreateOrderRequest,
   CreateOrderRequestSchema,
@@ -26,6 +27,7 @@ import {
   trackingCookieName,
 } from '@kagaz/shared';
 import { type Actor } from '../../common/actor.js';
+import { CustomerSessionService } from '../../common/auth/customer-session.js';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
@@ -40,14 +42,19 @@ export class OrdersController {
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly orders: OrdersService,
+    private readonly sessions: CustomerSessionService,
   ) {}
 
   @Post()
   async create(
     @Body(new ZodValidationPipe(CreateOrderRequestSchema)) body: CreateOrderRequest,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<CreateOrderResponse> {
-    const result = await this.orders.createDraft(body, GUEST);
+    // Signed-in customers (P2.2) own the order; guests rely on the tracking token alone.
+    const session = await this.sessions.fromRequest(req);
+    const actor: Actor = session ? { type: 'CUSTOMER', id: session.customerId } : GUEST;
+    const result = await this.orders.createDraft(body, actor, session);
     res.cookie(trackingCookieName(result.order.id), result.trackingToken, {
       httpOnly: true,
       sameSite: 'lax',
@@ -62,6 +69,14 @@ export class OrdersController {
   @UseGuards(TrackingGuard)
   get(@Param('id') id: string): Promise<PublicOrder> {
     return this.orders.getPublic(id);
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(200)
+  @UseGuards(TrackingGuard)
+  async cancel(@Param('id') id: string, @Req() req: Request): Promise<PublicOrder> {
+    const session = await this.sessions.fromRequest(req);
+    return this.orders.cancel(id, session ? { type: 'CUSTOMER', id: session.customerId } : GUEST);
   }
 
   @Patch(':id/options')

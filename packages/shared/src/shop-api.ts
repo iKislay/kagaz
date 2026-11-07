@@ -267,3 +267,18 @@ export type OperatorLoginResponse = z.infer<typeof OperatorLoginResponseSchema>;
 
 export const RotateDeviceTokenResponseSchema = z.object({ deviceToken: z.string() });
 export type RotateDeviceTokenResponse = z.infer<typeof RotateDeviceTokenResponseSchema>;
+// ─── Approval mode (P2.6, contract §3) ───
+
+export const ShopModeSchema = z.object({
+  approvalMode: z.enum(['MANUAL', 'AUTO']),
+  /** true = auto mode paused: paid orders wait for manual review. */
+  autoPaused: z.boolean(),
+});
+export type ShopMode = z.infer<typeof ShopModeSchema>;
+
+/** PATCH /api/shop/mode — send one or both fields. */
+export const UpdateShopModeRequestSchema = z.strictObject({
+  approvalMode: z.enum(['MANUAL', 'AUTO']).optional(),
+  autoPaused: z.boolean().optional(),
+});
+export type UpdateShopModeRequest = z.infer<typeof UpdateShopModeRequestSchema>;

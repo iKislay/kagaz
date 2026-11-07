@@ -95,6 +95,17 @@ export const PublicOrderSchema = z.object({
   /** Only present while READY_FOR_PICKUP (PRD FR-CUST-11). */
   pickupCode: z.string().nullable(),
   rejection: z.object({ code: z.string(), note: z.string().nullable() }).nullable(),
+  /** Latest refund for a rejected paid order (P3.4). Simulated → "Demo refund — no money moved". */
+  refund: z
+    .object({
+      status: z.enum(['PENDING', 'SUCCEEDED', 'FAILED']),
+      amountPaise: z.int(),
+      isSimulated: z.boolean(),
+    })
+    .nullable()
+    .default(null),
+  /** True while the customer may still cancel (before payment, nothing in flight) — P3.6. */
+  canCancel: z.boolean().default(false),
   timeline: z.array(OrderEventViewSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -118,3 +129,58 @@ export type PayResponse = z.infer<typeof PayResponseSchema>;
 /** Header carrying the order tracking token when a cookie isn't available. */
 export const TRACKING_TOKEN_HEADER = 'x-tracking-token';
 export const trackingCookieName = (orderId: string) => `kgz_t_${orderId}`;
+
+// ─── Customer identity (P2.2, contract §6) ───
+
+/** Session cookie set by POST /api/auth/otp/verify (httpOnly, SameSite=Lax, 7 days). */
+export const CUSTOMER_SESSION_COOKIE = 'kagaz_session';
+
+export const OtpRequestSchema = z.strictObject({ phone: PhoneSchema });
+export type OtpRequest = z.infer<typeof OtpRequestSchema>;
+
+export const OtpRequestResponseSchema = z.object({
+  /** Masked destination, e.g. +91******3210. */
+  sentTo: z.string(),
+  expiresInSeconds: z.int(),
+  resendAfterSeconds: z.int(),
+  /** DEMO: no SMS is sent; the code appears in the admin demo OTP inbox. */
+  demo: z.boolean(),
+});
+export type OtpRequestResponse = z.infer<typeof OtpRequestResponseSchema>;
+
+export const OtpVerifySchema = z.strictObject({
+  phone: PhoneSchema,
+  code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+export type OtpVerify = z.infer<typeof OtpVerifySchema>;
+
+export const CustomerSchema = z.object({ id: z.uuid(), phone: z.string() });
+export type Customer = z.infer<typeof CustomerSchema>;
+
+/** GET /api/me — `customer` is null when not signed in. */
+export const MeResponseSchema = z.object({ customer: CustomerSchema.nullable() });
+export type MeResponse = z.infer<typeof MeResponseSchema>;
+
+export const MyOrderSchema = z.object({
+  id: z.uuid(),
+  publicRef: z.string(),
+  status: OrderStatusSchema,
+  shopName: z.string(),
+  amountPaise: z.int().nullable(),
+  paymentStatus: z.enum(enumValues(PaymentStatus)).nullable(),
+  isSimulated: z.boolean(),
+  createdAt: z.string(),
+});
+export type MyOrder = z.infer<typeof MyOrderSchema>;
+
+/** Response of POST /api/webhooks/:provider (always 200 once the signature is valid). */
+export const WebhookAckSchema = z.object({
+  received: z.literal(true),
+  duplicate: z.boolean(),
+  outcome: z.string(),
+});
+export type WebhookAck = z.infer<typeof WebhookAckSchema>;
+
+/** GET /api/me/orders */
+export const MyOrdersResponseSchema = z.object({ orders: z.array(MyOrderSchema) });
+export type MyOrdersResponse = z.infer<typeof MyOrdersResponseSchema>;

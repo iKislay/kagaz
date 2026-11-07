@@ -379,6 +379,8 @@ model Payment {
   status            PaymentStatus @default(CREATED)
   isSimulated       Boolean       @default(false) @map("is_simulated")
   verifiedAt        DateTime?     @map("verified_at")
+  /// Settlement / transfer reference from the provider — present, not active (PRD §8.8, D6).
+  settlementRef     String?       @map("settlement_ref")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
@@ -472,6 +474,24 @@ model PickupCode {
 
   @@index([codeHmac])
   @@map("pickup_codes")
+}
+
+// ───────────────────────────── Customer identity (P2.2) ─────────────────────────────
+
+/// One sign-in code sent to a phone. The code itself is never stored (HMAC only).
+model OtpChallenge {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  phone      String
+  codeHmac   String    @map("code_hmac")
+  ip         String?
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([phone, createdAt])
+  @@index([ip, createdAt])
+  @@map("otp_challenges")
 }
 
 // ───────────────────────────── Audit & operations ─────────────────────────────

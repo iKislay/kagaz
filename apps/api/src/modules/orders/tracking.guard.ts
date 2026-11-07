@@ -1,6 +1,7 @@
 import { type CanActivate, type ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { type Request } from 'express';
 import { TRACKING_TOKEN_HEADER, trackingCookieName } from '@kagaz/shared';
+import { CustomerSessionService } from '../../common/auth/customer-session.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { OrdersService } from './orders.service.js';
 
@@ -17,12 +18,16 @@ export function readCookie(header: string | undefined, name: string): string | u
 
 /**
  * Customer access to /api/orders/:id* — requires the order's tracking token, from the
- * x-tracking-token header or the per-order httpOnly cookie. Wrong token and unknown order
- * both answer 404, so order ids can't be probed.
+ * x-tracking-token header or the per-order httpOnly cookie, OR the signed-in owner's
+ * `kagaz_session` (P2.2). Wrong token and unknown order both answer 404, so order ids can't
+ * be probed.
  */
 @Injectable()
 export class TrackingGuard implements CanActivate {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly sessions: CustomerSessionService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
@@ -35,10 +40,11 @@ export class TrackingGuard implements CanActivate {
         : undefined);
 
     const uuid = /^[0-9a-f-]{36}$/i;
-    if (typeof orderId !== 'string' || !uuid.test(orderId) || !token) throw notFound();
-    const order = await this.orders.findByTrackingToken(orderId, token);
-    if (!order) throw notFound();
-    return true;
+    if (typeof orderId !== 'string' || !uuid.test(orderId)) throw notFound();
+    if (token && (await this.orders.findByTrackingToken(orderId, token))) return true;
+    const session = await this.sessions.fromRequest(req);
+    if (session && (await this.orders.findByCustomer(orderId, session.customerId))) return true;
+    throw notFound();
   }
 }
 

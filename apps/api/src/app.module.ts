@@ -20,6 +20,7 @@ import { ShopsModule } from './modules/shops/shops.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+import { CustomerAuthModule } from './modules/customer-auth/customer-auth.module.js';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
@@ -76,6 +77,7 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
     ShopModule,
     AdminModule,
     IdentityModule,
+    CustomerAuthModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { DEMO_REFUND_NOTICE, OrderStatus, type PublicOrder, formatPaise } from '@kagaz/shared';
+import { PaymentStatePanel } from '@/components/order/PaymentStatePanel';
 import { Group, Notice, Pill, Row, Spinner, cx } from '@/components/ui';
 import { ApiRequestError, getOrder } from '@/lib/api';
 import { REJECT_REASONS, STATUS_COPY, TERMINAL, TIMELINE_STEPS } from '@/lib/status';
@@ -83,6 +84,8 @@ export function OrderTracker({ orderId }: { orderId: string }) {
       <p className="mt-1.5 text-[15px] text-text-secondary">{copy.detail}</p>
       {error && <Notice tone="orange">Reconnecting… {error.message}</Notice>}
 
+      <PaymentStatePanel order={order} token={token} onChange={setOrder} />
+
       {order.status === OrderStatus.READY_FOR_PICKUP && order.pickupCode && (
         <PickupCodeCard code={order.pickupCode} shop={order.shop} />
       )}
@@ -95,13 +98,16 @@ export function OrderTracker({ orderId }: { orderId: string }) {
             {REJECT_REASONS[order.rejection?.code ?? 'OTHER'] ?? REJECT_REASONS.OTHER}
           </div>
           {order.rejection?.note && <div className="mt-0.5">“{order.rejection.note}”</div>}
-          <div className="mt-1 text-[13px] opacity-80">
-            {order.payment?.isSimulated
-              ? DEMO_REFUND_NOTICE
-              : order.status === OrderStatus.REFUNDED
-                ? 'Your payment was refunded.'
-                : 'Your refund is being processed.'}
-          </div>
+          {/* Refund amount and status are shown by PaymentStatePanel when known. */}
+          {!order.refund && (
+            <div className="mt-1 text-[13px] opacity-80">
+              {order.payment?.isSimulated
+                ? DEMO_REFUND_NOTICE
+                : order.status === OrderStatus.REFUNDED
+                  ? 'Your payment was refunded.'
+                  : 'Your refund is being processed.'}
+            </div>
+          )}
         </Notice>
       )}
 
@@ -121,7 +127,7 @@ export function OrderTracker({ orderId }: { orderId: string }) {
         </Row>
         {order.amountPaise !== null && (
           <Row
-            label="Paid"
+            label={order.status === OrderStatus.AWAITING_PAYMENT ? 'Total' : 'Paid'}
             hint={order.payment?.isSimulated ? 'Demo payment — no money was charged' : undefined}
           >
             <span className="text-[15px] font-semibold tabular-nums">

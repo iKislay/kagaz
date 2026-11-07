@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ShopStatus, type ShopSummary } from '@kagaz/shared';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { isWithinOpeningHours } from './opening-hours.js';
 
 export interface ShopCapabilities {
   colour: boolean;
@@ -33,7 +34,7 @@ export class ShopsService {
         name: shop.name,
         address: shop.address,
         status: shop.status,
-        acceptingOrders: this.isAcceptingOrders(shop.status) && pricing !== null,
+        acceptingOrders: this.unavailableReason(shop) === null && pricing !== null,
         isDemo: shop.isDemo,
         capabilities: {
           colour: shop.printers.some((p) => p.colourCapable),
@@ -51,15 +52,22 @@ export class ShopsService {
     });
   }
 
-  /** Throws SHOP_UNAVAILABLE unless the shop can take a new order now (FR-CUST-02). */
+  /**
+   * Throws SHOP_UNAVAILABLE unless the shop can take a new order now (FR-CUST-02, P3.6):
+   * status OPEN and within opening hours (Asia/Kolkata). Used for new drafts and checkout.
+   */
   async requireOrderableShop(shopId: string) {
     const shop = await this.prisma.shop.findUnique({ where: { id: shopId } });
     if (!shop) throw new AppError('SHOP_NOT_FOUND', 'Shop not found', HttpStatus.NOT_FOUND);
-    if (!this.isAcceptingOrders(shop.status)) {
+    const reason = this.unavailableReason(shop);
+    if (reason) {
       throw new AppError(
         'SHOP_UNAVAILABLE',
-        `${shop.name} is not accepting orders right now`,
+        reason === 'OUTSIDE_OPENING_HOURS'
+          ? `${shop.name} is closed right now (outside opening hours)`
+          : `${shop.name} is not accepting orders right now`,
         HttpStatus.CONFLICT,
+        { reason },
       );
     }
     return shop;
@@ -74,8 +82,14 @@ export class ShopsService {
     };
   }
 
-  // Opening hours are evaluated from P3.6; for now the shop status decides.
-  private isAcceptingOrders(status: string): boolean {
-    return status === ShopStatus.OPEN;
+  /** Why a shop can't take new orders right now, or null when it can. */
+  unavailableReason(
+    shop: { status: string; openingHours: unknown },
+    now: Date = new Date(),
+  ): 'SHOP_NOT_OPEN' | 'SHOP_MAINTENANCE' | 'OUTSIDE_OPENING_HOURS' | null {
+    if (shop.status === ShopStatus.MAINTENANCE) return 'SHOP_MAINTENANCE';
+    if (shop.status !== ShopStatus.OPEN) return 'SHOP_NOT_OPEN';
+    if (!isWithinOpeningHours(shop.openingHours, now)) return 'OUTSIDE_OPENING_HOURS';
+    return null;
   }
 }

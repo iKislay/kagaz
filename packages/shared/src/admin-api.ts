@@ -7,7 +7,15 @@
  * phone number (masked to the last 2 digits).
  */
 import { z } from 'zod';
-import { ApprovalMode, OrderStatus, PaymentStatus, PrintJobStatus, ShopStatus } from './enums.js';
+import {
+  ApprovalMode,
+  DemoPaymentOutcome,
+  OrderStatus,
+  PaymentStatus,
+  PrintJobStatus,
+  RejectReasonCode,
+  ShopStatus,
+} from './enums.js';
 import { OrderStatusSchema, PrintOptionsSchema, QuoteSchema } from './schemas.js';
 
 const enumValues = <T extends Record<string, string>>(obj: T) =>
@@ -516,6 +524,7 @@ export const AdminPrinterUpdateRequestSchema = z.strictObject({
 export type AdminPrinterUpdateRequest = z.infer<typeof AdminPrinterUpdateRequestSchema>;
 
 // ─── Pricing versions (FR-ADMIN-06) ───
+const MAX_RATE_PAISE = 100_000; // ₹1,000 per side: a typo guard, not a business rule
 
 export const AdminPricingVersionSchema = z.object({
   id: z.uuid(),
@@ -721,3 +730,129 @@ export const AdminOverviewSchema = z.object({
   ),
 });
 export type AdminOverview = z.infer<typeof AdminOverviewSchema>;
+
+const ratePaise = z.int().min(1).max(MAX_RATE_PAISE);
+
+/** POST /api/admin/shops/:id/pricing — creates a new version; rows are never edited. */
+export const CreatePricingVersionSchema = z
+  .strictObject({
+    monoRatePaise: ratePaise,
+    colourRatePaise: ratePaise,
+    monoDuplexRatePaise: ratePaise.nullable().optional(),
+    colourDuplexRatePaise: ratePaise.nullable().optional(),
+    duplexRule: z.enum(['SAME_AS_SIMPLEX', 'DISCOUNTED_SIDE_RATE']).default('SAME_AS_SIMPLEX'),
+    minimumChargePaise: z.int().min(0).max(MAX_RATE_PAISE).default(0),
+    /** Defaults to now; a future time schedules the change. */
+    effectiveFrom: z.iso.datetime().optional(),
+  })
+  .refine(
+    (v) =>
+      v.duplexRule === 'SAME_AS_SIMPLEX' ||
+      (v.monoDuplexRatePaise != null && v.colourDuplexRatePaise != null),
+    { message: 'Duplex rates are required for DISCOUNTED_SIDE_RATE', path: ['duplexRule'] },
+  );
+export type CreatePricingVersion = z.infer<typeof CreatePricingVersionSchema>;
+
+// ─── Demo controls (P2.2 / P3.5) — non-production only ───
+
+export const DemoOtpInboxItemSchema = z.object({
+  /** Masked to the last 4 digits. */
+  phone: z.string(),
+  code: z.string(),
+  sentAt: z.string(),
+  expiresAt: z.string(),
+});
+export type DemoOtpInboxItem = z.infer<typeof DemoOtpInboxItemSchema>;
+
+/** GET /api/admin/demo/otp-inbox */
+export const DemoOtpInboxSchema = z.object({ items: z.array(DemoOtpInboxItemSchema) });
+export type DemoOtpInbox = z.infer<typeof DemoOtpInboxSchema>;
+
+const DemoPaymentOutcomeSchema = z.enum(enumValues(DemoPaymentOutcome));
+
+export const DemoPaymentOrderSchema = z.object({
+  id: z.uuid(),
+  publicRef: z.string(),
+  shopName: z.string(),
+  status: OrderStatusSchema,
+  amountPaise: z.int().nullable(),
+  paymentStatus: PaymentStatusSchema.nullable(),
+  /** Outcome the simulated gateway will use for this order's next payment (null = SUCCESS). */
+  nextOutcome: DemoPaymentOutcomeSchema.nullable(),
+  createdAt: z.string(),
+});
+export type DemoPaymentOrder = z.infer<typeof DemoPaymentOrderSchema>;
+
+/** GET /api/admin/demo/payments — recent orders with their simulated payment outcome. */
+export const DemoPaymentsSchema = z.object({
+  outcomes: z.array(DemoPaymentOutcomeSchema),
+  orders: z.array(DemoPaymentOrderSchema),
+});
+export type DemoPayments = z.infer<typeof DemoPaymentsSchema>;
+
+/** PUT /api/admin/demo/payments/:orderId/outcome — null clears (back to SUCCESS). */
+export const SetDemoOutcomeRequestSchema = z.strictObject({
+  outcome: DemoPaymentOutcomeSchema.nullable(),
+});
+export type SetDemoOutcomeRequest = z.infer<typeof SetDemoOutcomeRequestSchema>;
+
+// ─── Business rules (P3.4 / P3.6) ───
+
+/** POST /api/admin/orders/:id/reject — admin reject after payment (→ refund). */
+export const AdminRejectOrderRequestSchema = z.strictObject({
+  reasonCode: z.enum(enumValues(RejectReasonCode)),
+  note: z.string().max(500).optional(),
+});
+export type AdminRejectOrderRequest = z.infer<typeof AdminRejectOrderRequestSchema>;
+
+/** Result of an admin reject / refund retry. */
+export const AdminOrderActionResultSchema = z.object({
+  orderId: z.uuid(),
+  status: OrderStatusSchema,
+  refund: z
+    .object({
+      id: z.uuid(),
+      status: z.enum(['PENDING', 'SUCCEEDED', 'FAILED']),
+      amountPaise: z.int(),
+      isSimulated: z.boolean(),
+    })
+    .nullable(),
+});
+export type AdminOrderActionResult = z.infer<typeof AdminOrderActionResultSchema>;
+
+/** Paid orders waiting while their shop can't take work (T19). */
+export const HeldOrderSchema = z.object({
+  orderId: z.uuid(),
+  publicRef: z.string(),
+  shopId: z.uuid(),
+  shopName: z.string(),
+  shopStatus: ShopStatusSchema,
+  /** SHOP_NOT_OPEN | SHOP_MAINTENANCE | OUTSIDE_OPENING_HOURS */
+  reason: z.string(),
+  amountPaise: z.int().nullable(),
+  paidAt: z.string().nullable(),
+});
+export type HeldOrder = z.infer<typeof HeldOrderSchema>;
+
+/**
+ * PATCH /api/admin/shops/:id/settlement — merchant-of-record readiness (P3.8, D6). Stored only;
+ * nothing uses these values until a live gateway is approved.
+ */
+export const UpdateShopSettlementRequestSchema = z.strictObject({
+  gatewayAccountId: z.string().trim().min(1).max(100).nullable().optional(),
+  settlementConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+export type UpdateShopSettlementRequest = z.infer<typeof UpdateShopSettlementRequestSchema>;
+
+export const ShopSettlementSchema = z.object({
+  shopId: z.uuid(),
+  gatewayAccountId: z.string().nullable(),
+  settlementConfig: z.record(z.string(), z.unknown()).nullable(),
+  /** Always false until ADR-001 (D6) is decided. */
+  active: z.literal(false),
+});
+export type ShopSettlement = z.infer<typeof ShopSettlementSchema>;
+
+/** GET /api/admin/held-orders */
+export const HeldOrdersSchema = z.object({ items: z.array(HeldOrderSchema) });
+export type HeldOrders = z.infer<typeof HeldOrdersSchema>;
