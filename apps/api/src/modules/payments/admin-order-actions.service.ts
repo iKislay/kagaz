@@ -4,10 +4,13 @@ import {
   type AdminRejectOrderRequest,
   type HeldOrder,
   OrderStatus,
+  type ShopSettlement,
+  type UpdateShopSettlementRequest,
 } from '@kagaz/shared';
 import { type Actor } from '../../common/actor.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import { OrderStateMachine } from '../orders/order-state-machine.js';
 import { isWithinOpeningHours } from '../shops/opening-hours.js';
 import { RefundsService } from './refunds.service.js';
@@ -105,6 +108,50 @@ export class AdminOrderActionsService {
       });
     }
     return held;
+  }
+
+  /** P3.8: store (not activate) a shop's gateway account and settlement config. Audited. */
+  async updateSettlement(
+    shopId: string,
+    req: UpdateShopSettlementRequest,
+    actor: Actor,
+  ): Promise<ShopSettlement> {
+    const exists =
+      /^[0-9a-f-]{36}$/i.test(shopId) &&
+      (await this.prisma.shop.count({ where: { id: shopId } })) === 1;
+    if (!exists) throw new AppError('SHOP_NOT_FOUND', 'Shop not found', HttpStatus.NOT_FOUND);
+    const shop = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.shop.update({
+        where: { id: shopId },
+        data: {
+          ...(req.gatewayAccountId === undefined ? {} : { gatewayAccountId: req.gatewayAccountId }),
+          ...(req.settlementConfig === undefined
+            ? {}
+            : {
+                settlementConfig:
+                  req.settlementConfig === null
+                    ? Prisma.DbNull
+                    : (req.settlementConfig as Prisma.InputJsonObject),
+              }),
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorType: actor.type,
+          actorId: actor.id,
+          shopId,
+          action: 'shop.settlement_updated',
+          metadata: { gatewayAccountIdSet: updated.gatewayAccountId !== null },
+        },
+      });
+      return updated;
+    });
+    return {
+      shopId,
+      gatewayAccountId: shop.gatewayAccountId,
+      settlementConfig: (shop.settlementConfig as Record<string, unknown> | null) ?? null,
+      active: false,
+    };
   }
 
   private async requireOrder(orderId: string): Promise<void> {

@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { type Request } from 'express';
 import {
   type AdminOrderActionResult,
@@ -8,6 +19,9 @@ import {
   type HeldOrders,
   type SetDemoOutcomeRequest,
   SetDemoOutcomeRequestSchema,
+  type ShopSettlement,
+  type UpdateShopSettlementRequest,
+  UpdateShopSettlementRequestSchema,
 } from '@kagaz/shared';
 import { type Actor } from '../../common/actor.js';
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
@@ -38,6 +52,17 @@ export class AdminPaymentsController {
   @HttpCode(200)
   refund(@Param('id') id: string, @Req() req: AdminRequest): Promise<AdminOrderActionResult> {
     return this.actions.retryRefund(id, adminActor(req));
+  }
+
+  /** P3.8: merchant-of-record readiness fields — stored, never active until D6 is decided. */
+  @Patch('shops/:id/settlement')
+  settlement(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateShopSettlementRequestSchema))
+    body: UpdateShopSettlementRequest,
+    @Req() req: AdminRequest,
+  ): Promise<ShopSettlement> {
+    return this.actions.updateSettlement(id, body, adminActor(req));
   }
 
   @Get('held-orders')

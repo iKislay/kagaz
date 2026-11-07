@@ -423,6 +423,25 @@ export const HeldOrderSchema = z.object({
 });
 export type HeldOrder = z.infer<typeof HeldOrderSchema>;
 
+/**
+ * PATCH /api/admin/shops/:id/settlement — merchant-of-record readiness (P3.8, D6). Stored only;
+ * nothing uses these values until a live gateway is approved.
+ */
+export const UpdateShopSettlementRequestSchema = z.strictObject({
+  gatewayAccountId: z.string().trim().min(1).max(100).nullable().optional(),
+  settlementConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+export type UpdateShopSettlementRequest = z.infer<typeof UpdateShopSettlementRequestSchema>;
+
+export const ShopSettlementSchema = z.object({
+  shopId: z.uuid(),
+  gatewayAccountId: z.string().nullable(),
+  settlementConfig: z.record(z.string(), z.unknown()).nullable(),
+  /** Always false until ADR-001 (D6) is decided. */
+  active: z.literal(false),
+});
+export type ShopSettlement = z.infer<typeof ShopSettlementSchema>;
+
 /** GET /api/admin/held-orders */
 export const HeldOrdersSchema = z.object({ items: z.array(HeldOrderSchema) });
 export type HeldOrders = z.infer<typeof HeldOrdersSchema>;

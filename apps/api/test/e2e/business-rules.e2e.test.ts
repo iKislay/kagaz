@@ -305,4 +305,30 @@ describe('cancellation and business rules (P3.6)', () => {
     });
     expect((await pay(h, order).expect(409)).body.error.code).toBe('SHOP_UNAVAILABLE');
   });
+
+  it('P3.8: admin stores settlement fields (inactive)', async () => {
+    const shop = await createShop(h.prisma);
+    const res = await h
+      .http()
+      .patch(`/api/admin/shops/${shop.id}/settlement`)
+      .set('Cookie', admin)
+      .send({ gatewayAccountId: 'acc_TEST123', settlementConfig: { model: 'PENDING_D6' } })
+      .expect(200);
+    expect(res.body).toEqual({
+      shopId: shop.id,
+      gatewayAccountId: 'acc_TEST123',
+      settlementConfig: { model: 'PENDING_D6' },
+      active: false,
+    });
+    await h
+      .http()
+      .patch(`/api/admin/shops/${shop.id}/settlement`)
+      .send({ gatewayAccountId: 'x' })
+      .expect(401);
+    expect(
+      await h.prisma.auditLog.count({
+        where: { shopId: shop.id, action: 'shop.settlement_updated' },
+      }),
+    ).toBe(1);
+  });
 });
