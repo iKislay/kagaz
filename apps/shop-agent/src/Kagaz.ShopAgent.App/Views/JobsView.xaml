@@ -75,6 +75,8 @@
                                         <TextBlock Text="{Binding Summary}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                                         <TextBlock Text="{Binding StatusLabel}" FontSize="12" Margin="0,2,0,0"
                                                    Foreground="{Binding Status, Converter={StaticResource StatusBrush}}" />
+                                        <TextBlock Text="{Binding LiveStatus}" Style="{StaticResource SecondaryText}" FontSize="11" Margin="0,1,0,0"
+                                                   Visibility="{Binding LiveStatus, Converter={StaticResource NullToVisibility}}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" Margin="10,0,0,0">
                                         <TextBlock Text="{Binding DisplayAmount}" Style="{StaticResource HeadlineText}" FontSize="14" HorizontalAlignment="Right" />

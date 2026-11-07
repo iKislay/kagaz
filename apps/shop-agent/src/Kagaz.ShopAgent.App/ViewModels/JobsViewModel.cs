@@ -9,7 +9,7 @@ using Kagaz.ShopAgent.Core;
 namespace Kagaz.ShopAgent.App.ViewModels;
 
 /// <summary>One order as the operator sees it (no customer phone number — the API never sends it).</summary>
-public sealed class JobItem
+public sealed partial class JobItem : ObservableObject
 {
     private static readonly CultureInfo India = new("en-IN");
     private static readonly TimeZoneInfo Kolkata = FindKolkata();
@@ -20,6 +20,10 @@ public sealed class JobItem
     }
 
     public ShopJob ShopJob { get; }
+
+    /// <summary>Live spooler status from this PC's monitor ("Printing page 2 of 5", "Printer is out of paper").</summary>
+    [ObservableProperty]
+    private string? _liveStatus;
 
     public string OrderId => ShopJob.OrderId;
     public string PublicRef => ShopJob.PublicRef;
@@ -130,6 +134,7 @@ public sealed partial class JobsViewModel : ObservableObject
     private readonly AgentStateStore _state;
     private readonly AppStatus _status;
     private readonly AgentSettings _settings;
+    private readonly AgentSignals _signals;
     private readonly List<JobItem> _all = new();
     private HashSet<string>? _knownPending;
 
@@ -173,8 +178,10 @@ public sealed partial class JobsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ConfirmMarkReadyCommand))]
     private bool _markReadyChecked;
 
-    public JobsViewModel(ShopApiClient api, AgentStateStore state, AppStatus status, AgentSettings settings)
+    public JobsViewModel(ShopApiClient api, AgentStateStore state, AppStatus status, AgentSettings settings, AgentSignals signals)
     {
+        _signals = signals;
+        status.LiveStatusChanged += OnLiveStatusChanged;
         _api = api;
         _state = state;
         _status = status;
@@ -209,15 +216,36 @@ public sealed partial class JobsViewModel : ObservableObject
         new("OTHER", "Other reason"),
     ];
 
-    /// <summary>Poll loop. Call from the UI thread; ends when <paramref name="ct"/> is cancelled.</summary>
+    /// <summary>
+    /// Refresh loop. Call from the UI thread; ends when <paramref name="ct"/> is cancelled. Socket hints
+    /// (P2.9) wake it immediately; otherwise it polls every 10 s while the socket is up (safety poll) and
+    /// every <see cref="AgentSettings.PollIntervalSeconds"/> while it is down.
+    /// </summary>
     public async Task RunAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
             if (_status.IsPaired) await RefreshAsync();
-            try { await Task.Delay(TimeSpan.FromSeconds(Math.Max(2, _settings.PollIntervalSeconds)), ct); }
+            var interval = TimeSpan.FromSeconds(_status.RealtimeConnected
+                ? Math.Max(2, _settings.SafetyPollSeconds)
+                : Math.Max(2, _settings.PollIntervalSeconds));
+            try { await _signals.Jobs.WaitAsync(interval, ct); }
             catch (OperationCanceledException) { return; }
         }
+    }
+
+    private void OnLiveStatusChanged(string orderId)
+    {
+        void Apply()
+        {
+            foreach (var job in _all.Where(j => string.Equals(j.OrderId, orderId, StringComparison.OrdinalIgnoreCase)))
+            {
+                job.LiveStatus = _status.LiveStatus.TryGetValue(orderId, out var text) ? text : null;
+            }
+        }
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess()) Apply();
+        else dispatcher.BeginInvoke(Apply);
     }
 
     [RelayCommand]
@@ -227,7 +255,10 @@ public sealed partial class JobsViewModel : ObservableObject
         {
             var jobs = await _api.ListJobsAsync(status: null);
             _all.Clear();
-            _all.AddRange(jobs.Select(j => new JobItem(j)));
+            _all.AddRange(jobs.Select(j => new JobItem(j)
+            {
+                LiveStatus = _status.LiveStatus.TryGetValue(j.OrderId, out var live) ? live : null,
+            }));
             Error = null;
             LastUpdated = $"Updated {DateTime.Now:h:mm:ss tt}";
             NotifyNewPending();

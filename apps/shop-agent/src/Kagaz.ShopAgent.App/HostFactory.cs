@@ -80,6 +80,7 @@ public static class HostFactory
 
         builder.Services.AddHostedService<HeartbeatService>();
         builder.Services.AddHostedService<PrintWorkerService>();
+        builder.Services.AddHostedService<RealtimeService>();
         builder.Services.AddSingleton<TokenRotationService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<TokenRotationService>());
 
