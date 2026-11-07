@@ -89,6 +89,9 @@ public sealed partial class JobItem : ObservableObject
     /// <summary>READY needs a human (invariant 9) and a print that reached the spooler.</summary>
     public bool CanMarkReady => Status == "PRINTING" && PrintJob is { Status: "SUBMITTED" or "SPOOLER_COMPLETE" };
 
+    /// <summary>P2.11: the print outcome is unknown or failed; the operator decides.</summary>
+    public bool NeedsCheck => Status == "NEEDS_OPERATOR_CHECK";
+
     private static string FormatTime(string iso) =>
         DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t)
             ? TimeZoneInfo.ConvertTime(t, Kolkata).ToString("d MMM, h:mm tt", India)
@@ -143,11 +146,13 @@ public sealed partial class JobsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelection))]
-    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(OpenRejectCommand), nameof(OpenMarkReadyCommand), nameof(OpenPreviewCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(OpenRejectCommand), nameof(OpenMarkReadyCommand), nameof(OpenPreviewCommand),
+        nameof(OpenConfirmPrintedCommand), nameof(OpenReprintCommand), nameof(OpenMarkFailedCommand))]
     private JobItem? _selectedJob;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(SubmitRejectCommand), nameof(ConfirmMarkReadyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(SubmitRejectCommand), nameof(ConfirmMarkReadyCommand),
+        nameof(SubmitResolveCommand), nameof(ContinueReprintCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -384,6 +389,114 @@ public sealed partial class JobsViewModel : ObservableObject
             IsMarkReadyOpen = false;
             _status.ShowToast($"{job.PublicRef} is ready for pickup", "The customer can now collect it with their code.");
         });
+    }
+
+    // ─── Needs check (P2.11) ───
+
+    public const string NeedsCheckWarning =
+        "Check the printer output tray before reprinting — reprinting may produce duplicate pages";
+
+    /// <summary>Which resolve sheet is open; reprint takes two explicit steps.</summary>
+    public enum ResolveSheet { None, ConfirmPrinted, ReprintCheck, ReprintFinal, MarkFailed }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmPrintedOpen), nameof(IsReprintCheckOpen), nameof(IsReprintFinalOpen), nameof(IsMarkFailedOpen))]
+    [NotifyCanExecuteChangedFor(nameof(SubmitResolveCommand), nameof(ContinueReprintCommand))]
+    private ResolveSheet _resolveStep;
+
+    /// <summary>The operator's tick on the current resolve sheet (tray checked / stack found).</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitResolveCommand), nameof(ContinueReprintCommand))]
+    private bool _resolveChecked;
+
+    [ObservableProperty]
+    private string? _resolveNote;
+
+    /// <summary>One key per opened sheet: a double click or retry can't resolve twice.</summary>
+    private string _resolveIdempotencyKey = Guid.NewGuid().ToString();
+
+    public bool IsConfirmPrintedOpen => ResolveStep == ResolveSheet.ConfirmPrinted;
+    public bool IsReprintCheckOpen => ResolveStep == ResolveSheet.ReprintCheck;
+    public bool IsReprintFinalOpen => ResolveStep == ResolveSheet.ReprintFinal;
+    public bool IsMarkFailedOpen => ResolveStep == ResolveSheet.MarkFailed;
+
+    private bool CanOpenResolve() => SelectedJob is { NeedsCheck: true };
+
+    [RelayCommand(CanExecute = nameof(CanOpenResolve))]
+    private void OpenConfirmPrinted() => OpenResolve(ResolveSheet.ConfirmPrinted);
+
+    [RelayCommand(CanExecute = nameof(CanOpenResolve))]
+    private void OpenReprint() => OpenResolve(ResolveSheet.ReprintCheck);
+
+    [RelayCommand(CanExecute = nameof(CanOpenResolve))]
+    private void OpenMarkFailed() => OpenResolve(ResolveSheet.MarkFailed);
+
+    [RelayCommand]
+    private void CancelResolve() => ResolveStep = ResolveSheet.None;
+
+    private bool CanContinueReprint() => !IsBusy && ResolveStep == ResolveSheet.ReprintCheck && ResolveChecked;
+
+    /// <summary>Reprint step 1 → step 2: a second, separate confirmation.</summary>
+    [RelayCommand(CanExecute = nameof(CanContinueReprint))]
+    private void ContinueReprint() => ResolveStep = ResolveSheet.ReprintFinal;
+
+    private bool CanSubmitResolve() => !IsBusy && ResolveStep switch
+    {
+        ResolveSheet.ConfirmPrinted => ResolveChecked,
+        ResolveSheet.ReprintFinal => true, // its tick was step 1
+        ResolveSheet.MarkFailed => true,
+        _ => false,
+    };
+
+    [RelayCommand(CanExecute = nameof(CanSubmitResolve))]
+    private async Task SubmitResolveAsync()
+    {
+        var job = SelectedJob;
+        if (job is null) return;
+        var step = ResolveStep;
+        var request = step switch
+        {
+            ResolveSheet.ConfirmPrinted => new ResolveJobRequest(ResolveAction.ConfirmPrinted, null, Trimmed(ResolveNote)),
+            // confirm: true is only ever sent from the second reprint confirmation.
+            ResolveSheet.ReprintFinal => new ResolveJobRequest(ResolveAction.Reprint, true, Trimmed(ResolveNote)),
+            ResolveSheet.MarkFailed => new ResolveJobRequest(ResolveAction.MarkFailed, null, Trimmed(ResolveNote)),
+            _ => null,
+        };
+        if (request is null) return;
+
+        await RunActionAsync(async () =>
+        {
+            await _api.ResolveJobAsync(job.OrderId, request, _resolveIdempotencyKey);
+            ResolveStep = ResolveSheet.None;
+            switch (step)
+            {
+                case ResolveSheet.ConfirmPrinted:
+                    _status.ShowToast($"{job.PublicRef} is ready for pickup", "Confirmed as printed.");
+                    break;
+                case ResolveSheet.ReprintFinal:
+                    _status.ShowToast($"Reprinting {job.PublicRef}", "A new attempt was queued with the same packet and pickup code.");
+                    _signals.Jobs.Pulse();
+                    break;
+                default:
+                    _status.ShowToast($"{job.PublicRef} marked failed", job.IsDemoPayment ? "Demo refund — no money moved" : "The customer will be refunded.");
+                    break;
+            }
+        });
+    }
+
+    private void OpenResolve(ResolveSheet step)
+    {
+        ResolveChecked = false;
+        ResolveNote = null;
+        _resolveIdempotencyKey = Guid.NewGuid().ToString();
+        ResolveStep = step;
+    }
+
+    private static string? Trimmed(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note)) return null;
+        var t = note.Trim();
+        return t.Length > 500 ? t[..500] : t;
     }
 
     // ─── Preview ───

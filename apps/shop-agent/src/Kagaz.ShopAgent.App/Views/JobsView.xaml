@@ -164,9 +164,25 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Needs check (P2.11): the outcome is unknown — check the tray first. -->
+                        <Border Background="#1FFF9500" CornerRadius="8" Padding="12,10" Margin="0,8,0,0"
+                                Visibility="{Binding NeedsCheck, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="14" Foreground="{StaticResource OrangeBrush}" Margin="0,0,8,0" VerticalAlignment="Top" />
+                                <TextBlock Text="{x:Static vm:JobsViewModel.NeedsCheckWarning}" Style="{StaticResource BodyText}" FontWeight="SemiBold"
+                                           TextWrapping="Wrap" MaxWidth="380" />
+                            </StackPanel>
+                        </Border>
+
                         <Border Style="{StaticResource Hairline}" Margin="0,16,0,16" />
 
                         <WrapPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                            <Button Content="Confirm printed…" Style="{StaticResource PrimaryButton}" Command="{Binding OpenConfirmPrintedCommand}" Margin="0,0,8,8"
+                                    Visibility="{Binding SelectedJob.NeedsCheck, Converter={StaticResource BoolToVisibility}}" />
+                            <Button Content="Reprint…" Style="{StaticResource QuietButton}" Command="{Binding OpenReprintCommand}" Margin="0,0,8,8"
+                                    Visibility="{Binding SelectedJob.NeedsCheck, Converter={StaticResource BoolToVisibility}}" />
+                            <Button Content="Mark failed…" Style="{StaticResource DestructiveButton}" Command="{Binding OpenMarkFailedCommand}" Margin="0,0,8,8"
+                                    Visibility="{Binding SelectedJob.NeedsCheck, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="Accept" Style="{StaticResource PrimaryButton}" Command="{Binding AcceptCommand}" Margin="0,0,8,8"
                                     Visibility="{Binding SelectedJob.CanAccept, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="Mark Ready…" Style="{StaticResource PrimaryButton}" Command="{Binding OpenMarkReadyCommand}" Margin="0,0,8,8"
@@ -223,6 +239,92 @@
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
                         <Button Content="Cancel" Style="{StaticResource QuietButton}" Command="{Binding CancelMarkReadyCommand}" Margin="0,0,10,0" IsCancel="True" />
                         <Button Content="Mark Ready" Style="{StaticResource PrimaryButton}" Command="{Binding ConfirmMarkReadyCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+        <!-- Needs check: Confirm printed (→ READY_FOR_PICKUP; a human decision, invariant 9) -->
+        <Border Grid.RowSpan="3" Background="{StaticResource ScrimBrush}" Margin="-36,-28"
+                Visibility="{Binding IsConfirmPrintedOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}">
+                <StackPanel>
+                    <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" FontSize="26" Foreground="{StaticResource GreenBrush}" HorizontalAlignment="Left" />
+                    <TextBlock Style="{StaticResource TitleText}" FontSize="20" Margin="0,10,0,0">
+                        <Run Text="Confirm" /> <Run Text="{Binding SelectedJob.PublicRef, Mode=OneWay}" /> <Run Text="printed?" />
+                    </TextBlock>
+                    <TextBlock Text="The order becomes ready for pickup and the customer is told to collect it."
+                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,6,0,16" />
+                    <CheckBox Style="{StaticResource CheckField}" IsChecked="{Binding ResolveChecked}">
+                        <TextBlock Text="I found every page and the pickup slip in the output tray" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </CheckBox>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                        <Button Content="Cancel" Style="{StaticResource QuietButton}" Command="{Binding CancelResolveCommand}" Margin="0,0,10,0" IsCancel="True" />
+                        <Button Content="Confirm printed" Style="{StaticResource PrimaryButton}" Command="{Binding SubmitResolveCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Needs check: Reprint, step 1 of 2 -->
+        <Border Grid.RowSpan="3" Background="{StaticResource ScrimBrush}" Margin="-36,-28"
+                Visibility="{Binding IsReprintCheckOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}">
+                <StackPanel>
+                    <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="26" Foreground="{StaticResource OrangeBrush}" HorizontalAlignment="Left" />
+                    <TextBlock Style="{StaticResource TitleText}" FontSize="20" Margin="0,10,0,0">
+                        <Run Text="Reprint" /> <Run Text="{Binding SelectedJob.PublicRef, Mode=OneWay}" /><Run Text="?" />
+                    </TextBlock>
+                    <TextBlock Text="{x:Static vm:JobsViewModel.NeedsCheckWarning}" Style="{StaticResource BodyText}" FontWeight="SemiBold"
+                               TextWrapping="Wrap" Margin="0,6,0,6" />
+                    <TextBlock Text="A reprint sends the whole packet again — every page, every copy and the pickup slip."
+                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,0,0,16" />
+                    <CheckBox Style="{StaticResource CheckField}" IsChecked="{Binding ResolveChecked}">
+                        <TextBlock Text="I checked the output tray and this order did not print completely" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
+                    </CheckBox>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                        <Button Content="Cancel" Style="{StaticResource QuietButton}" Command="{Binding CancelResolveCommand}" Margin="0,0,10,0" IsCancel="True" />
+                        <Button Content="Continue…" Style="{StaticResource PrimaryButton}" Command="{Binding ContinueReprintCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Needs check: Reprint, step 2 of 2 (sends confirm: true) -->
+        <Border Grid.RowSpan="3" Background="{StaticResource ScrimBrush}" Margin="-36,-28"
+                Visibility="{Binding IsReprintFinalOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}">
+                <StackPanel>
+                    <TextBlock Text="&#xE749;" Style="{StaticResource IconText}" FontSize="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Left" />
+                    <TextBlock Text="Print it again now?" Style="{StaticResource TitleText}" FontSize="20" Margin="0,10,0,0" />
+                    <TextBlock Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,6,0,0">
+                        <Run Text="This is your last chance to stop a duplicate." />
+                        <Run Text="{Binding SelectedJob.PublicRef, Mode=OneWay}" FontWeight="SemiBold" />
+                        <Run Text="will be queued as a new attempt with the same packet and pickup code, and recorded in the audit log." />
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                        <Button Content="Don't reprint" Style="{StaticResource QuietButton}" Command="{Binding CancelResolveCommand}" Margin="0,0,10,0" IsCancel="True" />
+                        <Button Content="Reprint now" Style="{StaticResource PrimaryButton}" Command="{Binding SubmitResolveCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Needs check: Mark failed (→ REJECTED + refund) -->
+        <Border Grid.RowSpan="3" Background="{StaticResource ScrimBrush}" Margin="-36,-28"
+                Visibility="{Binding IsMarkFailedOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource TitleText}" FontSize="20">
+                        <Run Text="Mark" /> <Run Text="{Binding SelectedJob.PublicRef, Mode=OneWay}" /> <Run Text="failed?" />
+                    </TextBlock>
+                    <TextBlock Text="The order is cancelled and the customer refunded. Nothing is printed."
+                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,16" />
+                    <TextBlock Text="Note (optional)" Style="{StaticResource FieldLabel}" Margin="0,0,0,6" />
+                    <TextBox Text="{Binding ResolveNote, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}"
+                             MaxLength="500" TextWrapping="Wrap" AcceptsReturn="True" Height="64" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                        <Button Content="Cancel" Style="{StaticResource QuietButton}" Command="{Binding CancelResolveCommand}" Margin="0,0,10,0" IsCancel="True" />
+                        <Button Content="Mark failed" Style="{StaticResource PrimaryButton}" Background="{StaticResource RedBrush}" Command="{Binding SubmitResolveCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Border>
