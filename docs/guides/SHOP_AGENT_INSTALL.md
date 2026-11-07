@@ -20,13 +20,11 @@ The script:
    this step needs internet once;
 3. runs `vpk pack` into `artifacts/shop-agent/releases/`:
 
-| File                                 | What it is                                         |
-| ------------------------------------ | -------------------------------------------------- |
-| `KagazShop-win-Setup.exe`            | the installer to give to a shop (≈ 76 MB)           |
-| `KagazShop-win-Portable.zip`         | portable copy (no install; cannot self-update)     |
-| `KagazShop-<version>-full.nupkg`     | full update package                                |
-| `KagazShop-<version>-delta.nupkg`    | delta from the previous version (2nd build onward) |
-| `releases.win.json`, `assets.win.json`, `RELEASES` | the update feed index                |
+- `KagazShop-win-Setup.exe` — the installer to give to a shop (about 76 MB);
+- `KagazShop-win-Portable.zip` — portable copy (no install; cannot self-update);
+- `KagazShop-<version>-full.nupkg` — full update package;
+- `KagazShop-<version>-delta.nupkg` — delta from the previous version (second build onward);
+- `releases.win.json`, `assets.win.json`, `RELEASES` — the update feed index.
 
 `artifacts/` and `.tools/` are git-ignored.
 
