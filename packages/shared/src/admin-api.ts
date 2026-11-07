@@ -289,6 +289,51 @@ export const AdminLoginResponseSchema = z.object({
 });
 export type AdminLoginResponse = z.infer<typeof AdminLoginResponseSchema>;
 
+// ─── Pricing versions (P2.5) ───
+
+const MAX_RATE_PAISE = 100_000; // ₹1,000 per side: a typo guard, not a business rule
+
+export const AdminPricingVersionSchema = z.object({
+  id: z.uuid(),
+  monoRatePaise: z.int(),
+  colourRatePaise: z.int(),
+  monoDuplexRatePaise: z.int().nullable(),
+  colourDuplexRatePaise: z.int().nullable(),
+  duplexRule: z.enum(['SAME_AS_SIMPLEX', 'DISCOUNTED_SIDE_RATE']),
+  minimumChargePaise: z.int(),
+  effectiveFrom: z.string(),
+  createdAt: z.string(),
+  /** The row quotes use right now (latest effective_from ≤ now). */
+  current: z.boolean(),
+});
+export type AdminPricingVersion = z.infer<typeof AdminPricingVersionSchema>;
+
+/** GET /api/admin/shops/:id/pricing — newest effective_from first. */
+export const AdminPricingListSchema = z.object({ versions: z.array(AdminPricingVersionSchema) });
+export type AdminPricingList = z.infer<typeof AdminPricingListSchema>;
+
+const ratePaise = z.int().min(1).max(MAX_RATE_PAISE);
+
+/** POST /api/admin/shops/:id/pricing — creates a new version; rows are never edited. */
+export const CreatePricingVersionSchema = z
+  .strictObject({
+    monoRatePaise: ratePaise,
+    colourRatePaise: ratePaise,
+    monoDuplexRatePaise: ratePaise.nullable().optional(),
+    colourDuplexRatePaise: ratePaise.nullable().optional(),
+    duplexRule: z.enum(['SAME_AS_SIMPLEX', 'DISCOUNTED_SIDE_RATE']).default('SAME_AS_SIMPLEX'),
+    minimumChargePaise: z.int().min(0).max(MAX_RATE_PAISE).default(0),
+    /** Defaults to now; a future time schedules the change. */
+    effectiveFrom: z.iso.datetime().optional(),
+  })
+  .refine(
+    (v) =>
+      v.duplexRule === 'SAME_AS_SIMPLEX' ||
+      (v.monoDuplexRatePaise != null && v.colourDuplexRatePaise != null),
+    { message: 'Duplex rates are required for DISCOUNTED_SIDE_RATE', path: ['duplexRule'] },
+  );
+export type CreatePricingVersion = z.infer<typeof CreatePricingVersionSchema>;
+
 // ─── Demo controls (P2.2 / P3.5) — non-production only ───
 
 export const DemoOtpInboxItemSchema = z.object({

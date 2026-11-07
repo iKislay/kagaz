@@ -4,7 +4,10 @@ import { SYSTEM_ACTOR } from '../../common/actor.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
+import { parseOptions } from '../orders/order-view.js';
 import { OrdersService } from '../orders/orders.service.js';
+import { PricingService } from '../pricing/pricing.service.js';
+import { calculateQuote } from '../pricing/quote.js';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.js';
 
 const OPEN_PAYMENT = ['CREATED', 'PENDING'] as const;
@@ -18,6 +21,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly orders: OrdersService,
     private readonly stateMachine: OrderStateMachine,
+    private readonly pricing: PricingService,
   ) {}
 
   /**
@@ -26,6 +30,7 @@ export class PaymentsService {
    * the same payment and produce at most one paid transition (T04).
    */
   async pay(orderId: string): Promise<PayResponse> {
+    await this.ensureQuoteCurrent(orderId);
     const payment = await this.prisma.$transaction(async (tx) => {
       // Serialize pay attempts per order.
       await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
@@ -89,6 +94,43 @@ export class PaymentsService {
     }
 
     return { order: await this.orders.getPublic(orderId), mode };
+  }
+
+  /**
+   * P2.5: before the FIRST payment attempt the quote must come from the pricing row in effect
+   * now. If the shop changed its prices since the customer was quoted, re-quote and answer
+   * 409 PRICE_CHANGED so the customer confirms the new amount. Once a snapshot exists (retry
+   * after a failed payment) it is kept as is.
+   */
+  private async ensureQuoteCurrent(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        payments: { select: { id: true } },
+        files: { where: { kind: 'ORIGINAL', status: 'VALID' }, take: 1 },
+      },
+    });
+    if (!order || order.status !== OrderStatus.AWAITING_PAYMENT) return;
+    if (order.priceSnapshot !== null || order.payments.length > 0 || !order.quote) return;
+    const pageCount = order.files[0]?.pageCount;
+    if (!pageCount) return;
+    const quote = QuoteSchema.parse(order.quote);
+    const current = await this.pricing.getEffectivePricing(order.shopId);
+    if (current.id === quote.pricingId) return;
+
+    const fresh = calculateQuote(current, parseOptions(order.options), pageCount);
+    await this.prisma.$transaction((tx) =>
+      this.stateMachine.updateFields(tx, order, [OrderStatus.AWAITING_PAYMENT], {
+        quote: fresh,
+        amountPaise: fresh.totalPaise,
+      }),
+    );
+    throw new AppError(
+      'PRICE_CHANGED',
+      'The shop updated its prices. Please check the new total and pay again.',
+      HttpStatus.CONFLICT,
+      { quote: fresh },
+    );
   }
 
   /**
