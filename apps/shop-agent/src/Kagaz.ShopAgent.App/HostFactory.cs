@@ -51,7 +51,8 @@ public static class HostFactory
         builder.Services.AddSingleton(new AgentSession());
         builder.Services.AddSingleton<AgentSignals>();
         builder.Services.AddSingleton<ISpoolerProbe, SystemPrintingSpoolerProbe>();
-        builder.Services.AddSingleton<IUpdateService, NoUpdateService>();
+        builder.Services.AddSingleton<IUpdateService, VelopackUpdateService>();
+        builder.Services.AddSingleton(_ => new StartupRegistration(new CurrentUserRunKey()));
         builder.Services.AddSingleton<AppStatus>();
 
         builder.Services.AddHttpClient<ShopApiClient>(client => client.Timeout = TimeSpan.FromSeconds(15));

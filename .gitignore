@@ -35,3 +35,7 @@ Thumbs.db
 
 # Next.js generated types (rewritten by dev/build)
 next-env.d.ts
+
+# Shop agent installer output (scripts/build-shop-agent-installer.ps1)
+artifacts/
+.tools/

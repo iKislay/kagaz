@@ -13,6 +13,8 @@ public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AgentPaths _paths;
     private readonly TokenRotationService _rotation;
+    private readonly StartupRegistration _startup;
+    private bool _loadingStartup;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RotateTokenCommand))]
@@ -24,16 +26,30 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _lastRotated = "—";
 
-    public SettingsViewModel(AgentSettings settings, AgentPaths paths, AppStatus status, TokenRotationService rotation)
+    [ObservableProperty]
+    private bool _startWithWindows;
+
+    [ObservableProperty]
+    private string? _startupMessage;
+
+    public SettingsViewModel(AgentSettings settings, AgentPaths paths, AppStatus status, TokenRotationService rotation,
+        StartupRegistration startup, UpdateViewModel update)
     {
         _paths = paths;
         _rotation = rotation;
+        _startup = startup;
+        Update = update;
+        _loadingStartup = true;
+        try { StartWithWindows = startup.IsEnabled; }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException) { }
+        finally { _loadingStartup = false; }
         Settings = settings;
         Status = status;
         Version = typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
         RefreshLastRotated();
     }
 
+    public UpdateViewModel Update { get; }
     public AgentSettings Settings { get; }
     public AppStatus Status { get; }
     public string Version { get; }
@@ -43,6 +59,20 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string RotationPolicy => Settings.TokenRotationDays > 0
         ? $"Rotated automatically every {Settings.TokenRotationDays} days."
         : "Automatic rotation is off.";
+
+    partial void OnStartWithWindowsChanged(bool value)
+    {
+        if (_loadingStartup) return;
+        try
+        {
+            _startup.SetEnabled(value);
+            StartupMessage = value ? "Kagaz Shop will start when you sign in to Windows." : null;
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            StartupMessage = $"Could not change this setting ({ex.Message}).";
+        }
+    }
 
     [RelayCommand]
     private void OpenLogs() => OpenFolder(_paths.LogsDirectory);
