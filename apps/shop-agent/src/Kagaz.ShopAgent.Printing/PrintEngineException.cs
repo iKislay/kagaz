@@ -8,6 +8,7 @@ public sealed class PrintEngineException : Exception
 {
     public const string UnsupportedSetting = "UNSUPPORTED_SETTING";
     public const string PrinterNotFound = "PRINTER_NOT_FOUND";
+    public const string PrinterUnreachable = "PRINTER_UNREACHABLE";
     public const string InvalidPacket = "INVALID_PACKET";
     public const string Incomplete = "INCOMPLETE";
 

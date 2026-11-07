@@ -219,7 +219,7 @@ kagaz/
 - Printer setup: list installed printers (`PrinterSettings.InstalledPrinters`), operator picks the shop printer and confirms colour/duplex; `PUT /api/shop/printers`.
 - **Done when:** a paid web order appears within 5 s and can be accepted/rejected from the app.
 
-### P1.10 — Windows app: print engine + ready + pickup `[~]`
+### P1.10 — Windows app: print engine + ready + pickup `[x]`
 
 - `IPrintEngine.PrintAsync(pdfPath, PrintRequest{ printerName, colour, duplex, paper=A4, copies=1, documentName })`.
 - Implementation (see [Appendix A.4](#a4-windows-print-engine)): render PDF pages with PDFium and print through a single `PrintDocument` job with explicit `PrinterSettings` (duplex, colour, A4, copies=1) and `DocumentName = KAGAZ-<ref>-A<attempt>`. Keep a fallback engine (SumatraPDF CLI) behind config for the demo if PDFium rendering misbehaves on the chosen printer.
@@ -228,7 +228,8 @@ kagaz/
 - **Mark Ready** button with confirmation "I have checked the printed stack and the pickup slip".
 - **Verify Pickup** screen: 8-char input (auto-uppercase, strips spaces/dashes) → shows order summary → success / error states.
 - **Done when:** a real printer outputs customer pages followed by exactly one slip (T10 manual run), and the code on the slip verifies the order to `COLLECTED`.
-- **Status (2026-11-06):** everything verified end to end on the virtual _Microsoft Print to PDF_ printer — one 7-page job for 3 pages × 2 copies with the slip last, Mark Ready with confirmation, pickup success then `PICKUP_ALREADY_USED`, crash → reconciliation → NEEDS_OPERATOR_CHECK without reprint ([run notes](testing/p1-10-shop-app-virtual-printer.md)). Printing runs in a separate `Kagaz.ShopAgent.PrintHost.exe` so a driver/renderer crash only fails that attempt. **Open:** the real-printer T10 run (blocked on **D1**) and the SumatraPDF fallback engine (only if PDFium misbehaves on that printer).
+- **Status (2026-11-06):** everything verified end to end on the virtual _Microsoft Print to PDF_ printer — one 7-page job for 3 pages × 2 copies with the slip last, Mark Ready with confirmation, pickup success then `PICKUP_ALREADY_USED`, crash → reconciliation → NEEDS_OPERATOR_CHECK without reprint ([run notes](testing/p1-10-shop-app-virtual-printer.md)). Printing runs in a separate `Kagaz.ShopAgent.PrintHost.exe` so a driver/renderer crash only fails that attempt. **Open:** SumatraPDF fallback engine (only if PDFium misbehaves on a printer).
+- **Status (2026-11-07):** **T10 passed on a real printer** (Canon G2010, USB, vendor driver; working default for D1 = this laptop + Canon): one spooler job `KAGAZ-<ref>-A1` with 5 A4 pages for 2 pages × 2 copies, slip last, confirmed on paper; Mark Ready → code on the website → pickup COLLECTED, reuse and wrong code rejected ([run notes](testing/T10-real-printer-canon-g2010.md)). An HP Smart Tank 580-590 on the Microsoft IPP Class Driver could not be reached by Windows (CreateIC error 995); both attempts ended in NEEDS_OPERATOR_CHECK with no reprint.
 
 ### P1.11 — End-to-end rehearsal + demo assets `[ ]`
 

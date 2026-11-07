@@ -42,6 +42,12 @@ public sealed class PdfiumPrintEngine : IPrintEngine
         return Task.Run(() => PrintSync(pdfPath, request), CancellationToken.None);
     }
 
+    /// <summary>
+    /// Prints on the calling thread. The print host calls this from its <c>[STAThread]</c> main thread so GDI
+    /// printing runs on an STA thread (driver UI/COM components expect it) instead of a thread-pool thread.
+    /// </summary>
+    public PrintSubmission PrintOnCurrentThread(string pdfPath, PrintRequest request) => PrintSync(pdfPath, request);
+
     private PrintSubmission PrintSync(string pdfPath, PrintRequest request)
     {
         if (!string.Equals(request.PaperSize, "A4", StringComparison.OrdinalIgnoreCase))
@@ -52,7 +58,14 @@ public sealed class PdfiumPrintEngine : IPrintEngine
         var printerSettings = new PrinterSettings { PrinterName = request.PrinterName };
         if (!printerSettings.IsValid)
         {
-            throw new PrintEngineException(PrintEngineException.PrinterNotFound, $"Printer '{request.PrinterName}' is not installed on this PC.");
+            // IsValid is also false when the printer is installed but its driver can't reach the device
+            // (seen with the IPP class driver over USB: CreateIC fails with 995 after ~16 s).
+            bool installed = PrinterSettings.InstalledPrinters.Cast<string>()
+                .Any(n => string.Equals(n, request.PrinterName, StringComparison.OrdinalIgnoreCase));
+            throw installed
+                ? new PrintEngineException(PrintEngineException.PrinterUnreachable,
+                    $"Printer '{request.PrinterName}' is installed but not responding — check it is on, awake and connected.")
+                : new PrintEngineException(PrintEngineException.PrinterNotFound, $"Printer '{request.PrinterName}' is not installed on this PC.");
         }
 
         // Capability check before printing (A.4): mismatch → FAILED, nothing printed.
