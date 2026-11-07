@@ -2,6 +2,7 @@ using System.IO;
 using Kagaz.ShopAgent.App.Services;
 using Kagaz.ShopAgent.App.ViewModels;
 using Kagaz.ShopAgent.Core;
+using Kagaz.ShopAgent.Core.Spooler;
 using Kagaz.ShopAgent.Printing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,6 +49,9 @@ public static class HostFactory
         builder.Services.AddSingleton<ISecureStore>(_ => new DpapiSecureStore(paths.DeviceTokenPath));
         // Operator token + server signals (revoked / login required / upgrade) — memory only.
         builder.Services.AddSingleton(new AgentSession());
+        builder.Services.AddSingleton<AgentSignals>();
+        builder.Services.AddSingleton<ISpoolerProbe, SystemPrintingSpoolerProbe>();
+        builder.Services.AddSingleton<IUpdateService, NoUpdateService>();
         builder.Services.AddSingleton<AppStatus>();
 
         builder.Services.AddHttpClient<ShopApiClient>(client => client.Timeout = TimeSpan.FromSeconds(15));
@@ -69,6 +73,8 @@ public static class HostFactory
         builder.Services.AddSingleton<JobsViewModel>();
         builder.Services.AddSingleton<PickupViewModel>();
         builder.Services.AddSingleton<SettingsViewModel>();
+        builder.Services.AddSingleton<ShopModeViewModel>();
+        builder.Services.AddSingleton<UpdateViewModel>();
         builder.Services.AddSingleton<ShellViewModel>();
         builder.Services.AddSingleton<MainWindow>();
 

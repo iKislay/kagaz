@@ -178,6 +178,24 @@ public sealed class ShopApiClient
         return await ReadAsync<ShopJob>(response, ct, allowEmpty: true);
     }
 
+    /// <summary>
+    /// Report <c>UNCERTAIN {reason}</c> (contract §1). Against an API that predates the UNCERTAIN variant
+    /// (400 validation error) it falls back to <c>FAILED {error: "UNCERTAIN: …"}</c>, which also puts the
+    /// order in NEEDS_OPERATOR_CHECK.
+    /// </summary>
+    public async Task ReportUncertainAsync(string printJobId, string reason, CancellationToken ct = default)
+    {
+        try
+        {
+            await ReportPrintStatusAsync(printJobId, PrintStatusReportDto.Uncertain(reason), ct);
+        }
+        catch (ApiException ex) when (ex.HttpStatus == 400)
+        {
+            var error = reason.StartsWith("UNCERTAIN", StringComparison.Ordinal) ? reason : $"UNCERTAIN: {reason}";
+            await ReportPrintStatusAsync(printJobId, PrintStatusReportDto.Failed(error), ct);
+        }
+    }
+
     /// <summary>Mark Ready (FR-SHOP-12): the operator has confirmed the printed stack and slip.</summary>
     public async Task<ShopJob> MarkReadyAsync(string orderId, CancellationToken ct = default)
     {

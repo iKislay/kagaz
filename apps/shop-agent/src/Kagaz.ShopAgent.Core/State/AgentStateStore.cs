@@ -19,8 +19,10 @@ public static class LocalPhase
     public const string Submitted = "SUBMITTED";
     /// <summary>SPOOLER_COMPLETE reported; waiting for the operator's Mark Ready.</summary>
     public const string Done = "DONE";
-    /// <summary>FAILED reported; the operator handles it (NEEDS_OPERATOR_CHECK).</summary>
+    /// <summary>FAILED decided (and reported, or to be re-sent); the operator handles it (NEEDS_OPERATOR_CHECK).</summary>
     public const string Failed = "FAILED";
+    /// <summary>UNCERTAIN decided (and reported, or to be re-sent); the operator checks the tray.</summary>
+    public const string Uncertain = "UNCERTAIN";
 }
 
 /// <summary>
@@ -35,6 +37,10 @@ public sealed class LocalJobState
     public string PublicRef { get; set; } = string.Empty;
     public string DocumentName { get; set; } = string.Empty;
     public string PrinterName { get; set; } = string.Empty;
+    /// <summary>Reason sent with FAILED / UNCERTAIN, kept so a lost report can be re-sent verbatim.</summary>
+    public string? Reason { get; set; }
+    /// <summary>Spooler job id reported with SUBMITTED, if found.</summary>
+    public int? SpoolerJobId { get; set; }
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 

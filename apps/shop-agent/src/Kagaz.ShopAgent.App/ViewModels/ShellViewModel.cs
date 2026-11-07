@@ -37,11 +37,15 @@ public sealed partial class ShellViewModel : ObservableObject
         PrintersViewModel printers,
         JobsViewModel jobs,
         PickupViewModel pickup,
-        SettingsViewModel settings)
+        SettingsViewModel settings,
+        ShopModeViewModel mode,
+        UpdateViewModel update)
     {
         _api = api;
         Status = status;
         Login = login;
+        Mode = mode;
+        Update = update;
         Version = typeof(ShellViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
         WindowTitle = "Kagaz Shop";
 
@@ -67,6 +71,8 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public AppStatus Status { get; }
     public OperatorLoginViewModel Login { get; }
+    public ShopModeViewModel Mode { get; }
+    public UpdateViewModel Update { get; }
     public string Version { get; }
     public string WindowTitle { get; }
     public IReadOnlyList<NavigationItem> NavigationItems { get; }

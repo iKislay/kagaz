@@ -98,6 +98,8 @@
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -110,7 +112,33 @@
                 </StackPanel>
             </Border>
 
-            <ContentControl Grid.Row="1" Margin="36,28,36,28" Content="{Binding CurrentPage}" Focusable="False">
+            <!-- Printer problems on this PC (P2.10): paper out, offline, error… -->
+            <Border Grid.Row="1" Style="{StaticResource NoticeBar}" Background="#14FF3B30" BorderBrush="#26FF3B30"
+                    Visibility="{Binding Status.PrinterAlert, Converter={StaticResource NullToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE749;" Style="{StaticResource IconText}" FontSize="13" Foreground="{StaticResource RedBrush}" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding Status.PrinterAlert}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+
+            <!-- Toolbar: approval mode, always visible while paired (P2.6) -->
+            <Border Grid.Row="2" Padding="36,12,36,12" BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="0,0,0,1"
+                    Background="{StaticResource SurfaceBrush}" DataContext="{Binding Mode}"
+                    Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Approval" Style="{StaticResource SecondaryText}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <ListBox AutomationProperties.Name="Approval mode" Style="{StaticResource SegmentedControl}"
+                             ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode, Mode=TwoWay}"
+                             IsEnabled="{Binding CanChange}" VerticalAlignment="Center" />
+                    <CheckBox Style="{StaticResource ToggleSwitch}" Content="Pause auto" Margin="20,0,0,0" VerticalAlignment="Center"
+                              IsChecked="{Binding AutoPaused, Mode=TwoWay}" IsEnabled="{Binding CanChange}"
+                              Visibility="{Binding IsAuto, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding Hint}" Style="{StaticResource SecondaryText}" FontSize="12" VerticalAlignment="Center" Margin="16,0,0,0" />
+                </StackPanel>
+            </Border>
+
+            <ContentControl Grid.Row="3" Margin="36,28,36,28" Content="{Binding CurrentPage}" Focusable="False">
                 <ContentControl.Resources>
                     <DataTemplate DataType="{x:Type vm:PairingViewModel}">
                         <views:PairingView />
@@ -134,7 +162,7 @@
             </ContentControl>
 
             <!-- Toasts: top-right notification banners -->
-            <ItemsControl Grid.Row="1" ItemsSource="{Binding Status.Toasts}" HorizontalAlignment="Right" VerticalAlignment="Top"
+            <ItemsControl Grid.Row="3" ItemsSource="{Binding Status.Toasts}" HorizontalAlignment="Right" VerticalAlignment="Top"
                           Margin="0,16,20,0" Width="320" Focusable="False" IsHitTestVisible="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -163,5 +191,30 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </Grid>
+
+        <!-- "Update required" (P4.4): blocks the whole window while the server says this version is too old. -->
+        <Border Grid.ColumnSpan="2" Background="{StaticResource ScrimBrush}" DataContext="{Binding Update}"
+                Visibility="{Binding Status.UpgradeRequired, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}" MaxWidth="460">
+                <StackPanel>
+                    <TextBlock Text="&#xE777;" Style="{StaticResource IconText}" FontSize="28" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Left" />
+                    <TextBlock Text="Update required" Style="{StaticResource TitleText}" FontSize="22" Margin="0,10,0,0" />
+                    <TextBlock Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,6,0,0">
+                        <Run Text="This is Kagaz Shop" />
+                        <Run Text="{Binding CurrentVersion, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=". The server needs version" />
+                        <Run Text="{Binding Status.MinAgentVersion, Mode=OneWay, TargetNullValue=a newer one}" FontWeight="SemiBold" />
+                        <Run Text="or later. No new jobs will print until this PC is updated." />
+                    </TextBlock>
+                    <TextBlock Text="{Binding UnavailableReason}" Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0"
+                               Visibility="{Binding CanSelfUpdate, Converter={StaticResource InverseBoolToVisibility}}" />
+                    <TextBlock Text="{Binding Message}" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,12,0,0"
+                               Visibility="{Binding Message, Converter={StaticResource NullToVisibility}}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                        <Button Content="Install update" Style="{StaticResource PrimaryButton}" Command="{Binding InstallUpdateCommand}"
+                                Visibility="{Binding CanSelfUpdate, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </Window>

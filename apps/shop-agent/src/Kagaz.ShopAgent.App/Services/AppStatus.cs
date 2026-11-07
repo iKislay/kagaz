@@ -104,6 +104,33 @@ public sealed partial class AppStatus : ObservableObject
 
     public ObservableCollection<Toast> Toasts { get; } = new();
 
+    /// <summary>Live spooler status per order id ("Printing page 2 of 5", "Printer is out of paper").</summary>
+    public System.Collections.Concurrent.ConcurrentDictionary<string, string> LiveStatus { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Printer problems on this PC (P2.10), shown as a notice bar; null when all are READY.</summary>
+    [ObservableProperty]
+    private string? _printerAlert;
+
+    /// <summary>Raised when a live spooler status changes (any thread).</summary>
+    public event Action<string>? LiveStatusChanged;
+
+    public void SetLiveStatus(string orderId, string? text)
+    {
+        bool changed;
+        if (text is null)
+        {
+            changed = LiveStatus.TryRemove(orderId, out _);
+        }
+        else
+        {
+            changed = !LiveStatus.TryGetValue(orderId, out var old) || old != text;
+            LiveStatus[orderId] = text;
+        }
+        if (changed) LiveStatusChanged?.Invoke(orderId);
+    }
+
+    public void SetPrinterAlert(string? alert) => OnUi(() => PrinterAlert = alert);
+
     /// <summary>Raised on the UI thread after a successful pairing.</summary>
     public event Action? Paired;
 
