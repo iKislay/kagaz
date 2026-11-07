@@ -186,6 +186,31 @@ importers:
         specifier: ^5
         version: 5.1.0(@types/node@24.19.2)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
+  scripts:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1162.0
+        version: 3.1162.0
+      '@kagaz/shared':
+        specifier: workspace:^
+        version: link:../packages/shared
+      '@prisma/adapter-pg':
+        specifier: 7.10.1
+        version: 7.10.1
+      pdf-lib:
+        specifier: ^1.17.1
+        version: 1.17.1
+      socket.io-client:
+        specifier: ^4.8.1
+        version: 4.8.4
+    devDependencies:
+      '@kagaz/api':
+        specifier: workspace:*
+        version: link:../apps/api
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+
 packages:
 
   '@alloc/quick-lru@5.3.0':
