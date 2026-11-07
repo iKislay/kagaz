@@ -1,8 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { type OrderStatus, canTransition } from '@kagaz/shared';
 import { type Actor, isHumanActor } from '../../common/actor.js';
+import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { type Order, type Prisma } from '../../generated/prisma/client.js';
+import { AuditService } from '../audit/audit.service.js';
 
 export type Tx = Prisma.TransactionClient;
 
@@ -18,16 +20,24 @@ export interface TransitionParams {
   data?: Omit<Prisma.OrderUncheckedUpdateManyInput, 'id' | 'status' | 'version'>;
   /** Audit action name for human actors (defaults to order.<to lowercase>). */
   auditAction?: string;
+  /** Extra audit metadata for human actors (merged with from/to/reason). */
+  auditMetadata?: Record<string, Prisma.InputJsonValue | null>;
 }
 
 /**
  * The ONLY code allowed to change Order.status (CLAUDE.md invariant 5).
  * Must be called inside a transaction: checks the shared transition table, applies an
  * optimistic-lock update on (status, version), writes an OrderEvent, and an AuditLog row for
- * human actors — all atomically. Realtime notifications are emitted by callers after commit.
+ * human actors — all atomically. An `order.status_changed` domain event is queued on the
+ * transaction and emitted only after COMMIT (DomainEventBus, P2.1).
  */
 @Injectable()
 export class OrderStateMachine {
+  constructor(
+    private readonly audit: AuditService,
+    private readonly events: DomainEventBus,
+  ) {}
+
   async transition(tx: Tx, params: TransitionParams): Promise<Order> {
     const order = await tx.order.findUnique({ where: { id: params.orderId } });
     if (!order) {
@@ -73,19 +83,36 @@ export class OrderStateMachine {
     });
 
     if (isHumanActor(params.actor)) {
-      await tx.auditLog.create({
-        data: {
-          actorType: params.actor.type,
-          actorId: params.actor.id,
+      await this.audit.record(
+        tx,
+        params.actor,
+        params.auditAction ?? `order.${params.to.toLowerCase()}`,
+        {
           shopId: order.shopId,
           orderId: order.id,
-          action: params.auditAction ?? `order.${params.to.toLowerCase()}`,
-          metadata: { from: order.status, to: params.to, reason: params.reason ?? null },
+          metadata: {
+            from: order.status,
+            to: params.to,
+            reason: params.reason ?? null,
+            ...(params.auditMetadata ?? {}),
+          },
         },
-      });
+      );
     }
 
-    return tx.order.findUniqueOrThrow({ where: { id: order.id } });
+    const updatedOrder = await tx.order.findUniqueOrThrow({ where: { id: order.id } });
+    this.events.publish(tx, DomainEvent.ORDER_STATUS_CHANGED, {
+      orderId: order.id,
+      shopId: order.shopId,
+      publicRef: order.publicRef,
+      from: order.status,
+      to: params.to,
+      actorType: params.actor.type,
+      actorId: params.actor.id,
+      reason: params.reason ?? null,
+      at: updatedOrder.updatedAt.toISOString(),
+    });
+    return updatedOrder;
   }
 
   /** Records the initial DRAFT event for a freshly created order. */

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { type INestApplication } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { type CreateOrderResponse, type PrintOptions, type UploadUrlResponse } from '@kagaz/shared';
@@ -19,12 +20,23 @@ export async function createHarness(): Promise<Harness> {
   const app = moduleRef.createNestApplication({ logger: false });
   app.setGlobalPrefix('api');
   await app.init();
+  stopBackgroundJobs(app);
   return {
     app,
     prisma: app.get(PrismaService),
     http: () => request(app.getHttpServer()),
     close: () => app.close(),
   };
+}
+
+/**
+ * Background jobs (lease sweeper, retention, offline detector) are driven explicitly by the
+ * tests that need them (e.g. `app.get(PrintLeaseService).sweep()`), never by timers.
+ */
+function stopBackgroundJobs(app: INestApplication): void {
+  const registry = app.get(SchedulerRegistry);
+  for (const name of registry.getIntervals()) registry.deleteInterval(name);
+  for (const [name] of registry.getCronJobs()) registry.deleteCronJob(name);
 }
 
 export interface ShopOptions {
