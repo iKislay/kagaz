@@ -25,6 +25,9 @@ export class RealtimeIoAdapter extends IoAdapter {
       cors: { origin: [this.webOrigin], credentials: true },
     };
     // `as never`: IoAdapter's ServerOptions type requires `adapter`, which socket.io defaults.
-    return super.createIOServer(port, merged as never) as Server;
+    const server = super.createIOServer(port, merged as never) as Server;
+    // Only /shop, /customer and /admin carry events; refuse the unauthenticated main namespace.
+    server.of('/').use((_socket, next) => next(new Error('UNKNOWN_NAMESPACE')));
+    return server;
   }
 }
