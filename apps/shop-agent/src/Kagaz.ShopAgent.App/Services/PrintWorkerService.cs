@@ -27,12 +27,14 @@ public sealed class PrintWorkerService : BackgroundService
     private readonly AgentStateStore _state;
     private readonly IPrintEngine _engine;
     private readonly AppStatus _status;
+    private readonly PrinterReachability _reachability;
     private readonly ILogger<PrintWorkerService> _log;
     private readonly HttpClient _download = new() { Timeout = TimeSpan.FromMinutes(2) };
 
     public PrintWorkerService(ShopApiClient api, AgentStateStore state, IPrintEngine engine,
-        AppStatus status, ILogger<PrintWorkerService> log)
+        AppStatus status, PrinterReachability reachability, ILogger<PrintWorkerService> log)
     {
+        _reachability = reachability;
         _api = api;
         _state = state;
         _engine = engine;
@@ -194,6 +196,7 @@ public sealed class PrintWorkerService : BackgroundService
             }
             catch (PrintEngineException ex)
             {
+                if (ex.Code == PrintEngineException.PrinterUnreachable) _reachability.MarkUnreachable(lease.PrinterName);
                 await FailAsync(job, $"{ex.Code}: {ex.Message}", CancellationToken.None);
                 _status.ShowToast($"Could not print {lease.PublicRef}", ex.Message, warning: true);
                 return;
@@ -205,6 +208,7 @@ public sealed class PrintWorkerService : BackgroundService
                 return;
             }
             _state.SetPhase(job, LocalPhase.Submitted);
+            _reachability.MarkReachable(lease.PrinterName);
             _log.LogInformation("Submitted {Pages} pages as one spooler job {SpoolerJobId}", submission.PagesSent, submission.SpoolerJobId);
 
             // 4. Report SUBMITTED (retried: the spooler already has it).

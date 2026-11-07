@@ -1,5 +1,6 @@
 using System.Printing;
 using Kagaz.ShopAgent.Core;
+using Kagaz.ShopAgent.Printing;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -16,11 +17,13 @@ public sealed class HeartbeatService : BackgroundService
     private readonly KagazApiClient _health;
     private readonly AgentSettings _settings;
     private readonly AppStatus _status;
+    private readonly PrinterReachability _reachability;
     private readonly ILogger<HeartbeatService> _log;
 
     public HeartbeatService(ShopApiClient api, KagazApiClient health, AgentSettings settings, AppStatus status,
-        ILogger<HeartbeatService> log)
+        PrinterReachability reachability, ILogger<HeartbeatService> log)
     {
+        _reachability = reachability;
         _api = api;
         _health = health;
         _settings = settings;
@@ -48,10 +51,13 @@ public sealed class HeartbeatService : BackgroundService
             var printers = await _api.GetPrintersAsync(ct);
             var statuses = printers
                 .Where(p => p.Enabled)
-                .Select(p => (Printer: p, Status: MapPrinterStatus(p.PrinterName)))
+                .Select(p => (Printer: p, Status: MapPrinterStatus(p.PrinterName), Unreachable: _reachability.UnreachableReason(p.PrinterName)))
                 .Where(x => x.Status is not null)
                 .Take(20)
-                .Select(x => new PrinterStatus(x.Printer.Id, x.Status!, null))
+                // Installed but the driver can't open it: the Windows queue may still say "Ready".
+                .Select(x => x.Unreachable is not null && x.Status == "READY"
+                    ? new PrinterStatus(x.Printer.Id, "OFFLINE", x.Unreachable)
+                    : new PrinterStatus(x.Printer.Id, x.Status!, null))
                 .ToList();
 
             await _api.HeartbeatAsync(new HeartbeatRequest(

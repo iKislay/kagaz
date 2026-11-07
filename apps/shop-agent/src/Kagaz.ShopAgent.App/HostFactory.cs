@@ -58,6 +58,8 @@ public static class HostFactory
             settings.PrintToFileFolder,
             virtualPdfFolder: Path.Combine(paths.RootDirectory, "print-to-pdf")));
 
+        builder.Services.AddSingleton(_ => new PrinterReachability());
+
         builder.Services.AddSingleton<PairingViewModel>();
         builder.Services.AddSingleton<PrintersViewModel>();
         builder.Services.AddSingleton<JobsViewModel>();

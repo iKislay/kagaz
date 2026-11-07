@@ -19,7 +19,9 @@ internal static class Program
             var request = JsonSerializer.Deserialize<PrintHostRequest>(File.ReadAllText(args[0]), PrintHostProtocol.Json)
                 ?? throw new InvalidOperationException("Empty print request");
             var engine = new PdfiumPrintEngine(request.MaxRenderDpi, request.PrintToFileFolder, request.VirtualPdfFolder);
-            var result = engine.PrintAsync(request.PdfPath, request.Request, CancellationToken.None).GetAwaiter().GetResult();
+            // Print on this [STAThread] main thread, not via Task.Run: the IPP class driver
+            // (HP Smart Tank 580-590 over USB) needs an STA thread for GDI printing.
+            var result = engine.PrintOnCurrentThread(request.PdfPath, request.Request);
             Write(new PrintHostResult(true, result.SpoolerJobId, result.PagesSent, null, null));
             return 0;
         }
