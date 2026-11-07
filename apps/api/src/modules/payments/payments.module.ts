@@ -21,7 +21,9 @@ import { RefundsService } from './refunds.service.js';
         switch (config.PAYMENT_PROVIDER) {
           case 'demo':
             // loadConfig already refuses demo payments in production.
-            return new DemoMockProvider(config.DEMO_WEBHOOK_SECRET ?? 'demo-webhook-secret');
+            return new DemoMockProvider({
+              webhookSecret: config.DEMO_WEBHOOK_SECRET ?? 'demo-webhook-secret',
+            });
           default:
             // Live gateways are gated on the merchant-of-record decision (P3.8/P3.9, D6).
             throw new Error(`Payment provider "${config.PAYMENT_PROVIDER}" is not implemented yet`);

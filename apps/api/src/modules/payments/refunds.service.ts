@@ -72,7 +72,7 @@ export class RefundsService {
       this.logger.error({ err, refundId }, 'refund request failed');
       return;
     }
-    if (result.state !== 'SUCCEEDED') {
+    if (result.status !== 'SUCCEEDED') {
       await this.prisma.refund.update({
         where: { id: refund.id },
         data: { providerRefundId: result.providerRefundId },

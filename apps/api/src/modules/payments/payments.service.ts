@@ -73,6 +73,7 @@ export class PaymentsService {
         const session = await this.provider.createPayment({
           orderId,
           publicRef: order.publicRef,
+          receipt: order.publicRef,
           amountPaise: payment.amountPaise,
           currency: 'INR',
         });
