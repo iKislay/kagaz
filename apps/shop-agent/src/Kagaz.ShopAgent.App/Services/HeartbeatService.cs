@@ -35,6 +35,8 @@ public sealed class HeartbeatService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            // Operator tokens are 12 h JWTs: back to the sign-in screen when it lapses (P2.3).
+            _status.Session.ExpireIfDue();
             bool healthy = _status.IsPaired ? await BeatAsync(stoppingToken) : await CheckHealthAsync(stoppingToken);
 
             // Retry quickly while disconnected or unpaired so the indicator recovers fast.
@@ -67,7 +69,12 @@ public sealed class HeartbeatService : BackgroundService
             _status.SetConnection(ConnectionState.Connected, $"Connected · {_status.ShopName ?? "Kagaz"}");
             return true;
         }
-        catch (ApiException ex) when (ex.Code == "DEVICE_UNAUTHORIZED")
+        catch (ApiException ex) when (ex.Code == ApiErrorCodes.DeviceRevoked)
+        {
+            // AppStatus already wiped the token via AgentSession.DeviceRevoked (P2.4).
+            return false;
+        }
+        catch (ApiException ex) when (ex.Code == ApiErrorCodes.DeviceUnauthorized)
         {
             _status.SetConnection(ConnectionState.Unauthorized, "This PC is no longer paired — pair again");
             return false;

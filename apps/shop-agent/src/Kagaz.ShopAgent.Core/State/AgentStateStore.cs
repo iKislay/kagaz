@@ -38,6 +38,19 @@ public sealed class LocalJobState
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
+/// <summary>One entry of a printer's local queue (job id, attempt; local phase is implicitly QUEUED).</summary>
+public sealed class QueuedJob
+{
+    public string PrintJobId { get; set; } = string.Empty;
+    public string OrderId { get; set; } = string.Empty;
+    public string PublicRef { get; set; } = string.Empty;
+    public int Attempt { get; set; }
+    public string PrinterId { get; set; } = string.Empty;
+    /// <summary>Server order of the queue (paidAt, else createdAt — ISO-8601 sorts lexically).</summary>
+    public string SortKey { get; set; } = string.Empty;
+    public DateTimeOffset EnqueuedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 /// <summary>
 /// Durable local state: per-job print phase, paused flag, pairing details, registered printers.
 /// Survives restarts so reconciliation can resume ambiguous jobs. Never holds the device token
@@ -45,7 +58,17 @@ public sealed class LocalJobState
 /// </summary>
 public sealed class AgentState
 {
+    /// <summary>Print attempts this PC has leased (keyed by print-job id). Never printed twice.</summary>
     public Dictionary<string, LocalJobState> Jobs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Per-printer local queue (P2.7, keyed by Windows printer name): server-QUEUED attempts routed to a
+    /// printer on this PC, oldest first, not yet leased. The server lease still decides who prints.
+    /// </summary>
+    public Dictionary<string, List<QueuedJob>> Queues { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The server answered <c>401 DEVICE_REVOKED</c>; the pairing screen says so until re-paired.</summary>
+    public bool DeviceRevoked { get; set; }
+    /// <summary>Last device-token rotation (P2.4); null on installs paired before rotation existed.</summary>
+    public DateTimeOffset? TokenRotatedAt { get; set; }
     public bool PrintingPaused { get; set; }
     public List<string> RegisteredPrinterNames { get; set; } = new();
     /// <summary>API base URL chosen on the pairing screen (overrides appsettings.json).</summary>
@@ -92,8 +115,9 @@ public sealed class AgentStateStore
             {
                 var json = File.ReadAllText(_path);
                 var state = JsonSerializer.Deserialize<AgentState>(json, JsonOpts) ?? new AgentState();
-                // Keep job ids case-insensitive after a round trip.
-                state.Jobs = new Dictionary<string, LocalJobState>(state.Jobs, StringComparer.OrdinalIgnoreCase);
+                // Keep job ids / printer names case-insensitive after a round trip.
+                state.Jobs = new Dictionary<string, LocalJobState>(state.Jobs ?? new(), StringComparer.OrdinalIgnoreCase);
+                state.Queues = new Dictionary<string, List<QueuedJob>>(state.Queues ?? new(), StringComparer.OrdinalIgnoreCase);
                 return state;
             }
             catch

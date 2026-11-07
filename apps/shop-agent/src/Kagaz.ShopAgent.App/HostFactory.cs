@@ -39,12 +39,15 @@ public static class HostFactory
         {
             settings.ApiBaseUrl = savedApiUrl;
         }
+        settings.AppVersion = typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
         builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton<IOptions<AgentSettings>>(Options.Create(settings));
 
         builder.Services.AddSingleton(paths);
         builder.Services.AddSingleton(stateStore);
         builder.Services.AddSingleton<ISecureStore>(_ => new DpapiSecureStore(paths.DeviceTokenPath));
+        // Operator token + server signals (revoked / login required / upgrade) — memory only.
+        builder.Services.AddSingleton(new AgentSession());
         builder.Services.AddSingleton<AppStatus>();
 
         builder.Services.AddHttpClient<ShopApiClient>(client => client.Timeout = TimeSpan.FromSeconds(15));
@@ -61,6 +64,7 @@ public static class HostFactory
         builder.Services.AddSingleton(_ => new PrinterReachability());
 
         builder.Services.AddSingleton<PairingViewModel>();
+        builder.Services.AddSingleton<OperatorLoginViewModel>();
         builder.Services.AddSingleton<PrintersViewModel>();
         builder.Services.AddSingleton<JobsViewModel>();
         builder.Services.AddSingleton<PickupViewModel>();
@@ -70,6 +74,8 @@ public static class HostFactory
 
         builder.Services.AddHostedService<HeartbeatService>();
         builder.Services.AddHostedService<PrintWorkerService>();
+        builder.Services.AddSingleton<TokenRotationService>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<TokenRotationService>());
 
         return builder.Build();
     }

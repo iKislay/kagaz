@@ -38,6 +38,29 @@
                     </StackPanel>
                 </StackPanel>
 
+                <!-- Signed-in operator (P2.3) -->
+                <Border DockPanel.Dock="Bottom" Margin="0,8,0,0" Padding="10,8" CornerRadius="8"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1"
+                        Visibility="{Binding Status.IsOperatorSignedIn, Converter={StaticResource BoolToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#xE77B;" Style="{StaticResource IconText}" FontSize="14" Margin="0,0,8,0"
+                                   Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Status.OperatorName}" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Status.OperatorRole}" Style="{StaticResource SecondaryText}" FontSize="11" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Content="Sign out" Style="{StaticResource LinkButton}" FontSize="12"
+                                Command="{Binding SignOutCommand}" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
                 <Border DockPanel.Dock="Bottom" Margin="0,8,0,14" Padding="10,8" CornerRadius="8"
                         Background="{StaticResource SurfaceBrush}"
                         BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1">
@@ -91,6 +114,9 @@
                 <ContentControl.Resources>
                     <DataTemplate DataType="{x:Type vm:PairingViewModel}">
                         <views:PairingView />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:OperatorLoginViewModel}">
+                        <views:OperatorLoginView />
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:PrintersViewModel}">
                         <views:PrintersView />

@@ -1,0 +1,47 @@
+<UserControl x:Class="Kagaz.ShopAgent.App.Views.OperatorLoginView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
+             xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:OperatorLoginViewModel}"
+             d:DesignHeight="600" d:DesignWidth="800">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="420" HorizontalAlignment="Center" Margin="0,40,0,0">
+            <Border Width="52" Height="52" CornerRadius="26" Background="#1A007AFF" HorizontalAlignment="Center">
+                <TextBlock Text="&#xE77B;" Style="{StaticResource IconText}" FontSize="24" Foreground="{StaticResource AccentBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="Sign in" Style="{StaticResource TitleText}" HorizontalAlignment="Center" Margin="0,14,0,0" />
+            <TextBlock Style="{StaticResource SubtitleText}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,20">
+                <Run Text="Operators of" />
+                <Run Text="{Binding Status.ShopName, Mode=OneWay, TargetNullValue=this shop}" FontWeight="SemiBold" />
+                <Run Text="sign in to accept orders and hand them over. Printing of accepted jobs continues while signed out." />
+            </TextBlock>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Email or phone" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="LoginBox" AutomationProperties.Name="Email or phone"
+                             Text="{Binding Login, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" MaxLength="120" />
+
+                    <TextBlock Text="Password" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
+                    <PasswordBox x:Name="PasswordBox" AutomationProperties.Name="Password" PasswordChanged="OnPasswordChanged"
+                                 Style="{StaticResource PasswordField}" MaxLength="200" />
+
+                    <TextBlock Text="{Binding Error}" Style="{StaticResource ErrorText}" Margin="0,14,0,0"
+                               Visibility="{Binding Error, Converter={StaticResource NullToVisibility}}" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                        <Button Content="Sign in" Style="{StaticResource PrimaryButton}" Command="{Binding SignInCommand}" IsDefault="True" />
+                        <TextBlock Text="Signing in…" Style="{StaticResource SecondaryText}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                   Visibility="{Binding IsSigningIn, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="Your session stays in memory only and ends when you sign out or close the app."
+                       Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,14,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

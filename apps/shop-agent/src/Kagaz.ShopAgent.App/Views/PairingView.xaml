@@ -13,6 +13,20 @@
             <TextBlock Text="Connect this PC to your Kagaz shop with the one-time code from the Kagaz team."
                        Style="{StaticResource SubtitleText}" />
 
+            <!-- Revoked (P2.4) -->
+            <Border Background="#14FF3B30" CornerRadius="12" Padding="16,12" Margin="0,0,0,16"
+                    Visibility="{Binding Status.RevokedNotice, Converter={StaticResource NullToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="16" Foreground="{StaticResource RedBrush}"
+                               Margin="0,0,10,0" VerticalAlignment="Top" />
+                    <StackPanel>
+                        <TextBlock Text="{Binding Status.RevokedNotice}" Style="{StaticResource HeadlineText}" />
+                        <TextBlock Text="An administrator revoked this PC's access. Ask the Kagaz team for a new pairing code."
+                                   Style="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="460" Margin="0,2,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Paired -->
             <Border Style="{StaticResource Card}" Visibility="{Binding Status.IsPaired, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>

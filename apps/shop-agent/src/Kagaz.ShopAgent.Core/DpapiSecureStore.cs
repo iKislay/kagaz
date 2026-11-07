@@ -46,7 +46,11 @@ public sealed class DpapiSecureStore : ISecureStore
         }
 
         byte[] protectedBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(secret), Entropy, DataProtectionScope.CurrentUser);
-        File.WriteAllText(_filePath, Convert.ToBase64String(protectedBytes));
+        // Write-then-rename: token rotation (P2.4) must never leave a truncated or half-old token file,
+        // because the server invalidates the old token the moment it issues the new one.
+        string temp = _filePath + ".tmp";
+        File.WriteAllText(temp, Convert.ToBase64String(protectedBytes));
+        File.Move(temp, _filePath, overwrite: true);
     }
 
     public void Delete()

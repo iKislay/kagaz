@@ -44,6 +44,25 @@
                 </Grid>
             </Border>
 
+            <!-- Device token rotation (P2.4) -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0"
+                    Visibility="{Binding Status.IsPaired, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Device token" Style="{StaticResource HeadlineText}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,14" TextWrapping="Wrap">
+                        <Run Text="{Binding RotationPolicy, Mode=OneWay}" />
+                        <Run Text="Last rotated:" />
+                        <Run Text="{Binding LastRotated, Mode=OneWay}" />
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Rotate now" Style="{StaticResource QuietButton}" Command="{Binding RotateTokenCommand}" />
+                        <TextBlock Text="{Binding RotationMessage}" Style="{StaticResource SecondaryText}" VerticalAlignment="Center"
+                                   Margin="12,0,0,0" TextWrapping="Wrap" MaxWidth="380"
+                                   Visibility="{Binding RotationMessage, Converter={StaticResource NullToVisibility}}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                 <StackPanel>
                     <TextBlock Text="Troubleshooting" Style="{StaticResource HeadlineText}" />
