@@ -71,6 +71,14 @@ export class OrdersController {
     return this.orders.getPublic(id);
   }
 
+  @Post(':id/cancel')
+  @HttpCode(200)
+  @UseGuards(TrackingGuard)
+  async cancel(@Param('id') id: string, @Req() req: Request): Promise<PublicOrder> {
+    const session = await this.sessions.fromRequest(req);
+    return this.orders.cancel(id, session ? { type: 'CUSTOMER', id: session.customerId } : GUEST);
+  }
+
   @Patch(':id/options')
   @UseGuards(TrackingGuard)
   updateOptions(

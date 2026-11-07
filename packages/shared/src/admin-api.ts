@@ -7,7 +7,15 @@
  * phone number (masked to the last 2 digits).
  */
 import { z } from 'zod';
-import { ApprovalMode, OrderStatus, PaymentStatus, PrintJobStatus, ShopStatus } from './enums.js';
+import {
+  ApprovalMode,
+  DemoPaymentOutcome,
+  OrderStatus,
+  PaymentStatus,
+  PrintJobStatus,
+  RejectReasonCode,
+  ShopStatus,
+} from './enums.js';
 import { OrderStatusSchema, PrintOptionsSchema, QuoteSchema } from './schemas.js';
 
 const enumValues = <T extends Record<string, string>>(obj: T) =>
@@ -348,3 +356,73 @@ export type DemoOtpInboxItem = z.infer<typeof DemoOtpInboxItemSchema>;
 /** GET /api/admin/demo/otp-inbox */
 export const DemoOtpInboxSchema = z.object({ items: z.array(DemoOtpInboxItemSchema) });
 export type DemoOtpInbox = z.infer<typeof DemoOtpInboxSchema>;
+
+const DemoPaymentOutcomeSchema = z.enum(enumValues(DemoPaymentOutcome));
+
+export const DemoPaymentOrderSchema = z.object({
+  id: z.uuid(),
+  publicRef: z.string(),
+  shopName: z.string(),
+  status: OrderStatusSchema,
+  amountPaise: z.int().nullable(),
+  paymentStatus: PaymentStatusSchema.nullable(),
+  /** Outcome the simulated gateway will use for this order's next payment (null = SUCCESS). */
+  nextOutcome: DemoPaymentOutcomeSchema.nullable(),
+  createdAt: z.string(),
+});
+export type DemoPaymentOrder = z.infer<typeof DemoPaymentOrderSchema>;
+
+/** GET /api/admin/demo/payments — recent orders with their simulated payment outcome. */
+export const DemoPaymentsSchema = z.object({
+  outcomes: z.array(DemoPaymentOutcomeSchema),
+  orders: z.array(DemoPaymentOrderSchema),
+});
+export type DemoPayments = z.infer<typeof DemoPaymentsSchema>;
+
+/** PUT /api/admin/demo/payments/:orderId/outcome — null clears (back to SUCCESS). */
+export const SetDemoOutcomeRequestSchema = z.strictObject({
+  outcome: DemoPaymentOutcomeSchema.nullable(),
+});
+export type SetDemoOutcomeRequest = z.infer<typeof SetDemoOutcomeRequestSchema>;
+
+// ─── Business rules (P3.4 / P3.6) ───
+
+/** POST /api/admin/orders/:id/reject — admin reject after payment (→ refund). */
+export const AdminRejectOrderRequestSchema = z.strictObject({
+  reasonCode: z.enum(enumValues(RejectReasonCode)),
+  note: z.string().max(500).optional(),
+});
+export type AdminRejectOrderRequest = z.infer<typeof AdminRejectOrderRequestSchema>;
+
+/** Result of an admin reject / refund retry. */
+export const AdminOrderActionResultSchema = z.object({
+  orderId: z.uuid(),
+  status: OrderStatusSchema,
+  refund: z
+    .object({
+      id: z.uuid(),
+      status: z.enum(['PENDING', 'SUCCEEDED', 'FAILED']),
+      amountPaise: z.int(),
+      isSimulated: z.boolean(),
+    })
+    .nullable(),
+});
+export type AdminOrderActionResult = z.infer<typeof AdminOrderActionResultSchema>;
+
+/** Paid orders waiting while their shop can't take work (T19). */
+export const HeldOrderSchema = z.object({
+  orderId: z.uuid(),
+  publicRef: z.string(),
+  shopId: z.uuid(),
+  shopName: z.string(),
+  shopStatus: ShopStatusSchema,
+  /** SHOP_NOT_OPEN | SHOP_MAINTENANCE | OUTSIDE_OPENING_HOURS */
+  reason: z.string(),
+  amountPaise: z.int().nullable(),
+  paidAt: z.string().nullable(),
+});
+export type HeldOrder = z.infer<typeof HeldOrderSchema>;
+
+/** GET /api/admin/held-orders */
+export const HeldOrdersSchema = z.object({ items: z.array(HeldOrderSchema) });
+export type HeldOrders = z.infer<typeof HeldOrdersSchema>;

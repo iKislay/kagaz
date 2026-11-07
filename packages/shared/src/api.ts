@@ -95,6 +95,17 @@ export const PublicOrderSchema = z.object({
   /** Only present while READY_FOR_PICKUP (PRD FR-CUST-11). */
   pickupCode: z.string().nullable(),
   rejection: z.object({ code: z.string(), note: z.string().nullable() }).nullable(),
+  /** Latest refund for a rejected paid order (P3.4). Simulated → "Demo refund — no money moved". */
+  refund: z
+    .object({
+      status: z.enum(['PENDING', 'SUCCEEDED', 'FAILED']),
+      amountPaise: z.int(),
+      isSimulated: z.boolean(),
+    })
+    .nullable()
+    .default(null),
+  /** True while the customer may still cancel (before payment, nothing in flight) — P3.6. */
+  canCancel: z.boolean().default(false),
   timeline: z.array(OrderEventViewSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -161,6 +172,14 @@ export const MyOrderSchema = z.object({
   createdAt: z.string(),
 });
 export type MyOrder = z.infer<typeof MyOrderSchema>;
+
+/** Response of POST /api/webhooks/:provider (always 200 once the signature is valid). */
+export const WebhookAckSchema = z.object({
+  received: z.literal(true),
+  duplicate: z.boolean(),
+  outcome: z.string(),
+});
+export type WebhookAck = z.infer<typeof WebhookAckSchema>;
 
 /** GET /api/me/orders */
 export const MyOrdersResponseSchema = z.object({ orders: z.array(MyOrderSchema) });

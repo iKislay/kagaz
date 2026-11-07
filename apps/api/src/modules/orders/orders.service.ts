@@ -23,7 +23,13 @@ import { PricingService } from '../pricing/pricing.service.js';
 import { calculateQuote } from '../pricing/quote.js';
 import { ShopsService } from '../shops/shops.service.js';
 import { OrderStateMachine } from './order-state-machine.js';
-import { ORDER_VIEW_INCLUDE, parseOptions, toPublicOrder } from './order-view.js';
+import {
+  ORDER_VIEW_INCLUDE,
+  PAYMENT_IN_FLIGHT,
+  canCustomerCancel,
+  parseOptions,
+  toPublicOrder,
+} from './order-view.js';
 
 const PDF = 'application/pdf';
 /** Options can change until a payment exists for the order. */
@@ -253,6 +259,46 @@ export class OrdersService {
           actor,
         });
       }
+    });
+    return this.getPublic(orderId);
+  }
+
+  /**
+   * POST /api/orders/:id/cancel (FR-CUST-12, P3.6): only before payment. Refused while a
+   * payment is in flight or done — after payment only the shop/admin can reject (→ refund).
+   */
+  async cancel(orderId: string, actor: Actor): Promise<PublicOrder> {
+    await this.prisma.$transaction(async (tx) => {
+      // Same lock as pay(): a cancel and a pay for one order never interleave.
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { payments: { select: { status: true } } },
+      });
+      if (!order) throw notFound();
+      if (order.status === OrderStatus.CANCELLED) return; // idempotent
+      if (order.payments.some((p) => (PAYMENT_IN_FLIGHT as readonly string[]).includes(p.status))) {
+        throw new AppError(
+          'PAYMENT_IN_PROGRESS',
+          'This order has a payment in progress or completed; it can no longer be cancelled here',
+          HttpStatus.CONFLICT,
+        );
+      }
+      if (!canCustomerCancel(order)) {
+        throw new AppError(
+          'ORDER_NOT_CANCELLABLE',
+          'Only orders that have not been paid can be cancelled',
+          HttpStatus.CONFLICT,
+          { status: order.status },
+        );
+      }
+      await this.stateMachine.transition(tx, {
+        orderId,
+        to: OrderStatus.CANCELLED,
+        from: [OrderStatus.DRAFT, OrderStatus.AWAITING_PAYMENT],
+        actor,
+        reason: 'Cancelled by customer',
+      });
     });
     return this.getPublic(orderId);
   }
