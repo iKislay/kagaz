@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { type OrderStatus, canTransition } from '@kagaz/shared';
-import { type Actor, isHumanActor } from '../../common/actor.js';
+import { type Actor, actorMetadata, isHumanActor } from '../../common/actor.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { type Order, type Prisma } from '../../generated/prisma/client.js';
 
@@ -80,7 +80,12 @@ export class OrderStateMachine {
           shopId: order.shopId,
           orderId: order.id,
           action: params.auditAction ?? `order.${params.to.toLowerCase()}`,
-          metadata: { from: order.status, to: params.to, reason: params.reason ?? null },
+          metadata: {
+            from: order.status,
+            to: params.to,
+            reason: params.reason ?? null,
+            ...actorMetadata(params.actor),
+          },
         },
       });
     }

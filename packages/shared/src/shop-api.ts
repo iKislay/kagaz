@@ -173,3 +173,28 @@ export type VerifyPickupResponse = z.infer<typeof VerifyPickupResponseSchema>;
 
 export const printDocumentName = (publicRef: string, attempt: number) =>
   `KAGAZ-${publicRef}-A${attempt}`;
+
+// ─── Operator session + device token (contract §4) ───
+
+/** Header carrying the operator session token on human actions. */
+export const OPERATOR_TOKEN_HEADER = 'x-operator-token';
+
+export const OperatorRoleSchema = z.enum(['SHOP_OWNER', 'SHOP_OPERATOR']);
+export type OperatorRole = z.infer<typeof OperatorRoleSchema>;
+
+export const OperatorLoginRequestSchema = z.strictObject({
+  /** Email or phone (E.164) of a staff member of the device's shop. */
+  login: z.string().trim().min(3).max(120),
+  password: z.string().min(1).max(200),
+});
+export type OperatorLoginRequest = z.infer<typeof OperatorLoginRequestSchema>;
+
+export const OperatorLoginResponseSchema = z.object({
+  operatorToken: z.string(),
+  expiresAt: z.string(),
+  operator: z.object({ id: z.uuid(), name: z.string(), role: OperatorRoleSchema }),
+});
+export type OperatorLoginResponse = z.infer<typeof OperatorLoginResponseSchema>;
+
+export const RotateDeviceTokenResponseSchema = z.object({ deviceToken: z.string() });
+export type RotateDeviceTokenResponse = z.infer<typeof RotateDeviceTokenResponseSchema>;

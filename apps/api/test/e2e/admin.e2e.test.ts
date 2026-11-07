@@ -63,7 +63,7 @@ describe('admin auth (FR-ADMIN-01)', () => {
 
   it('GET /api/admin/auth/me returns the signed-in admin', async () => {
     const res = await http.get('/api/admin/auth/me').set('Cookie', session).expect(200);
-    expect(res.body).toMatchObject({ email: ADMIN_EMAIL, kind: 'ADMIN' });
+    expect(res.body).toMatchObject({ email: ADMIN_EMAIL, role: 'ADMIN', shops: [] });
   });
 
   it('wrong email and wrong password give the same 401 ADMIN_LOGIN_FAILED', async () => {

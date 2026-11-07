@@ -16,6 +16,7 @@ import { ShopModule } from './modules/shop/shop.module.js';
 import { PickupModule } from './modules/pickup/pickup.module.js';
 import { ShopsModule } from './modules/shops/shops.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { IdentityModule } from './modules/identity/identity.module.js';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
@@ -68,6 +69,7 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
     DevicesModule,
     ShopModule,
     AdminModule,
+    IdentityModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

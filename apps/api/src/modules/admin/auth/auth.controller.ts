@@ -1,13 +1,12 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { type Request } from 'express';
-import { type Response } from 'express';
-import { AdminAuthGuard } from './admin-auth.guard.js';
-import { AdminAuthService } from './auth.service.js';
-import { AdminLoginRequestSchema } from '@kagaz/shared';
+import { type Request, type Response } from 'express';
+import { type AdminLoginRequest, AdminLoginRequestSchema, AdminMeSchema } from '@kagaz/shared';
 import { ZodValidationPipe } from '../../../common/http/zod-validation.pipe.js';
+import { CurrentStaff, StaffAuthGuard, type StaffContext } from '../../identity/staff-session.js';
+import { AdminAuthService } from './auth.service.js';
 
 /**
- * Admin authentication endpoints (PRD §11.3).
+ * Staff web authentication (PRD §11.3, P2.3).
  * Session is an httpOnly `kgz_admin` cookie holding a HS256 JWT (12 h).
  */
 @Controller('admin/auth')
@@ -17,7 +16,7 @@ export class AdminAuthController {
   @HttpCode(200)
   @Post('login')
   async login(
-    @Body(new ZodValidationPipe(AdminLoginRequestSchema)) body: { email: string; password: string },
+    @Body(new ZodValidationPipe(AdminLoginRequestSchema)) body: AdminLoginRequest,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -35,8 +34,8 @@ export class AdminAuthController {
   }
 
   @Get('me')
-  @UseGuards(AdminAuthGuard)
-  me(@Req() req: Request & { admin?: { userId: string } }) {
-    return this.auth.me(req.admin!.userId);
+  @UseGuards(StaffAuthGuard)
+  async me(@CurrentStaff() staff: StaffContext) {
+    return AdminMeSchema.parse(await this.auth.me(staff.userId));
   }
 }

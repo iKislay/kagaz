@@ -39,6 +39,7 @@ import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
 import { PrintJobsService } from './print-jobs.service.js';
 import { ShopJobsService } from './shop-jobs.service.js';
 import { ShopPrintersService } from './shop-printers.service.js';
+import { RequireOperator } from '../identity/operator-auth.guard.js';
 
 const Uuid = new ZodValidationPipe(z.uuid());
 const StatusList = new ZodValidationPipe(
@@ -79,6 +80,7 @@ export class ShopController {
   }
 
   @Post('jobs/:orderId/accept')
+  @RequireOperator()
   @HttpCode(200)
   accept(
     @CurrentDevice() device: DeviceContext,
@@ -89,6 +91,7 @@ export class ShopController {
   }
 
   @Post('jobs/:orderId/reject')
+  @RequireOperator()
   @HttpCode(200)
   reject(
     @CurrentDevice() device: DeviceContext,
@@ -99,6 +102,7 @@ export class ShopController {
   }
 
   @Post('jobs/:orderId/ready')
+  @RequireOperator()
   @HttpCode(200)
   ready(
     @CurrentDevice() device: DeviceContext,
@@ -133,6 +137,7 @@ export class ShopController {
   }
 
   @Put('printers')
+  @RequireOperator()
   registerPrinters(
     @CurrentDevice() device: DeviceContext,
     @Body(new ZodValidationPipe(RegisterPrintersRequestSchema)) body: RegisterPrintersRequest,
@@ -141,6 +146,7 @@ export class ShopController {
   }
 
   @Post('pickups/verify')
+  @RequireOperator()
   @HttpCode(200)
   verifyPickup(
     @CurrentDevice() device: DeviceContext,

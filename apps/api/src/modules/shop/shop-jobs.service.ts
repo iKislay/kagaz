@@ -275,14 +275,15 @@ export class ShopJobsService {
     action: string,
     metadata: Record<string, string>,
   ) {
+    const actor = deviceActor(device);
     await this.prisma.auditLog.create({
       data: {
-        actorType: 'DEVICE',
-        actorId: device.deviceId,
+        actorType: actor.type,
+        actorId: actor.id,
         shopId: device.shopId,
         orderId,
         action,
-        metadata,
+        metadata: { ...metadata, deviceId: device.deviceId },
       },
     });
   }

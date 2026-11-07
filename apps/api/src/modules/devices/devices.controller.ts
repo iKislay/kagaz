@@ -5,6 +5,7 @@ import {
   type EnrollDeviceResponse,
   type HeartbeatRequest,
   HeartbeatRequestSchema,
+  type RotateDeviceTokenResponse,
 } from '@kagaz/shared';
 import {
   CurrentDevice,
@@ -34,5 +35,13 @@ export class DevicesController {
     @Body(new ZodValidationPipe(HeartbeatRequestSchema)) body: HeartbeatRequest,
   ): Promise<{ serverTime: string }> {
     return this.devices.heartbeat(device, body);
+  }
+
+  /** Contract §4: issue a new device token; the old one stops working immediately. */
+  @Post('rotate-token')
+  @HttpCode(200)
+  @UseGuards(DeviceAuthGuard)
+  rotateToken(@CurrentDevice() device: DeviceContext): Promise<RotateDeviceTokenResponse> {
+    return this.devices.rotateToken(device);
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type RegisterPrintersRequest, type ShopPrinter } from '@kagaz/shared';
-import { type DeviceContext } from '../../common/auth/device-auth.guard.js';
+import { type DeviceContext, deviceActor } from '../../common/auth/device-auth.guard.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 
 @Injectable()
@@ -52,11 +52,14 @@ export class ShopPrintersService {
       }
       await tx.auditLog.create({
         data: {
-          actorType: 'DEVICE',
-          actorId: device.deviceId,
+          actorType: deviceActor(device).type,
+          actorId: deviceActor(device).id,
           shopId: device.shopId,
           action: 'printers.registered',
-          metadata: { printers: req.printers.map((p) => p.printerName) },
+          metadata: {
+            printers: req.printers.map((p) => p.printerName),
+            deviceId: device.deviceId,
+          },
         },
       });
     });

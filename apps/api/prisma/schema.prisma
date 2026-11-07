@@ -495,3 +495,37 @@ model IdempotencyRecord {
   @@id([scope, key])
   @@map("idempotency_records")
 }
+
+// ───────────────────────────── Identity / admin (Phase 2–4) ─────────────────────────────
+// Kept relation-free on purpose (plain uuid columns + indexes) so these models stay additive.
+
+/// Operator session on a paired device (contract §4). The JWT carries this row's id (jti);
+/// logout or device revocation sets revoked_at, which kills the token immediately.
+model OperatorSession {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  deviceId  String    @map("device_id") @db.Uuid
+  shopId    String    @map("shop_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  @@index([deviceId])
+  @@index([userId])
+  @@map("operator_sessions")
+}
+
+/// Approximate printer uptime (P4.8): sampled once a minute by the admin health sampler.
+/// up = device online AND printer status READY; ratio = up_samples / observed_samples.
+model PrinterUptimeDaily {
+  printerId       String   @map("printer_id") @db.Uuid
+  shopId          String   @map("shop_id") @db.Uuid
+  /// Calendar day in Asia/Kolkata.
+  day             DateTime @db.Date
+  observedSamples Int      @default(0) @map("observed_samples")
+  upSamples       Int      @default(0) @map("up_samples")
+
+  @@id([printerId, day])
+  @@index([shopId, day])
+  @@map("printer_uptime_daily")
+}
