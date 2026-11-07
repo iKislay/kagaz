@@ -2,7 +2,6 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   type CreateOrderResponse,
-  type EnrollDeviceResponse,
   type LeaseResponse,
   type PublicOrder,
   type ShopJob,
@@ -15,6 +14,7 @@ import {
   createHarness,
   createOrder,
   createShop,
+  pairDevice,
   uploadPdf,
 } from './harness.js';
 
@@ -26,21 +26,14 @@ afterAll(async () => {
   await h.close();
 });
 
-/** A shop with one paired device and one confirmed printer. */
+/**
+ * A shop with one paired device, a signed-in operator and one confirmed printer.
+ * `auth` carries device + operator tokens (human actions); `agentAuth` only the device token.
+ */
 async function pairedShop(caps: { colour?: boolean; duplex?: boolean } = {}) {
   const shop = await createShop(h.prisma);
-  const code = randomCode(8);
-  await h.prisma.enrollmentCode.create({
-    data: { shopId: shop.id, codeHash: sha256Hex(code), expiresAt: new Date(Date.now() + 60_000) },
-  });
-  const enrolled = (
-    await h
-      .http()
-      .post('/api/devices/enroll')
-      .send({ code: `${code.slice(0, 4)}-${code.slice(4)}`.toLowerCase(), name: 'Counter PC' })
-      .expect(201)
-  ).body as EnrollDeviceResponse;
-  const auth = { Authorization: `Bearer ${enrolled.deviceToken}` };
+  const paired = await pairDevice(h, shop.id);
+  const auth = paired.opAuth;
   const printers = await h
     .http()
     .put('/api/shop/printers')
@@ -57,7 +50,13 @@ async function pairedShop(caps: { colour?: boolean; duplex?: boolean } = {}) {
       ],
     })
     .expect(200);
-  return { shop, auth, device: enrolled, printerId: printers.body[0].id as string };
+  return {
+    shop,
+    auth,
+    agentAuth: paired.auth,
+    paired,
+    printerId: printers.body[0].id as string,
+  };
 }
 
 async function paidOrder(shopId: string, pages = 3, options = MONO): Promise<CreateOrderResponse> {
@@ -111,11 +110,11 @@ describe('device enrollment', () => {
 
 describe('vertical slice lifecycle (T07, T10, T15)', () => {
   it('pay → accept → lease → submit → ready → customer sees code → pickup → collected', async () => {
-    const { shop, auth, printerId } = await pairedShop({ duplex: true });
+    const { shop, auth, agentAuth, printerId } = await pairedShop({ duplex: true });
     const created = await paidOrder(shop.id, 3, { ...MONO, copies: 2, duplex: true });
 
     // Operator sees the paid order, without the customer's phone number.
-    const list = await h.http().get('/api/shop/jobs').set(auth).expect(200);
+    const list = await h.http().get('/api/shop/jobs').set(agentAuth).expect(200);
     const listed = (list.body.jobs as ShopJob[]).find((j) => j.orderId === created.order.id)!;
     expect(listed).toMatchObject({
       status: 'PENDING_REVIEW',
@@ -145,7 +144,7 @@ describe('vertical slice lifecycle (T07, T10, T15)', () => {
       await h
         .http()
         .post(`/api/shop/print-jobs/${accepted.body.printJob.id}/lease`)
-        .set(auth)
+        .set(agentAuth)
         .expect(200)
     ).body as LeaseResponse;
     expect(lease).toMatchObject({
@@ -177,19 +176,19 @@ describe('vertical slice lifecycle (T07, T10, T15)', () => {
     await h
       .http()
       .post(`/api/shop/print-jobs/${lease.printJobId}/status`)
-      .set(auth)
+      .set(agentAuth)
       .send({ status: 'SUBMITTED', spoolerJobId: 42 })
       .expect(200);
     await h
       .http()
       .post(`/api/shop/print-jobs/${lease.printJobId}/status`)
-      .set(auth)
+      .set(agentAuth)
       .send({ status: 'SUBMITTED', spoolerJobId: 42 })
       .expect(200); // idempotent replay
     const complete = await h
       .http()
       .post(`/api/shop/print-jobs/${lease.printJobId}/status`)
-      .set(auth)
+      .set(agentAuth)
       .send({ status: 'SPOOLER_COMPLETE' })
       .expect(200);
     expect(complete.body.status).toBe('PRINTING'); // spooler success is not READY (invariant 9)

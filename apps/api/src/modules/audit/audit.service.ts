@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type Actor } from '../../common/actor.js';
+import { type Actor, actorMetadata } from '../../common/actor.js';
 import { type Prisma } from '../../generated/prisma/client.js';
 
 type AuditClient = Pick<Prisma.TransactionClient, 'auditLog'>;
@@ -32,7 +32,14 @@ export class AuditService {
         shopId: ctx.shopId ?? null,
         orderId: ctx.orderId ?? null,
         action,
-        ...(ctx.metadata === undefined ? {} : { metadata: ctx.metadata }),
+        ...(ctx.metadata === undefined && !actor.deviceId
+          ? {}
+          : {
+              metadata: {
+                ...actorMetadata(actor),
+                ...((ctx.metadata as object | undefined) ?? {}),
+              },
+            }),
         ip: ctx.ip ?? null,
       },
     });

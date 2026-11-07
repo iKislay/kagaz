@@ -5,7 +5,8 @@
  *   pnpm --filter @kagaz/api db:seed
  *
  * Creates: 3 demo shops in Mandya (OPEN, MANUAL mode, is_demo=true) with pricing,
- * one admin, one owner + one operator per shop (no passwords until P2.3).
+ * one admin, one owner + one operator per shop. Staff passwords come from SEED_STAFF_PASSWORD
+ * (local/demo default "kagaz-demo-123"; other environments must set it) and are printed.
  * Printers are not seeded: the shop app registers the real Windows printer (P1.9).
  */
 import { existsSync } from 'node:fs';
@@ -82,7 +83,20 @@ async function upsertUser(
   });
 }
 
+/** Local/demo-only default for seeded shop staff (contract §4). Never used elsewhere. */
+const DEMO_STAFF_PASSWORD = 'kagaz-demo-123';
+
 async function main() {
+  const staffPassword =
+    process.env.SEED_STAFF_PASSWORD ??
+    (appEnv === 'local' || appEnv === 'demo' ? DEMO_STAFF_PASSWORD : undefined);
+  if (!staffPassword) {
+    console.error(`SEED_STAFF_PASSWORD is required when APP_ENV=${appEnv}.`);
+    process.exit(1);
+  }
+  const staffPasswordHash = await hash(staffPassword);
+  const staffLogins: string[] = [];
+
   const adminEmail = 'admin@kagaz.local';
   const seedPassword = process.env.SEED_ADMIN_PASSWORD;
   let adminPasswordHash: string | undefined;
@@ -138,7 +152,9 @@ async function main() {
         `${role.toLowerCase()}-${letter}@kagaz.local`,
         `Shop ${letter.toUpperCase()} ${role === 'OWNER' ? 'Owner' : 'Operator'}`,
         'STAFF',
+        staffPasswordHash,
       );
+      staffLogins.push(`${user.email} (${role.toLowerCase()}, ${def.slug})`);
       await prisma.shopUser.upsert({
         where: { shopId_userId: { shopId: shop.id, userId: user.id } },
         update: { role },
@@ -158,6 +174,10 @@ async function main() {
   });
 
   console.log(`Seeded ${shops.length} demo shops (APP_ENV=${appEnv}).`);
+  const shownPassword =
+    staffPassword === DEMO_STAFF_PASSWORD ? staffPassword : 'value of SEED_STAFF_PASSWORD';
+  console.log(`Shop staff logins (password: ${shownPassword}):`);
+  for (const login of staffLogins) console.log(`  ${login}`);
   console.log(`Device enrollment code for ${shops[0]!.name}: ${formatCode(code)} (valid 24 h)`);
 }
 

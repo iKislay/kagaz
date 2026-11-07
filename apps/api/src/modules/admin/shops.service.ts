@@ -13,11 +13,13 @@ export class ShopsService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async listAdminShops() {
+  /** All shops, or only `onlyShopIds` (shop owners see just their own shops). */
+  async listAdminShops(onlyShopIds?: string[]) {
     const now = new Date();
     const thresholdMs = (this.config.DEVICE_ONLINE_THRESHOLD_SECONDS ?? 45) * 1000;
 
     const shops = await this.prisma.shop.findMany({
+      where: onlyShopIds ? { id: { in: onlyShopIds } } : {},
       orderBy: { name: 'asc' },
       include: {
         pricing: {
@@ -25,7 +27,7 @@ export class ShopsService {
           orderBy: { effectiveFrom: 'desc' },
           take: 1,
         },
-        devices: {},
+        devices: { where: { status: 'ACTIVE' }, orderBy: { createdAt: 'asc' } },
         printers: {
           include: {
             printJobs: {

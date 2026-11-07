@@ -146,4 +146,28 @@ export class DevicesService {
       shop: result.shop,
     };
   }
+
+  /** Swap the token hash in one conditional update; the old token is dead on commit. */
+  async rotateToken(device: DeviceContext): Promise<{ deviceToken: string }> {
+    const token = generateToken();
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.shopDevice.updateMany({
+        where: { id: device.deviceId, status: 'ACTIVE' },
+        data: { tokenHash: sha256Hex(token) },
+      });
+      if (updated.count !== 1) {
+        throw new AppError('DEVICE_REVOKED', 'This device was revoked', HttpStatus.UNAUTHORIZED);
+      }
+      await tx.auditLog.create({
+        data: {
+          actorType: 'DEVICE',
+          actorId: device.deviceId,
+          shopId: device.shopId,
+          action: 'device.token_rotated',
+          metadata: { deviceId: device.deviceId },
+        },
+      });
+    });
+    return { deviceToken: token };
+  }
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type AdminOrdersQuery, maskPhone } from '@kagaz/shared';
+import { AuditService } from './audit.service.js';
 
 interface PaymentRow {
   id: string;
@@ -11,7 +12,10 @@ interface PaymentRow {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async list(query: AdminOrdersQuery) {
     const where: Record<string, unknown> = {};
@@ -124,18 +128,22 @@ export class OrdersService {
     const auditRows = await this.prisma.auditLog.findMany({
       where: { orderId },
       orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        actorType: true,
-        actorId: true,
-        shopId: true,
-        orderId: true,
-        action: true,
-        metadata: true,
-        ip: true,
-        createdAt: true,
-      },
     });
+    const audit = await this.auditService.withActorNames(auditRows);
+    // Event actor names: reuse the resolver on synthetic rows.
+    const eventNames = await this.auditService.withActorNames(
+      order.events.map((e) => ({
+        id: e.id,
+        actorType: e.actorType,
+        actorId: e.actorId,
+        shopId: null,
+        orderId,
+        action: '',
+        metadata: null,
+        ip: null,
+        createdAt: e.createdAt,
+      })),
+    );
 
     return {
       id: order.id,
@@ -191,26 +199,17 @@ export class OrdersService {
         error: j.error,
         createdAt: j.createdAt.toISOString(),
       })),
-      events: order.events.map((e) => ({
+      events: order.events.map((e, i) => ({
         id: e.id,
         fromStatus: e.fromStatus,
         toStatus: e.toStatus,
         actorType: e.actorType,
         actorId: e.actorId,
+        actorName: eventNames[i]?.actorName ?? null,
         reason: e.reason,
         createdAt: e.createdAt.toISOString(),
       })),
-      audit: auditRows.map((a) => ({
-        id: a.id,
-        actorType: a.actorType,
-        actorId: a.actorId,
-        shopId: a.shopId,
-        orderId: a.orderId,
-        action: a.action,
-        metadata: a.metadata,
-        ip: a.ip,
-        createdAt: a.createdAt.toISOString(),
-      })),
+      audit,
       createdAt: order.createdAt.toISOString(),
       updatedAt: order.updatedAt.toISOString(),
     };
