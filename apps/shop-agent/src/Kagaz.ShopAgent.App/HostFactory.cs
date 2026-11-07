@@ -2,6 +2,7 @@ using System.IO;
 using Kagaz.ShopAgent.App.Services;
 using Kagaz.ShopAgent.App.ViewModels;
 using Kagaz.ShopAgent.Core;
+using Kagaz.ShopAgent.Core.Spooler;
 using Kagaz.ShopAgent.Printing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,12 +40,19 @@ public static class HostFactory
         {
             settings.ApiBaseUrl = savedApiUrl;
         }
+        settings.AppVersion = typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
         builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton<IOptions<AgentSettings>>(Options.Create(settings));
 
         builder.Services.AddSingleton(paths);
         builder.Services.AddSingleton(stateStore);
         builder.Services.AddSingleton<ISecureStore>(_ => new DpapiSecureStore(paths.DeviceTokenPath));
+        // Operator token + server signals (revoked / login required / upgrade) — memory only.
+        builder.Services.AddSingleton(new AgentSession());
+        builder.Services.AddSingleton<AgentSignals>();
+        builder.Services.AddSingleton<ISpoolerProbe, SystemPrintingSpoolerProbe>();
+        builder.Services.AddSingleton<IUpdateService, VelopackUpdateService>();
+        builder.Services.AddSingleton(_ => new StartupRegistration(new CurrentUserRunKey()));
         builder.Services.AddSingleton<AppStatus>();
 
         builder.Services.AddHttpClient<ShopApiClient>(client => client.Timeout = TimeSpan.FromSeconds(15));
@@ -58,16 +66,24 @@ public static class HostFactory
             settings.PrintToFileFolder,
             virtualPdfFolder: Path.Combine(paths.RootDirectory, "print-to-pdf")));
 
+        builder.Services.AddSingleton(_ => new PrinterReachability());
+
         builder.Services.AddSingleton<PairingViewModel>();
+        builder.Services.AddSingleton<OperatorLoginViewModel>();
         builder.Services.AddSingleton<PrintersViewModel>();
         builder.Services.AddSingleton<JobsViewModel>();
         builder.Services.AddSingleton<PickupViewModel>();
         builder.Services.AddSingleton<SettingsViewModel>();
+        builder.Services.AddSingleton<ShopModeViewModel>();
+        builder.Services.AddSingleton<UpdateViewModel>();
         builder.Services.AddSingleton<ShellViewModel>();
         builder.Services.AddSingleton<MainWindow>();
 
         builder.Services.AddHostedService<HeartbeatService>();
         builder.Services.AddHostedService<PrintWorkerService>();
+        builder.Services.AddHostedService<RealtimeService>();
+        builder.Services.AddSingleton<TokenRotationService>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<TokenRotationService>());
 
         return builder.Build();
     }

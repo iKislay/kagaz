@@ -219,7 +219,7 @@ public class ShopApiClientTests
         var job = await client.ReportPrintStatusAsync("55555555-5555-5555-5555-555555555555",
             new PrintStatusReportDto { Status = "SUBMITTED", SpoolerJobId = 42 });
 
-        Assert.Equal("PRINTING", job.Status);
+        Assert.Equal("PRINTING", job!.Status);
     }
 
     [Fact]

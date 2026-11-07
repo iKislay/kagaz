@@ -39,41 +39,39 @@ public sealed class PdfiumPrintEngine : IPrintEngine
     {
         ct.ThrowIfCancellationRequested();
         // Not cancellable once started: a half-cancelled spooler job is exactly the ambiguity we avoid.
-        return Task.Run(() => PrintSync(pdfPath, request), CancellationToken.None);
+        return Task.Run(() => PrintOnCurrentThread(pdfPath, request), CancellationToken.None);
     }
 
     /// <summary>
-    /// Prints on the calling thread. The print host calls this from its <c>[STAThread]</c> main thread so GDI
-    /// printing runs on an STA thread (driver UI/COM components expect it) instead of a thread-pool thread.
+    /// Prints synchronously on the calling thread. The print host calls this from its
+    /// <c>[STAThread]</c> Main: some drivers (e.g. the Microsoft IPP Class Driver) misbehave when
+    /// GDI printing runs on a thread-pool (MTA) thread.
     /// </summary>
-    public PrintSubmission PrintOnCurrentThread(string pdfPath, PrintRequest request) => PrintSync(pdfPath, request);
-
-    private PrintSubmission PrintSync(string pdfPath, PrintRequest request)
+    public PrintSubmission PrintOnCurrentThread(string pdfPath, PrintRequest request)
     {
         if (!string.Equals(request.PaperSize, "A4", StringComparison.OrdinalIgnoreCase))
         {
             throw new PrintEngineException(PrintEngineException.UnsupportedSetting, $"Paper size {request.PaperSize} is not supported (A4 only).");
         }
 
-        var printerSettings = new PrinterSettings { PrinterName = request.PrinterName };
-        if (!printerSettings.IsValid)
-        {
-            // IsValid is also false when the printer is installed but its driver can't reach the device
-            // (seen with the IPP class driver over USB: CreateIC fails with 995 after ~16 s).
-            bool installed = PrinterSettings.InstalledPrinters.Cast<string>()
-                .Any(n => string.Equals(n, request.PrinterName, StringComparison.OrdinalIgnoreCase));
-            throw installed
-                ? new PrintEngineException(PrintEngineException.PrinterUnreachable,
-                    $"Printer '{request.PrinterName}' is installed but not responding — check it is on, awake and connected.")
-                : new PrintEngineException(PrintEngineException.PrinterNotFound, $"Printer '{request.PrinterName}' is not installed on this PC.");
-        }
+        var printerSettings = OpenPrinter(request.PrinterName);
 
         // Capability check before printing (A.4): mismatch → FAILED, nothing printed.
-        if (request.Colour && !printerSettings.SupportsColor)
+        bool supportsColour, canDuplex;
+        try
+        {
+            supportsColour = printerSettings.SupportsColor;
+            canDuplex = printerSettings.CanDuplex;
+        }
+        catch (Exception ex) when (ex is InvalidPrinterException or System.ComponentModel.Win32Exception)
+        {
+            throw Unreachable(request.PrinterName);
+        }
+        if (request.Colour && !supportsColour)
         {
             throw new PrintEngineException(PrintEngineException.UnsupportedSetting, "Colour was ordered but this printer cannot print colour.");
         }
-        if (request.Duplex && !printerSettings.CanDuplex)
+        if (request.Duplex && !canDuplex)
         {
             throw new PrintEngineException(PrintEngineException.UnsupportedSetting, "Double-sided was ordered but this printer cannot print duplex.");
         }
@@ -117,7 +115,16 @@ public sealed class PdfiumPrintEngine : IPrintEngine
             pageIndex++;
             args.HasMorePages = pageIndex < pageCount;
         };
-        printDoc.Print();
+        try
+        {
+            printDoc.Print();
+        }
+        catch (Exception ex) when (pageIndex == 0 && ex is InvalidPrinterException or System.ComponentModel.Win32Exception)
+        {
+            // The device context could not be created (CreateDC/CreateIC failed): no page was
+            // rendered, so nothing reached the paper. Safe to report as "nothing printed".
+            throw Unreachable(request.PrinterName);
+        }
 
         if (pageIndex != pageCount)
         {
@@ -127,6 +134,35 @@ public sealed class PdfiumPrintEngine : IPrintEngine
         int? spoolerJobId = SpoolerJobFinder.Find(request.PrinterName, request.DocumentName, TimeSpan.FromSeconds(5));
         return new PrintSubmission(spoolerJobId, request.DocumentName, pageCount);
     }
+
+    /// <summary>
+    /// <c>PRINTER_NOT_FOUND</c> when no printer of that name is installed; <c>PRINTER_UNREACHABLE</c>
+    /// when it is installed but the driver can't open it (<see cref="PrinterSettings.IsValid"/> false).
+    /// </summary>
+    private static PrinterSettings OpenPrinter(string printerName)
+    {
+        var printerSettings = new PrinterSettings { PrinterName = printerName };
+        if (printerSettings.IsValid) return printerSettings;
+
+        if (!IsInstalled(printerName))
+        {
+            throw new PrintEngineException(PrintEngineException.PrinterNotFound, $"Printer '{printerName}' is not installed on this PC.");
+        }
+        throw Unreachable(printerName);
+    }
+
+    /// <summary>True if Windows lists a printer with this exact name (cheap; doesn't contact the device).</summary>
+    public static bool IsInstalled(string printerName)
+    {
+        foreach (string name in PrinterSettings.InstalledPrinters)
+        {
+            if (string.Equals(name, printerName, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    private static PrintEngineException Unreachable(string printerName) =>
+        new(PrintEngineException.PrinterUnreachable, $"{PrintEngineException.PrinterUnreachableMessage} ({printerName}).");
 
     private static PaperSize FindA4(PrinterSettings settings)
     {

@@ -38,3 +38,6 @@ next-env.d.ts
 
 # Demo compose secrets (infra/demo.env.example is the template)
 infra/demo.env
+# Shop agent installer output (scripts/build-shop-agent-installer.ps1)
+artifacts/
+.tools/
