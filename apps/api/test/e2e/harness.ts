@@ -16,7 +16,8 @@ export interface Harness {
 
 export async function createHarness(): Promise<Harness> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = moduleRef.createNestApplication({ logger: false });
+  // rawBody: webhook signatures are verified over the exact bytes (P3.3), as in main.ts.
+  const app = moduleRef.createNestApplication({ logger: false, rawBody: true });
   app.setGlobalPrefix('api');
   await app.init();
   return {
