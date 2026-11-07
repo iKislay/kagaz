@@ -1,6 +1,9 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { type OrderStatus, canTransition } from '@kagaz/shared';
 import { type Actor, isHumanActor } from '../../common/actor.js';
+import { afterCommit } from '../../common/events/after-commit.js';
+import { DomainEvent, type OrderTransitionedEvent } from '../../common/events/domain-events.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { type Order, type Prisma } from '../../generated/prisma/client.js';
 
@@ -24,10 +27,13 @@ export interface TransitionParams {
  * The ONLY code allowed to change Order.status (CLAUDE.md invariant 5).
  * Must be called inside a transaction: checks the shared transition table, applies an
  * optimistic-lock update on (status, version), writes an OrderEvent, and an AuditLog row for
- * human actors — all atomically. Realtime notifications are emitted by callers after commit.
+ * human actors — all atomically. An `order.transitioned` domain event is emitted only after the
+ * surrounding transaction commits (realtime hints); nothing is emitted on rollback.
  */
 @Injectable()
 export class OrderStateMachine {
+  constructor(@Optional() private readonly events?: EventEmitter2) {}
+
   async transition(tx: Tx, params: TransitionParams): Promise<Order> {
     const order = await tx.order.findUnique({ where: { id: params.orderId } });
     if (!order) {
@@ -83,6 +89,19 @@ export class OrderStateMachine {
           metadata: { from: order.status, to: params.to, reason: params.reason ?? null },
         },
       });
+    }
+
+    const events = this.events;
+    if (events) {
+      const event: OrderTransitionedEvent = {
+        orderId: order.id,
+        shopId: order.shopId,
+        from: order.status,
+        to: params.to,
+        actorType: params.actor.type,
+        at: new Date().toISOString(),
+      };
+      afterCommit(() => events.emit(DomainEvent.ORDER_TRANSITIONED, event));
     }
 
     return tx.order.findUniqueOrThrow({ where: { id: order.id } });

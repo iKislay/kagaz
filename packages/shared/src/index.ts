@@ -7,3 +7,4 @@ export * from './schemas.js';
 export * from './api.js';
 export * from './shop-api.js';
 export * from './admin-api.js';
+export * from './realtime.js';

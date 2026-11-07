@@ -16,6 +16,8 @@ import { ShopModule } from './modules/shop/shop.module.js';
 import { PickupModule } from './modules/pickup/pickup.module.js';
 import { ShopsModule } from './modules/shops/shops.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { RealtimeModule } from './modules/realtime/realtime.module.js';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
@@ -60,6 +62,9 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
       },
     }),
     PrismaModule,
+    // In-process domain events (emitted after commit). Register forRoot ONCE, here.
+    EventEmitterModule.forRoot(),
+    RealtimeModule,
     FilesModule,
     PickupModule,
     ShopsModule,

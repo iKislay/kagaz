@@ -5,6 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
 import { ConfigError, loadConfig, paymentModeOf } from './common/config/config.schema.js';
+import { RealtimeIoAdapter } from './modules/realtime/realtime.adapter.js';
 
 // Local development: read the repo-root .env. Real environments inject variables directly.
 const rootEnv = fileURLToPath(new URL('../../../.env', import.meta.url));
@@ -20,6 +21,7 @@ async function bootstrap(): Promise<void> {
   // maxAge: browsers cache the preflight, so status polling isn't doubled by OPTIONS requests.
   app.enableCors({ origin: [config.PUBLIC_WEB_URL], credentials: true, maxAge: 600 });
   app.enableShutdownHooks();
+  app.useWebSocketAdapter(new RealtimeIoAdapter(app, config.PUBLIC_WEB_URL));
 
   await app.listen(config.API_PORT);
 
