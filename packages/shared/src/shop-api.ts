@@ -31,6 +31,13 @@ export type EnrollDeviceResponse = z.infer<typeof EnrollDeviceResponseSchema>;
 
 export const HeartbeatRequestSchema = z.strictObject({
   appVersion: z.string().max(40).optional(),
+  /** Contract §1 / P4.4 health fields (all optional for back-compat). */
+  os: z.string().max(120).optional(),
+  uptimeSeconds: z.int().nonnegative().optional(),
+  /** Jobs in the agent's local queue. */
+  queueDepth: z.int().nonnegative().max(10_000).optional(),
+  /** Print attempts the agent is printing/monitoring: their leases are renewed. */
+  activePrintJobIds: z.array(z.uuid()).max(50).optional(),
   printers: z
     .array(
       z.strictObject({
@@ -43,6 +50,49 @@ export const HeartbeatRequestSchema = z.strictObject({
     .optional(),
 });
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequestSchema>;
+
+/** POST /api/shop/heartbeat (and legacy /api/devices/heartbeat) response — contract §1. */
+export const HeartbeatResponseSchema = z.object({
+  serverTime: z.string(),
+  leaseTtlSeconds: z.int(),
+  minAgentVersion: z.string().nullable(),
+  /** True when appVersion < minAgentVersion: other shop endpoints answer 426. */
+  upgradeRequired: z.boolean(),
+  shop: z.object({
+    status: z.enum(['OPEN', 'CLOSED', 'MAINTENANCE']),
+    approvalMode: z.enum(['MANUAL', 'AUTO']),
+    autoPaused: z.boolean(),
+  }),
+});
+export type HeartbeatResponse = z.infer<typeof HeartbeatResponseSchema>;
+
+/** Read model for admin health views (P4.4); online = heartbeat within the threshold. */
+export const DeviceHealthSchema = z.object({
+  deviceId: z.uuid(),
+  shopId: z.uuid(),
+  name: z.string(),
+  status: z.enum(['ACTIVE', 'REVOKED']),
+  connectivity: z.enum(['ONLINE', 'STALE', 'OFFLINE']),
+  online: z.boolean(),
+  lastHeartbeatAt: z.string().nullable(),
+  appVersion: z.string().nullable(),
+  upgradeRequired: z.boolean(),
+  os: z.string().nullable(),
+  uptimeSeconds: z.int().nullable(),
+  queueDepth: z.int().nullable(),
+  printers: z.array(
+    z.object({
+      printerId: z.uuid(),
+      displayName: z.string(),
+      status: z.string(),
+      lastError: z.string().nullable(),
+      lastStatusAt: z.string().nullable(),
+      /** READY/LEASED/SUBMITTED print jobs waiting on or holding this printer. */
+      queueDepth: z.int(),
+    }),
+  ),
+});
+export type DeviceHealth = z.infer<typeof DeviceHealthSchema>;
 
 // ─── Printers ───
 
@@ -153,8 +203,27 @@ export const PrintStatusReportSchema = z.discriminatedUnion('status', [
   }),
   z.strictObject({ status: z.literal('SPOOLER_COMPLETE') }),
   z.strictObject({ status: z.literal('FAILED'), error: z.string().min(1).max(500) }),
+  /** Outcome unknown (restart, vanished spooler job) → order NEEDS_OPERATOR_CHECK. */
+  z.strictObject({ status: z.literal('UNCERTAIN'), reason: z.string().min(1).max(500).optional() }),
 ]);
 export type PrintStatusReport = z.infer<typeof PrintStatusReportSchema>;
+
+// ─── Needs-check resolution (contract §2) ───
+
+export const ResolveAction = {
+  CONFIRM_PRINTED: 'CONFIRM_PRINTED',
+  REPRINT: 'REPRINT',
+  MARK_FAILED: 'MARK_FAILED',
+} as const;
+export type ResolveAction = (typeof ResolveAction)[keyof typeof ResolveAction];
+
+/** POST /api/shop/jobs/:orderId/resolve. REPRINT requires `confirm: true`. Response: ShopJobDetail. */
+export const ResolveJobRequestSchema = z.strictObject({
+  action: z.enum(enumValues(ResolveAction)),
+  confirm: z.boolean().optional(),
+  note: z.string().max(500).optional(),
+});
+export type ResolveJobRequest = z.infer<typeof ResolveJobRequestSchema>;
 
 // ─── Pickup ───
 

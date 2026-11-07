@@ -46,7 +46,15 @@ export const EnvSchema = z.object({
   PRINTER_LEASE_TTL_SECONDS: int(60),
   DEVICE_ONLINE_THRESHOLD_SECONDS: int(45),
   RETENTION_AFTER_COLLECTED_HOURS: int(24),
+  /** PRD §14.3 dispute window: files of REJECTED/REFUNDED orders are kept 7 days. */
+  RETENTION_AFTER_REJECTED_HOURS: int(168),
   UNPAID_ORDER_EXPIRY_HOURS: int(24),
+  /** Agents older than this get 426 AGENT_UPGRADE_REQUIRED on shop endpoints (P4.4). */
+  MIN_AGENT_VERSION: z
+    .string()
+    .regex(/^\d+(\.\d+){0,3}$/, 'MIN_AGENT_VERSION must look like 0.3.0')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
 
   SENTRY_DSN: z.string().optional(),
 });

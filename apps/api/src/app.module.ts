@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { type IncomingMessage, type ServerResponse } from 'node:http';
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 import { ConfigModule } from './common/config/config.module.js';
+import { EventsModule } from './common/events/events.module.js';
 import { loadConfig } from './common/config/config.schema.js';
 import { ApiExceptionFilter } from './common/http/api-exception.filter.js';
 import { PrismaModule } from './common/prisma/prisma.module.js';
@@ -16,6 +18,7 @@ import { ShopModule } from './modules/shop/shop.module.js';
 import { PickupModule } from './modules/pickup/pickup.module.js';
 import { ShopsModule } from './modules/shops/shops.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { AuditModule } from './modules/audit/audit.module.js';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
@@ -59,7 +62,10 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
         };
       },
     }),
+    EventsModule,
+    ScheduleModule.forRoot(),
     PrismaModule,
+    AuditModule,
     FilesModule,
     PickupModule,
     ShopsModule,

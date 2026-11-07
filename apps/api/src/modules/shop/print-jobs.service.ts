@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   type LeaseResponse,
   OrderStatus,
@@ -8,15 +8,28 @@ import {
 } from '@kagaz/shared';
 import { SYSTEM_ACTOR } from '../../common/actor.js';
 import { type DeviceContext, deviceActor } from '../../common/auth/device-auth.guard.js';
-import { APP_CONFIG } from '../../common/config/config.module.js';
-import { type AppConfig } from '../../common/config/config.schema.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { type PrintJobStatus, type Prisma } from '../../generated/prisma/client.js';
 import { StorageService } from '../files/storage.service.js';
-import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
+import { OrderStateMachine } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
+import {
+  LEASE_EXPIRED_REASON,
+  LEASE_HOLDING,
+  PrintLeaseService,
+  releaseLease,
+} from '../printing/print-leases.service.js';
 import { SHOP_JOB_INCLUDE, toShopJob } from './shop-job-view.js';
-import { releaseLease } from './shop-jobs.service.js';
+import { findShopOrder, findShopPrintJob, printJobNotFound } from './shop-scope.js';
+
+/** Which job statuses each report may follow. Terminal reports clear the lease. */
+const REPORT_FROM: Record<PrintStatusReport['status'], PrintJobStatus[]> = {
+  SUBMITTED: ['LEASED'],
+  SPOOLER_COMPLETE: ['LEASED', 'SUBMITTED'],
+  FAILED: ['LEASED', 'SUBMITTED'],
+  UNCERTAIN: ['LEASED', 'SUBMITTED'],
+};
 
 /**
  * Printer leases and print progress (Appendix A.2, CLAUDE.md invariant 8):
@@ -26,35 +39,37 @@ import { releaseLease } from './shop-jobs.service.js';
 @Injectable()
 export class PrintJobsService {
   constructor(
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly stateMachine: OrderStateMachine,
+    private readonly leases: PrintLeaseService,
   ) {}
 
   async lease(device: DeviceContext, printJobId: string): Promise<LeaseResponse> {
     const now = new Date();
-    const leaseUntil = new Date(now.getTime() + this.config.PRINTER_LEASE_TTL_SECONDS * 1000);
+    const leaseUntil = this.leases.leaseUntil(now);
 
     const job = await this.prisma.$transaction(async (tx) => {
-      const job = await this.findScoped(tx, device, printJobId);
+      const job = await findShopPrintJob(tx, device.shopId, printJobId);
 
-      // Idempotent re-lease by the same device (e.g. it lost the response).
+      // Idempotent re-lease by the holder (e.g. it lost the response): renew only.
       if (job.status === 'LEASED' && job.leasedByDeviceId === device.deviceId) {
-        await tx.printJob.update({ where: { id: job.id }, data: { leaseUntil } });
-        await tx.printer.updateMany({
-          where: { id: job.printerId, activeJobId: job.id },
-          data: { leaseUntil },
-        });
+        await this.leases.renew(tx, device, [job.id], leaseUntil);
         return job;
       }
       if (job.status !== 'READY') {
-        throw new AppError('JOB_NOT_READY', `Print job is ${job.status}`, HttpStatus.CONFLICT);
+        throw new AppError(
+          'JOB_NOT_LEASABLE',
+          `Print job is ${job.status} and cannot be leased`,
+          HttpStatus.CONFLICT,
+          { status: job.status },
+        );
       }
 
+      // Explain failures precisely; the conditional update below is what guarantees safety.
       const head = await tx.printJob.findFirst({
         where: { printerId: job.printerId, status: 'READY' },
-        orderBy: { createdAt: 'asc' },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         select: { id: true },
       });
       if (head?.id !== job.id) {
@@ -64,32 +79,27 @@ export class PrintJobsService {
           HttpStatus.CONFLICT,
         );
       }
-
-      // A previous holder whose lease expired is now in an unknown state: hand it to the
-      // operator before taking the printer (the full background sweeper lands in P2.7).
       const printer = job.printer;
       if (printer.activeJobId && printer.activeJobId !== job.id) {
-        if (printer.leaseUntil && printer.leaseUntil > now) {
-          throw new AppError('PRINTER_BUSY', 'The printer is busy with another job', 409);
-        }
-        await this.markUncertain(tx, printer.activeJobId, 'Lease expired before completion');
+        if (printer.leaseUntil && printer.leaseUntil >= now) throw printerBusy();
+        // The previous holder's lease ran out: its outcome is unknown → operator check.
+        await this.leases.expire(tx, printer.activeJobId, LEASE_EXPIRED_REASON, SYSTEM_ACTOR, now);
       }
 
-      const taken = await tx.printer.updateMany({
-        where: {
-          id: printer.id,
-          shopId: device.shopId,
-          OR: [{ activeJobId: null }, { leaseUntil: { lt: now } }, { activeJobId: job.id }],
-        },
-        data: { activeJobId: job.id, leaseUntil },
+      const won = await this.leases.acquire(tx, {
+        jobId: job.id,
+        printerId: printer.id,
+        shopId: device.shopId,
+        leaseUntil,
+        now,
       });
+      if (!won) throw printerBusy();
       const leased = await tx.printJob.updateMany({
         where: { id: job.id, status: 'READY' },
         data: { status: 'LEASED', leaseUntil, leasedByDeviceId: device.deviceId },
       });
-      if (taken.count !== 1 || leased.count !== 1) {
-        throw new AppError('PRINTER_BUSY', 'The printer was taken by another job', 409);
-      }
+      if (leased.count !== 1) throw printerBusy();
+      this.leases.publishJob(tx, job, device.shopId, 'LEASED');
 
       await this.stateMachine.transition(tx, {
         orderId: job.orderId,
@@ -102,7 +112,7 @@ export class PrintJobsService {
       return job;
     });
 
-    if (!job.packetFile || !job.checksum) {
+    if (!job.packetFile || !job.checksum || job.packetFile.deletedAt) {
       throw new AppError('PACKET_MISSING', 'The print packet is not available', 409);
     }
     const download = await this.storage.createDownloadUrl(job.packetFile.objectKey);
@@ -123,109 +133,103 @@ export class PrintJobsService {
     };
   }
 
-  /** Agent progress reports. Repeating the current status is a no-op (safe retries). */
+  /**
+   * Agent progress reports (P2.10). Every report renews or clears the lease; repeating the
+   * current status is a no-op (safe retries). FAILED/UNCERTAIN send the order to the operator,
+   * never to READY (invariant 9). A job not leased by this device → 404 (contract §1).
+   */
   async report(
     device: DeviceContext,
     printJobId: string,
     report: PrintStatusReport,
   ): Promise<ShopJob> {
     const now = new Date();
-    const leaseUntil = new Date(now.getTime() + this.config.PRINTER_LEASE_TTL_SECONDS * 1000);
+    const leaseUntil = this.leases.leaseUntil(now);
 
     const orderId = await this.prisma.$transaction(async (tx) => {
-      const job = await this.findScoped(tx, device, printJobId);
-      if (job.leasedByDeviceId !== device.deviceId) {
-        throw new AppError('NOT_LEASE_HOLDER', 'This device does not hold the job lease', 409);
-      }
-      if (job.status === report.status) return job.orderId; // idempotent replay
+      const job = await findShopPrintJob(tx, device.shopId, printJobId);
+      if (job.leasedByDeviceId !== device.deviceId) throw printJobNotFound();
 
-      const allowed: Record<PrintStatusReport['status'], string[]> = {
-        SUBMITTED: ['LEASED'],
-        SPOOLER_COMPLETE: ['LEASED', 'SUBMITTED'],
-        FAILED: ['LEASED', 'SUBMITTED'],
-      };
-      if (!allowed[report.status].includes(job.status)) {
-        throw new AppError(
-          'INVALID_JOB_TRANSITION',
-          `Print job is ${job.status}; cannot report ${report.status}`,
-          HttpStatus.CONFLICT,
-        );
+      if (job.status === report.status) {
+        if (LEASE_HOLDING.includes(job.status)) {
+          await this.leases.renew(tx, device, [job.id], leaseUntil);
+        }
+        return job.orderId; // idempotent replay
       }
+      const from = REPORT_FROM[report.status];
+      if (!from.includes(job.status)) throw invalidJobTransition(job.status, report.status);
 
-      if (report.status === 'SUBMITTED') {
-        await tx.printJob.update({
-          where: { id: job.id },
-          data: {
-            status: 'SUBMITTED',
+      const data: Prisma.PrintJobUpdateManyMutationInput = { status: report.status };
+      switch (report.status) {
+        case 'SUBMITTED':
+          Object.assign(data, {
             spoolerJobId: report.spoolerJobId ?? null,
             submittedAt: now,
             leaseUntil,
-          },
-        });
+          });
+          break;
+        case 'SPOOLER_COMPLETE':
+          Object.assign(data, { completedAt: now, leaseUntil: null });
+          break;
+        case 'FAILED':
+          Object.assign(data, { error: report.error, leaseUntil: null });
+          break;
+        case 'UNCERTAIN':
+          Object.assign(data, { error: report.reason ?? 'Outcome unknown', leaseUntil: null });
+          break;
+      }
+      // Conditional on the current status: concurrent duplicate reports apply once.
+      const applied = await tx.printJob.updateMany({
+        where: { id: job.id, status: { in: from }, leasedByDeviceId: device.deviceId },
+        data,
+      });
+      if (applied.count !== 1) {
+        const current = await tx.printJob.findUniqueOrThrow({ where: { id: job.id } });
+        if (current.status === report.status) return job.orderId;
+        throw invalidJobTransition(current.status, report.status);
+      }
+      this.leases.publishJob(tx, job, device.shopId, report.status);
+
+      if (report.status === 'SUBMITTED') {
         await tx.printer.updateMany({
           where: { id: job.printerId, activeJobId: job.id },
           data: { leaseUntil },
         });
-      } else if (report.status === 'SPOOLER_COMPLETE') {
-        // Telemetry only: the order stays PRINTING until the operator marks it ready.
-        await tx.printJob.update({
-          where: { id: job.id },
-          data: { status: 'SPOOLER_COMPLETE', completedAt: now, leaseUntil: null },
-        });
-        await releaseLease(tx, job.printerId, job.id);
-      } else {
-        await tx.printJob.update({
-          where: { id: job.id },
-          data: { status: 'FAILED', error: report.error, leaseUntil: null },
-        });
-        await releaseLease(tx, job.printerId, job.id);
+        return job.orderId;
+      }
+      // Terminal for this attempt: free the printer for the next job.
+      await releaseLease(tx, job.printerId, job.id);
+
+      // SPOOLER_COMPLETE is telemetry only: the order stays PRINTING until Mark Ready.
+      if (report.status !== 'SPOOLER_COMPLETE' && job.order.status === OrderStatus.PRINTING) {
+        const reason =
+          report.status === 'FAILED' ? report.error : (report.reason ?? 'Outcome unknown');
         await this.stateMachine.transition(tx, {
           orderId: job.orderId,
           to: OrderStatus.NEEDS_OPERATOR_CHECK,
           from: OrderStatus.PRINTING,
           actor: deviceActor(device),
-          reason: report.error,
-          auditAction: 'print.failed',
+          reason,
+          auditAction: report.status === 'FAILED' ? 'print.failed' : 'print.uncertain',
           metadata: { printJobId: job.id, attempt: job.attempt },
         });
       }
       return job.orderId;
     });
 
-    const order = await this.prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      include: SHOP_JOB_INCLUDE,
-    });
-    return toShopJob(order);
+    return toShopJob(await findShopOrder(this.prisma, device.shopId, orderId, SHOP_JOB_INCLUDE));
   }
+}
 
-  private async findScoped(tx: Tx, device: DeviceContext, printJobId: string) {
-    const job = await tx.printJob.findFirst({
-      where: { id: printJobId, order: { shopId: device.shopId } },
-      include: { order: true, printer: true, packetFile: true },
-    });
-    if (!job)
-      throw new AppError('PRINT_JOB_NOT_FOUND', 'Print job not found', HttpStatus.NOT_FOUND);
-    return job;
-  }
+function printerBusy(): AppError {
+  return new AppError('PRINTER_BUSY', 'The printer is busy with another job', HttpStatus.CONFLICT);
+}
 
-  private async markUncertain(tx: Tx, printJobId: string, reason: string): Promise<void> {
-    const stale = await tx.printJob.findUnique({ where: { id: printJobId } });
-    if (!stale || (stale.status !== 'LEASED' && stale.status !== 'SUBMITTED')) return;
-    await tx.printJob.update({
-      where: { id: stale.id },
-      data: { status: 'UNCERTAIN', error: reason, leaseUntil: null },
-    });
-    const order = await tx.order.findUnique({ where: { id: stale.orderId } });
-    if (order?.status === OrderStatus.PRINTING) {
-      await this.stateMachine.transition(tx, {
-        orderId: stale.orderId,
-        to: OrderStatus.NEEDS_OPERATOR_CHECK,
-        from: OrderStatus.PRINTING,
-        actor: SYSTEM_ACTOR,
-        reason,
-        metadata: { printJobId: stale.id },
-      });
-    }
-  }
+function invalidJobTransition(from: string, to: string): AppError {
+  return new AppError(
+    'INVALID_JOB_TRANSITION',
+    `Print job is ${from}; cannot report ${to}`,
+    HttpStatus.CONFLICT,
+    { status: from },
+  );
 }

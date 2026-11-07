@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
+import { PickupAttemptsService } from './pickup-attempts.service.js';
 import { PickupCrypto } from './pickup-crypto.js';
 
 @Global()
@@ -12,7 +13,8 @@ import { PickupCrypto } from './pickup-crypto.js';
       useFactory: (config: AppConfig) =>
         new PickupCrypto(config.PICKUP_CODE_PEPPER, config.PICKUP_CODE_ENC_KEY),
     },
+    PickupAttemptsService,
   ],
-  exports: [PickupCrypto],
+  exports: [PickupCrypto, PickupAttemptsService],
 })
 export class PickupModule {}

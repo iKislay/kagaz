@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { type RegisterPrintersRequest, type ShopPrinter } from '@kagaz/shared';
-import { type DeviceContext } from '../../common/auth/device-auth.guard.js';
+import { type DeviceContext, deviceActor } from '../../common/auth/device-auth.guard.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { AuditService } from '../audit/audit.service.js';
 
 @Injectable()
 export class ShopPrintersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async list(device: DeviceContext): Promise<ShopPrinter[]> {
     const printers = await this.prisma.printer.findMany({
@@ -50,14 +54,9 @@ export class ShopPrintersService {
           create: { shopId: device.shopId, printerName: p.printerName, ...fields },
         });
       }
-      await tx.auditLog.create({
-        data: {
-          actorType: 'DEVICE',
-          actorId: device.deviceId,
-          shopId: device.shopId,
-          action: 'printers.registered',
-          metadata: { printers: req.printers.map((p) => p.printerName) },
-        },
+      await this.audit.record(tx, deviceActor(device), 'printers.registered', {
+        shopId: device.shopId,
+        metadata: { printers: req.printers.map((p) => p.printerName) },
       });
     });
     return this.list(device);
