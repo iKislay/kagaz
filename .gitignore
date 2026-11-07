@@ -35,3 +35,6 @@ Thumbs.db
 
 # Next.js generated types (rewritten by dev/build)
 next-env.d.ts
+
+# Demo compose secrets (infra/demo.env.example is the template)
+infra/demo.env
