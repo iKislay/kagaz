@@ -15,7 +15,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
-    "infra:down": "docker compose -f infra/docker-compose.yml down"
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "sim:agent": "pnpm --filter @kagaz/scripts sim-agent",
+    "load:orders": "pnpm --filter @kagaz/scripts load-orders",
+    "verify:run": "pnpm --filter @kagaz/scripts verify-run",
+    "demo:reset": "pnpm --filter @kagaz/scripts demo-reset"
   },
   "devDependencies": {
     "@eslint/js": "^10",

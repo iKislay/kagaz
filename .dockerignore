@@ -1,0 +1,23 @@
+# Build context = repo root. Keep it small and never ship secrets.
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/*.tsbuildinfo
+apps/api/src/generated
+apps/shop-agent
+.git
+.claude
+.vs
+.idea
+**/bin
+**/obj
+**/TestResults
+docs
+test-assets
+**/*.log
+
+# env / secrets — configuration is injected at runtime
+.env
+.env.*
+!.env.example

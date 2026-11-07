@@ -27,6 +27,8 @@
     "@nestjs/event-emitter": "^12",
     "@nestjs/platform-express": "^12",
     "@nestjs/schedule": "^12",
+    "@nestjs/platform-socket.io": "^12",
+    "@nestjs/websockets": "^12",
     "@node-rs/argon2": "^2.2.2",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
@@ -38,6 +40,7 @@
     "pino-http": "^11.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "socket.io": "^4.8.1",
     "zod": "^4"
   },
   "devDependencies": {
@@ -50,6 +53,7 @@
     "pg": "^8.23.1",
     "pino-pretty": "^13.2.0",
     "prisma": "7.10.1",
+    "socket.io-client": "^4.8.1",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "unplugin-swc": "^2.0.0",

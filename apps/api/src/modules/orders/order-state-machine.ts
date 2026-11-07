@@ -1,4 +1,5 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { type OrderStatus, canTransition } from '@kagaz/shared';
 import { type Actor, isHumanActor } from '../../common/actor.js';
 import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.js';

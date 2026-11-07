@@ -1,0 +1,25 @@
+{
+  "name": "@kagaz/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev/ops tooling: simulated shop agent, load generator, run verifier, demo reset.",
+  "type": "module",
+  "scripts": {
+    "sim-agent": "tsx sim-agent.ts",
+    "load-orders": "tsx load-orders.ts",
+    "verify-run": "tsx verify-run.ts",
+    "demo-reset": "tsx demo-reset.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1162.0",
+    "@kagaz/shared": "workspace:^",
+    "@prisma/adapter-pg": "7.10.1",
+    "pdf-lib": "^1.17.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@kagaz/api": "workspace:*",
+    "tsx": "^4.23.15"
+  }
+}

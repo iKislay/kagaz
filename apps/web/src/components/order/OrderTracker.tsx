@@ -1,51 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { DEMO_REFUND_NOTICE, OrderStatus, type PublicOrder, formatPaise } from '@kagaz/shared';
 import { PaymentStatePanel } from '@/components/order/PaymentStatePanel';
 import { Group, Notice, Pill, Row, Spinner, cx } from '@/components/ui';
-import { ApiRequestError, getOrder } from '@/lib/api';
-import { REJECT_REASONS, STATUS_COPY, TERMINAL, TIMELINE_STEPS } from '@/lib/status';
-import { loadTrackingToken, trackingUrl } from '@/lib/tracking';
+import { useOrderUpdates } from '@/lib/realtime';
+import { REJECT_REASONS, STATUS_COPY, TIMELINE_STEPS } from '@/lib/status';
+import { trackingUrl } from '@/lib/tracking';
 
-const POLL_MS = 5000;
-
-/** Live order status (FR-CUST-10/11). Polls until the order reaches a final state. */
+/** Live order status (FR-CUST-10/11) until the order reaches a final state. */
 export function OrderTracker({ orderId }: { orderId: string }) {
-  const [order, setOrder] = useState<PublicOrder | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [error, setError] = useState<{ notFound: boolean; message: string } | null>(null);
-
-  useEffect(() => {
-    const tok = loadTrackingToken(orderId);
-    setToken(tok);
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let cancelled = false;
-
-    const tick = async () => {
-      try {
-        const next = await getOrder(orderId, tok);
-        if (cancelled) return;
-        setOrder(next);
-        setError(null);
-        if (!TERMINAL.includes(next.status)) timer = setTimeout(tick, POLL_MS);
-      } catch (err) {
-        if (cancelled) return;
-        const notFound = err instanceof ApiRequestError && err.status === 404;
-        setError({
-          notFound,
-          message: err instanceof ApiRequestError ? err.message : 'Something went wrong.',
-        });
-        if (!notFound) timer = setTimeout(tick, POLL_MS * 2); // keep retrying network errors
-      }
-    };
-    void tick();
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [orderId]);
+  // Socket hints + 30 s safety poll (P2.9); REST stays the source of truth.
+  const { order, token, error, setOrder } = useOrderUpdates(orderId);
 
   if (error?.notFound) {
     return (
