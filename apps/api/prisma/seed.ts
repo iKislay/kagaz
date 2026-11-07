@@ -10,6 +10,8 @@
  */
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { randomBytes } from 'node:crypto';
+import { hash } from '@node-rs/argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { formatCode, randomCode, sha256Hex } from '../src/common/crypto/tokens.js';
@@ -67,16 +69,43 @@ const SHOPS = [
   },
 ];
 
-async function upsertUser(email: string, name: string, kind: 'ADMIN' | 'STAFF') {
+async function upsertUser(
+  email: string,
+  name: string,
+  kind: 'ADMIN' | 'STAFF',
+  passwordHash?: string,
+) {
   return prisma.user.upsert({
     where: { email },
-    update: { name, kind },
-    create: { email, name, kind },
+    update: passwordHash ? { name, kind, passwordHash } : { name, kind },
+    create: { email, name, kind, ...(passwordHash ? { passwordHash } : {}) },
   });
 }
 
 async function main() {
-  await upsertUser('admin@kagaz.local', 'Kagaz Admin', 'ADMIN');
+  const adminEmail = 'admin@kagaz.local';
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD;
+  let adminPasswordHash: string | undefined;
+  let printedPassword: string | undefined;
+
+  if (seedPassword) {
+    adminPasswordHash = await hash(seedPassword);
+  } else {
+    const existing = await prisma.user.findUnique({
+      where: { email: adminEmail },
+      select: { passwordHash: true },
+    });
+    if (!existing?.passwordHash) {
+      const generated = randomBytes(24).toString('base64url');
+      adminPasswordHash = await hash(generated);
+      printedPassword = generated;
+    }
+  }
+
+  await upsertUser(adminEmail, 'Kagaz Admin', 'ADMIN', adminPasswordHash);
+  if (printedPassword) {
+    console.log(`Admin password for ${adminEmail}: ${printedPassword}`);
+  }
 
   const shops = [];
   for (const [i, def] of SHOPS.entries()) {

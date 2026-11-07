@@ -6,3 +6,4 @@ export * from './constants.js';
 export * from './schemas.js';
 export * from './api.js';
 export * from './shop-api.js';
+export * from './admin-api.js';
