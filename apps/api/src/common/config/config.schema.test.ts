@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig, toPublicConfig } from './config.schema.js';
+import {
+  ConfigError,
+  environmentProfile,
+  loadConfig,
+  startupSummary,
+  toPublicConfig,
+} from './config.schema.js';
 
 const base = {
   APP_ENV: 'local',
@@ -47,8 +53,37 @@ describe('loadConfig', () => {
   });
 
   it('allows mock payments in demo and staging', () => {
-    expect(loadConfig({ ...base, APP_ENV: 'demo' }).PAYMENT_PROVIDER).toBe('demo');
-    expect(loadConfig({ ...base, APP_ENV: 'staging' }).PAYMENT_PROVIDER).toBe('demo');
+    const secret = { DEMO_WEBHOOK_SECRET: 'w'.repeat(32) };
+    expect(loadConfig({ ...base, ...secret, APP_ENV: 'demo' }).PAYMENT_PROVIDER).toBe('demo');
+    expect(loadConfig({ ...base, ...secret, APP_ENV: 'staging' }).PAYMENT_PROVIDER).toBe('demo');
+  });
+
+  it('requires a real demo webhook secret outside local', () => {
+    expect(() => loadConfig({ ...base, APP_ENV: 'demo' })).toThrow(/DEMO_WEBHOOK_SECRET/);
+    expect(loadConfig(base).DEMO_WEBHOOK_SECRET).toBeUndefined();
+  });
+
+  it('environment matrix: demo features only outside production', () => {
+    for (const env of ['local', 'demo', 'staging'] as const) {
+      expect(environmentProfile(env)).toMatchObject({
+        demoPaymentsAllowed: true,
+        demoOtpAllowed: true,
+        demoControlsAllowed: true,
+      });
+    }
+    expect(environmentProfile('production')).toEqual({
+      demoPaymentsAllowed: false,
+      demoOtpAllowed: false,
+      demoControlsAllowed: false,
+      secureCookies: true,
+    });
+    expect(environmentProfile('local').secureCookies).toBe(false);
+  });
+
+  it('logs the mode at startup', () => {
+    expect(startupSummary(loadConfig(base))).toBe(
+      'APP_ENV=local | PAYMENT=DEMO (SIMULATED) | OTP=DEMO (NO SMS) | DEMO_CONTROLS=ON',
+    );
   });
 
   it('refuses placeholder secrets in staging', () => {
@@ -76,6 +111,8 @@ describe('loadConfig', () => {
     expect(toPublicConfig(loadConfig(base))).toEqual({
       appEnv: 'local',
       paymentMode: 'DEMO',
+      otpMode: 'DEMO',
+      demoControls: true,
       limits: { maxUploadBytes: 26_214_400, maxPages: 300, maxCopies: 20, maxSides: 1000 },
     });
   });

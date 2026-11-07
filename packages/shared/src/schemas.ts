@@ -45,6 +45,10 @@ export type Limits = z.infer<typeof LimitsSchema>;
 export const PublicConfigSchema = z.object({
   appEnv: AppEnvSchema,
   paymentMode: PaymentModeSchema,
+  /** DEMO: sign-in codes go to the demo OTP inbox instead of SMS (P2.2). */
+  otpMode: PaymentModeSchema,
+  /** True when admin demo controls (OTP inbox, payment outcomes) are available (P3.2/P3.5). */
+  demoControls: z.boolean(),
   limits: LimitsSchema,
 });
 export type PublicConfig = z.infer<typeof PublicConfigSchema>;
