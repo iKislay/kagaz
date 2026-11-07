@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import Link from 'next/link';
 import { DemoBanner } from '@/components/DemoBanner';
+import { AccountLink } from '@/components/customer/AccountLink';
 import './globals.css';
 
 // Fallback for non-Apple devices; Apple devices use SF via -apple-system (see globals.css).
@@ -37,7 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
               <span className="text-[15px] font-semibold tracking-tight">Kagaz</span>
             </Link>
-            <span className="text-[13px] text-text-secondary">Mandya</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-text-secondary">Mandya</span>
+              <AccountLink />
+            </div>
           </div>
           <DemoBanner />
         </header>
