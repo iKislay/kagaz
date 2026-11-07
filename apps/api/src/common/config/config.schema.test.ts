@@ -79,4 +79,11 @@ describe('loadConfig', () => {
       limits: { maxUploadBytes: 26_214_400, maxPages: 300, maxCopies: 20, maxSides: 1000 },
     });
   });
+
+  it('MIN_AGENT_VERSION is optional; empty means no minimum', () => {
+    expect(loadConfig(base).MIN_AGENT_VERSION).toBeUndefined();
+    expect(loadConfig({ ...base, MIN_AGENT_VERSION: '' }).MIN_AGENT_VERSION).toBeUndefined();
+    expect(loadConfig({ ...base, MIN_AGENT_VERSION: '0.3.0' }).MIN_AGENT_VERSION).toBe('0.3.0');
+    expect(() => loadConfig({ ...base, MIN_AGENT_VERSION: 'latest' })).toThrow(ConfigError);
+  });
 });
