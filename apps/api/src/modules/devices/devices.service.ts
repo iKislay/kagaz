@@ -1,17 +1,32 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import {
   type EnrollDeviceRequest,
   type EnrollDeviceResponse,
   type HeartbeatRequest,
+  type HeartbeatResponse,
 } from '@kagaz/shared';
+import { isUpgradeRequired } from '../../common/auth/agent-version.guard.js';
 import { type DeviceContext } from '../../common/auth/device-auth.guard.js';
+import { APP_CONFIG } from '../../common/config/config.module.js';
+import { type AppConfig } from '../../common/config/config.schema.js';
 import { generateToken, normalizeCode, sha256Hex } from '../../common/crypto/tokens.js';
+import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { AuditService } from '../audit/audit.service.js';
+import { PrintLeaseService } from '../printing/print-leases.service.js';
+import { DeviceHealthService } from './device-health.service.js';
 
 @Injectable()
 export class DevicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly leases: PrintLeaseService,
+    private readonly health: DeviceHealthService,
+    private readonly events: DomainEventBus,
+  ) {}
 
   /** Exchange a one-time enrollment code for a device token (FR-SHOP-01). */
   async enroll(req: EnrollDeviceRequest): Promise<EnrollDeviceResponse> {
@@ -47,14 +62,9 @@ export class DevicesService {
       if (used.count !== 1) {
         throw new AppError('ENROLLMENT_CODE_INVALID', 'This pairing code was already used', 400);
       }
-      await tx.auditLog.create({
-        data: {
-          actorType: 'DEVICE',
-          actorId: device.id,
-          shopId: code.shopId,
-          action: 'device.enrolled',
-          metadata: { name: req.name, appVersion: req.appVersion ?? null },
-        },
+      await this.audit.record(tx, { type: 'DEVICE', id: device.id }, 'device.enrolled', {
+        shopId: code.shopId,
+        metadata: { name: req.name, appVersion: req.appVersion ?? null },
       });
       return {
         deviceToken: token,
@@ -64,25 +74,76 @@ export class DevicesService {
     });
   }
 
-  /** Records liveness, app version and printer health (full health views in P4.4). */
-  async heartbeat(device: DeviceContext, req: HeartbeatRequest): Promise<{ serverTime: string }> {
+  /**
+   * Heartbeat (contract §1, P4.4, every 15 s): records liveness + health, printer status,
+   * renews the leases of `activePrintJobIds`, and tells the agent the lease TTL, the
+   * minimum agent version and the shop's mode.
+   */
+  async heartbeat(device: DeviceContext, req: HeartbeatRequest): Promise<HeartbeatResponse> {
     const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.shopDevice.update({
+    const at = now.toISOString();
+    const result = await this.prisma.$transaction(async (tx) => {
+      const before = await tx.shopDevice.findUniqueOrThrow({
+        where: { id: device.deviceId },
+        select: { lastHeartbeatAt: true },
+      });
+      const updated = await tx.shopDevice.update({
         where: { id: device.deviceId },
         data: {
           lastHeartbeatAt: now,
           ...(req.appVersion ? { appVersion: req.appVersion } : {}),
+          ...(req.os === undefined ? {} : { os: req.os }),
+          ...(req.uptimeSeconds === undefined ? {} : { uptimeSeconds: req.uptimeSeconds }),
+          ...(req.queueDepth === undefined ? {} : { queueDepth: req.queueDepth }),
+        },
+        select: {
+          appVersion: true,
+          shop: { select: { status: true, approvalMode: true, autoPaused: true } },
         },
       });
-      for (const p of req.printers ?? []) {
-        // Scoped to this shop: a device can't touch another shop's printers.
-        await tx.printer.updateMany({
-          where: { id: p.printerId, shopId: device.shopId },
-          data: { status: p.status, lastStatusAt: now, lastError: p.lastError ?? null },
+      if (!this.health.isOnline(before.lastHeartbeatAt, now)) {
+        this.events.publish(tx, DomainEvent.DEVICE_STATUS_CHANGED, {
+          deviceId: device.deviceId,
+          shopId: device.shopId,
+          online: true,
+          at,
         });
       }
+
+      for (const p of req.printers ?? []) {
+        // Scoped to this shop: a device can't touch another shop's printers.
+        const printer = await tx.printer.findFirst({
+          where: { id: p.printerId, shopId: device.shopId },
+          select: { id: true, status: true, lastError: true },
+        });
+        if (!printer) continue;
+        const lastError = p.lastError ?? null;
+        await tx.printer.update({
+          where: { id: printer.id },
+          data: { status: p.status, lastStatusAt: now, lastError },
+        });
+        if (printer.status !== p.status || printer.lastError !== lastError) {
+          this.events.publish(tx, DomainEvent.PRINTER_STATUS_CHANGED, {
+            printerId: printer.id,
+            shopId: device.shopId,
+            status: p.status,
+            lastError,
+            at,
+          });
+        }
+      }
+
+      await this.leases.renew(tx, device, req.activePrintJobIds ?? [], this.leases.leaseUntil(now));
+      return updated;
     });
-    return { serverTime: now.toISOString() };
+
+    const min = this.config.MIN_AGENT_VERSION ?? null;
+    return {
+      serverTime: at,
+      leaseTtlSeconds: this.config.PRINTER_LEASE_TTL_SECONDS,
+      minAgentVersion: min,
+      upgradeRequired: isUpgradeRequired(result.appVersion, min ?? undefined),
+      shop: result.shop,
+    };
   }
 }

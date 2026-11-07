@@ -194,6 +194,14 @@ model ShopDevice {
   status          DeviceStatus @default(ACTIVE)
   createdAt       DateTime     @default(now()) @map("created_at")
   revokedAt       DateTime?    @map("revoked_at")
+  /// Heartbeat health (P4.4).
+  os              String?
+  uptimeSeconds   Int?         @map("uptime_seconds")
+  queueDepth      Int?         @map("queue_depth")
+  /// Pickup brute-force window (P4.5): failures since pickupWindowAt; lockout end.
+  pickupFailures  Int          @default(0) @map("pickup_failures")
+  pickupWindowAt  DateTime?    @map("pickup_window_at")
+  pickupLockUntil DateTime?    @map("pickup_lock_until")
 
   shop     Shop      @relation(fields: [shopId], references: [id])
   printers Printer[]
@@ -443,6 +451,7 @@ model PrintJob {
 
   @@unique([orderId, attempt])
   @@index([printerId, status, createdAt])
+  @@index([status, leaseUntil])
   @@map("print_jobs")
 }
 

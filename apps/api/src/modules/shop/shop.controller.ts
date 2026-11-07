@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { z } from 'zod';
 import {
@@ -23,6 +24,8 @@ import {
   RegisterPrintersRequestSchema,
   type RejectJobRequest,
   RejectJobRequestSchema,
+  type ResolveJobRequest,
+  ResolveJobRequestSchema,
   type ShopJob,
   type ShopJobDetail,
   type ShopPrinter,
@@ -30,11 +33,16 @@ import {
   VerifyPickupRequestSchema,
   type VerifyPickupResponse,
 } from '@kagaz/shared';
+import { AgentVersionGuard } from '../../common/auth/agent-version.guard.js';
 import {
   CurrentDevice,
   DeviceAuthGuard,
   type DeviceContext,
 } from '../../common/auth/device-auth.guard.js';
+import {
+  IdempotencyInterceptor,
+  SkipIdempotency,
+} from '../../common/http/idempotency.interceptor.js';
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
 import { PrintJobsService } from './print-jobs.service.js';
 import { ShopJobsService } from './shop-jobs.service.js';
@@ -51,10 +59,12 @@ const StatusList = new ZodValidationPipe(
 
 /**
  * Shop / device API (PRD §11.2) for the Windows app. The shop is always the authenticated
- * device's shop — no route takes a shop id.
+ * device's shop — no route takes a shop id. Agents below MIN_AGENT_VERSION get 426;
+ * mutating calls honour `Idempotency-Key` (P2.1).
  */
 @Controller('shop')
-@UseGuards(DeviceAuthGuard)
+@UseGuards(DeviceAuthGuard, AgentVersionGuard)
+@UseInterceptors(IdempotencyInterceptor)
 export class ShopController {
   constructor(
     private readonly jobs: ShopJobsService,
@@ -108,8 +118,21 @@ export class ShopController {
     return this.jobs.markReady(device, orderId);
   }
 
+  /** Needs-check resolution (contract §2): CONFIRM_PRINTED | REPRINT | MARK_FAILED. */
+  @Post('jobs/:orderId/resolve')
+  @HttpCode(200)
+  resolve(
+    @CurrentDevice() device: DeviceContext,
+    @Param('orderId', Uuid) orderId: string,
+    @Body(new ZodValidationPipe(ResolveJobRequestSchema)) body: ResolveJobRequest,
+  ): Promise<ShopJobDetail> {
+    return this.jobs.resolve(device, orderId, body);
+  }
+
+  /** Not stored for replay: the response holds a signed URL; re-lease by the holder is safe. */
   @Post('print-jobs/:id/lease')
   @HttpCode(200)
+  @SkipIdempotency()
   lease(
     @CurrentDevice() device: DeviceContext,
     @Param('id', Uuid) id: string,

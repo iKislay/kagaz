@@ -5,6 +5,7 @@ import {
   type EnrollDeviceResponse,
   type HeartbeatRequest,
   HeartbeatRequestSchema,
+  type HeartbeatResponse,
 } from '@kagaz/shared';
 import {
   CurrentDevice,
@@ -26,13 +27,33 @@ export class DevicesController {
     return this.devices.enroll(body);
   }
 
+  /** Legacy path (PRD §11.2); same handler as POST /api/shop/heartbeat. */
   @Post('heartbeat')
   @HttpCode(200)
   @UseGuards(DeviceAuthGuard)
   heartbeat(
     @CurrentDevice() device: DeviceContext,
     @Body(new ZodValidationPipe(HeartbeatRequestSchema)) body: HeartbeatRequest,
-  ): Promise<{ serverTime: string }> {
+  ): Promise<HeartbeatResponse> {
+    return this.devices.heartbeat(device, body);
+  }
+}
+
+/**
+ * `POST /api/shop/heartbeat` (contract §1). Deliberately NOT behind AgentVersionGuard: an
+ * outdated agent still gets 200 with `upgradeRequired: true`.
+ */
+@Controller('shop')
+@UseGuards(DeviceAuthGuard)
+export class ShopHeartbeatController {
+  constructor(private readonly devices: DevicesService) {}
+
+  @Post('heartbeat')
+  @HttpCode(200)
+  heartbeat(
+    @CurrentDevice() device: DeviceContext,
+    @Body(new ZodValidationPipe(HeartbeatRequestSchema)) body: HeartbeatRequest,
+  ): Promise<HeartbeatResponse> {
     return this.devices.heartbeat(device, body);
   }
 }
