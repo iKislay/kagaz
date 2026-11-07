@@ -288,3 +288,18 @@ export const AdminLoginResponseSchema = z.object({
   admin: z.object({ id: z.uuid(), email: z.string() }),
 });
 export type AdminLoginResponse = z.infer<typeof AdminLoginResponseSchema>;
+
+// ─── Demo controls (P2.2 / P3.5) — non-production only ───
+
+export const DemoOtpInboxItemSchema = z.object({
+  /** Masked to the last 4 digits. */
+  phone: z.string(),
+  code: z.string(),
+  sentAt: z.string(),
+  expiresAt: z.string(),
+});
+export type DemoOtpInboxItem = z.infer<typeof DemoOtpInboxItemSchema>;
+
+/** GET /api/admin/demo/otp-inbox */
+export const DemoOtpInboxSchema = z.object({ items: z.array(DemoOtpInboxItemSchema) });
+export type DemoOtpInbox = z.infer<typeof DemoOtpInboxSchema>;

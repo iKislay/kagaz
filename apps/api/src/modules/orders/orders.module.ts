@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CustomerSessionService } from '../../common/auth/customer-session.js';
 import { FilesModule } from '../files/files.module.js';
 import { PricingModule } from '../pricing/pricing.module.js';
 import { ShopsModule } from '../shops/shops.module.js';
@@ -10,7 +11,7 @@ import { TrackingGuard } from './tracking.guard.js';
 @Module({
   imports: [FilesModule, PricingModule, ShopsModule],
   controllers: [OrdersController],
-  providers: [OrdersService, OrderStateMachine, TrackingGuard],
-  exports: [OrdersService, OrderStateMachine, TrackingGuard],
+  providers: [OrdersService, OrderStateMachine, TrackingGuard, CustomerSessionService],
+  exports: [OrdersService, OrderStateMachine, TrackingGuard, CustomerSessionService],
 })
 export class OrdersModule {}

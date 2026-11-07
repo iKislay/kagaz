@@ -54,6 +54,14 @@ export class OrdersService {
     return toPublicOrder(order, this.pickup);
   }
 
+  /** Session check used by the customer guard: is this the signed-in customer's order? */
+  async findByCustomer(orderId: string, customerId: string): Promise<{ id: string } | null> {
+    return this.prisma.order.findFirst({
+      where: { id: orderId, customerId },
+      select: { id: true },
+    });
+  }
+
   /** Tracking-token check used by the customer guard. Unknown id or bad token → null. */
   async findByTrackingToken(orderId: string, token: string): Promise<{ id: string } | null> {
     return this.prisma.order.findFirst({
@@ -64,9 +72,11 @@ export class OrdersService {
 
   // ─── Commands ───
 
+  /** `customer`: the signed-in customer (P2.2) — the order is linked to their account. */
   async createDraft(
     req: CreateOrderRequest,
     actor: Actor,
+    customer?: { customerId: string; phone: string } | null,
   ): Promise<{ order: PublicOrder; trackingToken: string }> {
     await this.shops.requireOrderableShop(req.shopId);
     await this.assertOptionsAllowed(req.shopId, req.options);
@@ -81,7 +91,8 @@ export class OrdersService {
             data: {
               publicRef: `KGZ-${randomCode(6)}`,
               shopId: req.shopId,
-              customerPhone: req.customerPhone ?? null,
+              customerId: customer?.customerId ?? null,
+              customerPhone: customer?.phone ?? req.customerPhone ?? null,
               options: req.options,
               trackingTokenHash: sha256Hex(trackingToken),
               expiresAt,
