@@ -3,6 +3,7 @@ import { OrderStatus, type PayResponse, QuoteSchema } from '@kagaz/shared';
 import { SYSTEM_ACTOR } from '../../common/actor.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { ApprovalService } from '../approval/approval.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
 import { OrdersService } from '../orders/orders.service.js';
@@ -22,6 +23,7 @@ export class PaymentsService {
     private readonly orders: OrdersService,
     private readonly stateMachine: OrderStateMachine,
     private readonly pricing: PricingService,
+    private readonly approval: ApprovalService,
   ) {}
 
   /**
@@ -150,9 +152,10 @@ export class PaymentsService {
         );
         throw new AppError('PAYMENT_AMOUNT_MISMATCH', 'Payment amount mismatch', 409);
       }
-      await this.prisma.$transaction((tx) =>
+      const paidOrderId = await this.prisma.$transaction((tx) =>
         this.markPaid(tx, payment.id, status.providerPaymentId),
       );
+      if (paidOrderId) await this.approval.autoAcceptIfEligible(paidOrderId);
     } else if (status.state === 'FAILED') {
       await this.prisma.payment.updateMany({
         where: { id: payment.id, status: { in: [...OPEN_PAYMENT] } },
@@ -163,25 +166,37 @@ export class PaymentsService {
 
   /**
    * Exactly-once paid transition (PRD §9.4 rule 1): the conditional payment update succeeds
-   * for one caller only; that caller moves the order AWAITING_PAYMENT → PENDING_REVIEW.
-   * (Guarded auto-accept straight to QUEUED arrives in P2.6.)
+   * for one caller only; that caller moves the order AWAITING_PAYMENT → PENDING_REVIEW with
+   * the auto-accept evaluation (P2.6) in the event metadata. Returns the order id when this
+   * call made the transition — the caller runs auto-accept AFTER commit.
    */
-  private async markPaid(tx: Tx, paymentId: string, providerPaymentId: string | null) {
+  private async markPaid(
+    tx: Tx,
+    paymentId: string,
+    providerPaymentId: string | null,
+  ): Promise<string | null> {
     const updated = await tx.payment.updateMany({
       where: { id: paymentId, status: { in: [...OPEN_PAYMENT] } },
       data: { status: 'PAID', providerPaymentId, verifiedAt: new Date() },
     });
-    if (updated.count !== 1) return; // already applied
+    if (updated.count !== 1) return null; // already applied
 
     const payment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+    const autoAccept = await this.approval.evaluate(payment.orderId, tx);
     await this.stateMachine.transition(tx, {
       orderId: payment.orderId,
       to: OrderStatus.PENDING_REVIEW,
       from: OrderStatus.AWAITING_PAYMENT,
       actor: SYSTEM_ACTOR,
       reason: payment.isSimulated ? 'Demo payment verified (no money moved)' : 'Payment verified',
-      metadata: { paymentId, provider: payment.provider, simulated: payment.isSimulated },
+      metadata: {
+        paymentId,
+        provider: payment.provider,
+        simulated: payment.isSimulated,
+        autoAccept: { eligible: autoAccept.eligible, reasons: autoAccept.reasons },
+      },
       data: { paidAt: new Date() },
     });
+    return payment.orderId;
   }
 }

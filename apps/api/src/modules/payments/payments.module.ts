@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
+import { ApprovalModule } from '../approval/approval.module.js';
 import { OrdersModule } from '../orders/orders.module.js';
 import { PricingModule } from '../pricing/pricing.module.js';
 import { DemoMockProvider } from './demo-mock.provider.js';
@@ -10,7 +11,7 @@ import { PaymentsService } from './payments.service.js';
 import { RefundsService } from './refunds.service.js';
 
 @Module({
-  imports: [OrdersModule, PricingModule],
+  imports: [OrdersModule, PricingModule, ApprovalModule],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,
