@@ -18,8 +18,8 @@ public sealed record NavigationItem(string Title, string Icon, string Subtitle, 
 }
 
 /// <summary>
-/// Window shell: sidebar navigation, connection indicator, signed-in operator, approval-mode
-/// control (P2.6), update-required banner (P4.4), toasts.
+/// Window shell: sidebar navigation, connection indicator, signed-in operator, read-only
+/// approval-mode indicator (changed in Settings, ADR-002), update-required banner (P4.4), toasts.
 /// </summary>
 public sealed partial class ShellViewModel : ObservableObject
 {
@@ -36,7 +36,7 @@ public sealed partial class ShellViewModel : ObservableObject
         OperatorLoginViewModel login,
         PrintersViewModel printers,
         JobsViewModel jobs,
-        PickupViewModel pickup,
+        TodaysPickupsViewModel pickups,
         SettingsViewModel settings,
         ShopModeViewModel mode,
         UpdateViewModel update)
@@ -51,15 +51,16 @@ public sealed partial class ShellViewModel : ObservableObject
 
         NavigationItems =
         [
-            new NavigationItem("Jobs", "", "Paid orders to accept, print and hand over.", jobs, RequiresOperator: true),
-            new NavigationItem("Pickup", "", "Verify a customer's pickup code.", pickup, RequiresOperator: true),
-            new NavigationItem("Printers", "", "Printers on this PC and what they can do.", printers, RequiresOperator: true),
-            new NavigationItem("Pairing", "", "Connect this PC to your Kagaz shop.", pairing),
-            new NavigationItem("Settings", "", "Connection and app details.", settings),
+            new NavigationItem("Jobs", "", "Paid orders to accept, print and hand over.", jobs, RequiresOperator: true),
+            new NavigationItem("Today's pickups", "", "Today's paid orders by pickup number.", pickups, RequiresOperator: true),
+            new NavigationItem("Printers", "", "Printers on this PC and what they can do.", printers, RequiresOperator: true),
+            new NavigationItem("Pairing", "", "Connect this PC to your Kagaz shop.", pairing),
+            new NavigationItem("Settings", "", "Order approval, connection and app details.", settings),
         ];
         Jobs = NavigationItems[0];
         Printers = NavigationItems[2];
         Pairing = NavigationItems[3];
+        Settings = NavigationItems[4];
 
         SelectedNavigation = status.IsPaired ? Jobs : Pairing;
 
@@ -80,6 +81,13 @@ public sealed partial class ShellViewModel : ObservableObject
     private NavigationItem Jobs { get; }
     private NavigationItem Printers { get; }
     private NavigationItem Pairing { get; }
+    private NavigationItem Settings { get; }
+
+    partial void OnSelectedNavigationChanged(NavigationItem? value)
+    {
+        // Show the server's approval mode as soon as Settings opens (never PATCHes).
+        if (value is not null && ReferenceEquals(value, Settings)) _ = Mode.LoadAsync();
+    }
 
     /// <summary>
     /// The page to show. Operator pages need a paired PC and a signed-in operator: otherwise the

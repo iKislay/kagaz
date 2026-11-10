@@ -222,48 +222,84 @@ public class ShopApiClientTests
         Assert.Equal("PRINTING", job!.Status);
     }
 
+    // ─── ADR-002: daily pickup number on ShopJob ───
+
     [Fact]
-    public async Task Mark_ready_returns_ready_for_pickup()
+    public async Task Jobs_parse_pickup_number_and_date()
     {
         var body = """
-            { "orderId": "44444444-4444-4444-4444-444444444444", "publicRef": "KGZ-ABCD12", "status": "READY_FOR_PICKUP",
-              "options": { "copies": 1, "colour": false, "duplex": false, "paperSize": "A4" },
-              "pageCount": 3, "amountPaise": 200, "simulatedPayment": true,
-              "createdAt": "2026-11-05T10:00:00Z", "paidAt": null, "printJob": null, "rejection": null, "previewUrl": null }
+            { "jobs": [
+                { "orderId": "o-1", "publicRef": "KGZ-ABCD12", "status": "READY_FOR_PICKUP",
+                  "options": { "copies": 1, "colour": false, "duplex": false, "paperSize": "A4" },
+                  "pageCount": 3, "amountPaise": 200, "simulatedPayment": true,
+                  "createdAt": "2026-11-10T04:00:00Z", "paidAt": "2026-11-10T04:01:00Z", "printJob": null, "rejection": null,
+                  "previewUrl": null, "pickupNumber": 7, "pickupDate": "2026-11-10" }
+            ] }
             """;
-        var handler = new StubHttpMessageHandler((req, _) =>
-        {
-            Assert.Equal("Bearer test-token", req.Headers.Authorization?.ToString());
-            Assert.Contains("/ready", req.RequestUri!.LocalPath);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
-        });
-        var client = CreateClient(handler);
+        var client = CreateClient(new StubHttpMessageHandler((_, _) => Task.FromResult(TestApi.Ok(body))));
 
-        var job = await client.MarkReadyAsync("44444444-4444-4444-4444-444444444444");
+        var job = Assert.Single(await client.ListJobsAsync(null));
 
-        Assert.Equal("READY_FOR_PICKUP", job.Status);
+        Assert.Equal(7, job.PickupNumber);
+        Assert.Equal("2026-11-10", job.PickupDate);
     }
 
     [Fact]
-    public async Task Verify_pickup_returns_collected()
+    public async Task Jobs_without_pickup_fields_still_parse()
     {
+        // Older API, or an order that is not paid yet: no number.
         var body = """
-            { "orderId": "44444444-4444-4444-4444-444444444444", "publicRef": "KGZ-ABCD12", "status": "COLLECTED",
-              "options": { "copies": 2, "colour": false, "duplex": true, "paperSize": "A4" },
-              "pageCount": 6, "collectedAt": "2026-11-05T11:00:00Z" }
+            { "orderId": "o-1", "publicRef": "KGZ-ABCD12", "status": "PENDING_REVIEW",
+              "options": { "copies": 1, "colour": false, "duplex": false, "paperSize": "A4" },
+              "pageCount": 3, "amountPaise": 200, "simulatedPayment": true,
+              "createdAt": "2026-11-10T04:00:00Z", "paidAt": null, "printJob": null, "rejection": null, "previewUrl": null }
             """;
-        var handler = new StubHttpMessageHandler((req, _) =>
+        var client = CreateClient(new StubHttpMessageHandler((_, _) => Task.FromResult(TestApi.Ok(body))));
+
+        var job = await client.GetJobAsync("o-1");
+
+        Assert.Null(job.PickupNumber);
+        Assert.Null(job.PickupDate);
+        Assert.Equal("KGZ-ABCD12", job.PublicRef);
+    }
+
+    [Fact]
+    public async Task Explicit_null_pickup_fields_parse_as_null()
+    {
+        var body = TestApi.JobJson("QUEUED").TrimEnd().TrimEnd('}') + """, "pickupNumber": null, "pickupDate": null }""";
+        var client = CreateClient(new StubHttpMessageHandler((_, _) => Task.FromResult(TestApi.Ok(body))));
+
+        var job = await client.GetJobAsync("o-1");
+
+        Assert.Null(job.PickupNumber);
+        Assert.Null(job.PickupDate);
+    }
+
+    [Fact]
+    public async Task Get_mode_uses_the_device_token_only()
+    {
+        HttpRequestMessage? seen = null;
+        var client = CreateClient(new StubHttpMessageHandler((req, _) =>
         {
-            Assert.Equal("Bearer test-token", req.Headers.Authorization?.ToString());
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
-        });
-        var client = CreateClient(handler);
+            seen = req;
+            return Task.FromResult(TestApi.Ok("""{ "approvalMode": "AUTO", "autoPaused": false }"""));
+        }));
 
-        var result = await client.VerifyPickupAsync("A1B2-C3D4");
+        var mode = await client.GetModeAsync();
 
-        Assert.Equal("COLLECTED", result.Status);
-        Assert.Equal("KGZ-ABCD12", result.PublicRef);
-        Assert.Equal("2026-11-05T11:00:00Z", result.CollectedAt);
+        Assert.Equal(ApprovalMode.Auto, mode.ApprovalMode);
+        Assert.False(mode.AutoPaused);
+        Assert.Equal(HttpMethod.Get, seen!.Method);
+        Assert.Equal("/api/shop/mode", seen.RequestUri!.AbsolutePath);
+        Assert.Equal("Bearer test-token", seen.Headers.Authorization?.ToString());
+        Assert.False(seen.Headers.Contains("X-Operator-Token"));
+    }
+
+    [Fact]
+    public void Retired_pickup_verify_and_mark_ready_calls_are_gone()
+    {
+        Assert.Null(typeof(ShopApiClient).GetMethod("MarkReadyAsync"));
+        Assert.Null(typeof(ShopApiClient).GetMethod("VerifyPickupAsync"));
     }
 
     [Fact]

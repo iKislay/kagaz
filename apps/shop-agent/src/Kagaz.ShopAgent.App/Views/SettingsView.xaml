@@ -10,7 +10,37 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="620" HorizontalAlignment="Left">
             <TextBlock Text="Settings" Style="{StaticResource TitleText}" />
-            <TextBlock Text="Connection and app details for support." Style="{StaticResource SubtitleText}" />
+            <TextBlock Text="How this shop takes orders, plus connection and app details for support." Style="{StaticResource SubtitleText}" />
+
+            <!-- Order approval (ADR-002): a shop setting; reflects the heartbeat / socket state, PATCHes only on operator changes. -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding Mode}"
+                    Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Order approval" Style="{StaticResource HeadlineText}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,14">
+                        <Run Text="Auto:" FontWeight="SemiBold" /><Run Text=" paid orders print automatically when the printer can do them." />
+                        <LineBreak />
+                        <Run Text="Manual:" FontWeight="SemiBold" /><Run Text=" you accept each order." />
+                    </TextBlock>
+                    <ListBox AutomationProperties.Name="Order approval" Style="{StaticResource SegmentedControl}" HorizontalAlignment="Left"
+                             ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode, Mode=TwoWay}"
+                             IsEnabled="{Binding CanChange}" />
+                    <StackPanel Visibility="{Binding IsAuto, Converter={StaticResource BoolToVisibility}}">
+                        <Border Style="{StaticResource Hairline}" />
+                        <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AutoPaused, Mode=TwoWay}" IsEnabled="{Binding CanChange}">
+                            <StackPanel>
+                                <TextBlock Text="Pause auto-accept" Style="{StaticResource HeadlineText}" FontSize="14" />
+                                <TextBlock Text="New orders wait for you to accept them until you turn this off."
+                                           Style="{StaticResource SecondaryText}" FontSize="12" />
+                            </StackPanel>
+                        </CheckBox>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Hint}" Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0" />
+                    <TextBlock Text="Orders the printer can't do (colour on a black &amp; white printer, printer offline, too large) always wait for you."
+                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Visibility="{Binding IsAuto, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Border>
 
             <Border Style="{StaticResource Card}">
                 <Grid>
@@ -92,7 +122,7 @@
             <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                 <StackPanel>
                     <TextBlock Text="Troubleshooting" Style="{StaticResource HeadlineText}" />
-                    <TextBlock Text="Logs never contain tokens, pickup codes or download links."
+                    <TextBlock Text="Logs never contain tokens or download links."
                                Style="{StaticResource SecondaryText}" Margin="0,4,0,14" />
                     <StackPanel Orientation="Horizontal">
                         <Button Content="Open logs folder" Style="{StaticResource QuietButton}" Command="{Binding OpenLogsCommand}" />

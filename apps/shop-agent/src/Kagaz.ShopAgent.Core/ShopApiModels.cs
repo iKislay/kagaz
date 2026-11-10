@@ -89,6 +89,11 @@ public record ShopPrintJob(string Id, int Attempt, string Status, string Printer
 
 public record ShopRejection(string Code, string? Note);
 
+/// <summary>
+/// One order for the shop. ADR-002: <see cref="PickupNumber"/> is the shop's daily pickup number (#1, #2 …,
+/// restarting every day in Asia/Kolkata), assigned when payment is verified; <see cref="PickupDate"/> is that
+/// business date (<c>YYYY-MM-DD</c>). Both are null on older APIs and on unpaid orders.
+/// </summary>
 public record ShopJob(
     string OrderId,
     string PublicRef,
@@ -102,7 +107,9 @@ public record ShopJob(
     string? PaidAt,
     ShopPrintJob? PrintJob,
     ShopRejection? Rejection,
-    string? PreviewUrl);
+    string? PreviewUrl,
+    int? PickupNumber = null,
+    string? PickupDate = null);
 
 // ─── Actions ───
 
@@ -155,10 +162,6 @@ public static class PrintReportStatus
     public const string Uncertain = "UNCERTAIN";
 }
 
-// ─── Pickup ───
-
-public record VerifyPickupRequest(string Code);
-
 // ─── Operator session (contract §4) ───
 
 public record OperatorLoginRequest(string Login, string Password);
@@ -168,13 +171,3 @@ public record OperatorInfo(string Id, string Name, string Role);
 public record OperatorLoginResponse(string OperatorToken, string ExpiresAt, OperatorInfo Operator);
 
 public record RotateTokenResponse(string DeviceToken);
-
-// ─── Pickup response ───
-
-public record VerifyPickupResponse(
-    string OrderId,
-    string PublicRef,
-    string Status,
-    ShopPrintOptions Options,
-    int? PageCount,
-    string? CollectedAt);

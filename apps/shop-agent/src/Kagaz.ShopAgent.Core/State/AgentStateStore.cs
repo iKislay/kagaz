@@ -17,7 +17,7 @@ public static class LocalPhase
     public const string Submitting = "SUBMITTING";
     /// <summary>Spooler accepted the job and SUBMITTED was reported.</summary>
     public const string Submitted = "SUBMITTED";
-    /// <summary>SPOOLER_COMPLETE reported; waiting for the operator's Mark Ready.</summary>
+    /// <summary>SPOOLER_COMPLETE reported; the server moves the order to READY_FOR_PICKUP (ADR-002).</summary>
     public const string Done = "DONE";
     /// <summary>FAILED decided (and reported, or to be re-sent); the operator handles it (NEEDS_OPERATOR_CHECK).</summary>
     public const string Failed = "FAILED";

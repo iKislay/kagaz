@@ -65,7 +65,7 @@ public class OperatorSessionTests
         var api = TestApi.Client(handler, session: session);
         await api.OperatorLoginAsync("a", "b");
 
-        var ex = await Assert.ThrowsAsync<ApiException>(() => api.MarkReadyAsync("o-1"));
+        var ex = await Assert.ThrowsAsync<ApiException>(() => api.AcceptJobAsync("o-1", printerId: null));
 
         Assert.Equal(ApiErrorCodes.OperatorLoginRequired, ex.Code);
         Assert.True(raised);

@@ -97,7 +97,7 @@ public static class Reconciliation
             bool inFlight = job.Status == "PRINTING" && job.PrintJobStatus is not null && InFlight.Contains(job.PrintJobStatus);
             if (!inFlight || mine is null)
             {
-                // Waiting for Mark Ready, in NEEDS_OPERATOR_CHECK, or leased by another device: not ours to act on.
+                // Spooler complete (server moves it to Ready), in NEEDS_OPERATOR_CHECK, or leased by another device: not ours to act on.
                 outcomes.Add(new Outcome(job.PrintJobId, job.OrderId, Decision.None, null));
                 continue;
             }
