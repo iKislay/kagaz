@@ -22,7 +22,6 @@ import { OrderAcceptanceService } from '../approval/order-acceptance.service.js'
 import { PickupAttemptsService } from '../pickup/pickup-attempts.service.js';
 import { PickupCrypto } from '../pickup/pickup-crypto.js';
 import { PrintLeaseService, releaseLease } from '../printing/print-leases.service.js';
-import { PrintPreparationService } from '../printing/print-preparation.service.js';
 import { SHOP_JOB_INCLUDE, toShopJob } from './shop-job-view.js';
 import { findShopOrder } from './shop-scope.js';
 

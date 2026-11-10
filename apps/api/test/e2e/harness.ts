@@ -199,3 +199,19 @@ export async function pairDevice(
     opAuth: { ...auth, 'X-Operator-Token': operatorToken },
   };
 }
+
+/** Signs a new operator of `shopId` in on the device behind `auth`; returns the operator header. */
+export async function operatorHeader(
+  h: Harness,
+  shopId: string,
+  auth: Record<string, string>,
+): Promise<Record<string, string>> {
+  const staff = await createStaff(h.prisma, shopId, 'OPERATOR');
+  const res = await h
+    .http()
+    .post('/api/shop/operator/login')
+    .set(auth)
+    .send({ login: staff.email, password: E2E_STAFF_PASSWORD })
+    .expect(200);
+  return { 'X-Operator-Token': res.body.operatorToken as string };
+}

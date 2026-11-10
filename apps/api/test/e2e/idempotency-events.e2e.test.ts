@@ -46,7 +46,8 @@ describe('post-commit domain events (P2.1)', () => {
         publicRef: created.order.publicRef,
         from: 'PENDING_REVIEW',
         to: 'QUEUED',
-        actorType: 'DEVICE',
+        // The signed-in operator is the actor of human actions (contract §4).
+        actorType: 'STAFF',
       }),
     ]);
     // Emitted after commit: the listener-visible state is already in the database.

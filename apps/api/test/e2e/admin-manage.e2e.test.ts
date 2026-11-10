@@ -318,7 +318,7 @@ describe('shop settings, printers, pricing (P4.3)', () => {
         minimumChargePaise: 0,
         effectiveFrom: new Date(Date.now() - 3_600_000).toISOString(),
       })
-      .expect(400);
+      .expect(422); // past effectiveFrom is a business-rule error (P2.5)
     await h
       .http()
       .post(`/api/admin/shops/${id}/pricing`)
@@ -347,7 +347,7 @@ describe('shop settings, printers, pricing (P4.3)', () => {
     const versions = await h.http().get(`/api/admin/shops/${id}/pricing`).set(admin).expect(200);
     expect(versions.body.versions).toHaveLength(1);
     expect(
-      await h.prisma.auditLog.count({ where: { shopId: id, action: 'pricing.created' } }),
+      await h.prisma.auditLog.count({ where: { shopId: id, action: 'pricing.version_created' } }),
     ).toBe(1);
   });
 });

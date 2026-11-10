@@ -52,7 +52,7 @@ Until a code-signing certificate is available the installer and app are **unsign
 SmartScreen shows **"Windows protected your PC — Microsoft Defender SmartScreen prevented an unrecognized app from
 starting."**
 
-- Click **More info**, check the publisher shows *Unknown publisher* and the file is `KagazShop-win-Setup.exe`, then
+- Click **More info**, check the publisher shows _Unknown publisher_ and the file is `KagazShop-win-Setup.exe`, then
   **Run anyway**.
 - Some antivirus products quarantine new unsigned executables; whitelist `%LOCALAPPDATA%\KagazShop\` if that happens.
 - The browser may also warn when downloading the installer ("not commonly downloaded"); choose **Keep**.
@@ -74,7 +74,7 @@ scripts\build-shop-agent-installer.ps1 -Version 0.2.1 -SignParams "/a /fd sha256
 3. In the app: **Settings → Updates → Check for updates / Install update**. Installing downloads the package, closes
    the app and restarts into the new version.
 4. When the API requires a newer agent (`MIN_AGENT_VERSION`; heartbeat `upgradeRequired` or `426
-   AGENT_UPGRADE_REQUIRED`), the app shows a blocking **Update required** sheet with **Install update**, and starts
+AGENT_UPGRADE_REQUIRED`), the app shows a blocking **Update required** sheet with **Install update**, and starts
    no new prints until it is updated.
 
 Updating mid-print is safe: the local print state is persisted, and on restart the app reconciles (plan A.3) —

@@ -3,7 +3,7 @@
  * `shopAction()` so the operator header (X-Operator-Token, identity workstream) can be added
  * in ONE place at integration time.
  */
-import { SignJWT } from 'jose';
+import { signStaffToken } from '../../src/modules/identity/staff-session.js';
 import type request from 'supertest';
 import {
   type CreateOrderResponse,
@@ -14,6 +14,7 @@ import { randomCode, sha256Hex } from '../../src/common/crypto/tokens.js';
 import { makePdf } from '../fixtures/pdfs.js';
 import {
   MONO,
+  operatorHeader,
   type Harness,
   createOrder,
   createShop,
@@ -26,11 +27,7 @@ export async function adminCookie(h: Harness): Promise<string> {
   const admin = await h.prisma.user.create({
     data: { email: `admin-${randomCode(8).toLowerCase()}@e2e.local`, kind: 'ADMIN' },
   });
-  const token = await new SignJWT({ kind: 'ADMIN', email: admin.email })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(admin.id)
-    .setExpirationTime('1h')
-    .sign(new TextEncoder().encode(process.env.SESSION_JWT_SECRET!));
+  const token = await signStaffToken(process.env.SESSION_JWT_SECRET!, admin.id);
   return `kgz_admin=${token}`;
 }
 
@@ -54,7 +51,9 @@ export async function pairedShop(
   const enrolled = (
     await h.http().post('/api/devices/enroll').send({ code, name: 'Counter PC' }).expect(201)
   ).body as EnrollDeviceResponse;
-  const auth = { Authorization: `Bearer ${enrolled.deviceToken}` };
+  const deviceAuth = { Authorization: `Bearer ${enrolled.deviceToken}` };
+  // Operator signed in on the device: human actions (accept, mode, printers) need it (contract §4).
+  const auth = { ...deviceAuth, ...(await operatorHeader(h, shop.id, deviceAuth)) };
   const printers = await h
     .http()
     .put('/api/shop/printers')

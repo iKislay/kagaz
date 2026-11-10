@@ -12,7 +12,19 @@ import { TrackingGuard } from './tracking.guard.js';
 @Module({
   imports: [FilesModule, PricingModule, ShopsModule],
   controllers: [OrdersController],
-  providers: [OrdersService, OrderStateMachine, TrackingGuard, RetentionService, CustomerSessionService],
-  exports: [OrdersService, OrderStateMachine, TrackingGuard, RetentionService, CustomerSessionService],
+  providers: [
+    OrdersService,
+    OrderStateMachine,
+    TrackingGuard,
+    RetentionService,
+    CustomerSessionService,
+  ],
+  exports: [
+    OrdersService,
+    OrderStateMachine,
+    TrackingGuard,
+    RetentionService,
+    CustomerSessionService,
+  ],
 })
 export class OrdersModule {}

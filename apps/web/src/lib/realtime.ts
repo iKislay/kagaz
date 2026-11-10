@@ -28,7 +28,9 @@ export interface OrderUpdates {
  * `/customer` socket hints `order.updated` (or reconnects), plus a 30 s safety poll in case
  * hints are lost or websockets are blocked. Stops once the order is final.
  */
-export function useOrderUpdates(orderId: string): OrderUpdates & { setOrder: (order: PublicOrder) => void } {
+export function useOrderUpdates(
+  orderId: string,
+): OrderUpdates & { setOrder: (order: PublicOrder) => void } {
   const [state, setState] = useState<OrderUpdates>({ order: null, token: null, error: null });
 
   useEffect(() => {

@@ -9,7 +9,14 @@ import {
 } from '@kagaz/shared';
 import { randomCode, sha256Hex } from '../../src/common/crypto/tokens.js';
 import { makePdf } from '../fixtures/pdfs.js';
-import { MONO, type Harness, createOrder, createShop, uploadPdf } from './harness.js';
+import {
+  MONO,
+  type Harness,
+  createOrder,
+  createShop,
+  operatorHeader,
+  uploadPdf,
+} from './harness.js';
 
 type Headers = Record<string, string>;
 
@@ -24,10 +31,11 @@ export async function pairedShop(h: Harness, caps: { colour?: boolean; duplex?: 
   const shop = await createShop(h.prisma);
   const device = await enrollDevice(h, shop.id);
   const auth: Headers = { Authorization: `Bearer ${device.deviceToken}` };
+  const operator = await operatorHeader(h, shop.id, auth);
   const printers = await h
     .http()
     .put('/api/shop/printers')
-    .set(auth)
+    .set({ ...auth, ...operator })
     .send({
       printers: [
         {
@@ -46,7 +54,7 @@ export async function pairedShop(h: Harness, caps: { colour?: boolean; duplex?: 
     h
       .http()
       .post(`/api/shop/${path}`)
-      .set({ ...auth, ...headers })
+      .set({ ...auth, ...operator, ...headers })
       .send(body);
   const agent = (path: string, body: object = {}, headers: Headers = {}) =>
     h
@@ -55,7 +63,7 @@ export async function pairedShop(h: Harness, caps: { colour?: boolean; duplex?: 
       .set({ ...auth, ...headers })
       .send(body);
 
-  return { shop, device, auth, printerId, human, agent };
+  return { shop, device, auth, operator, printerId, human, agent };
 }
 export type PairedShop = Awaited<ReturnType<typeof pairedShop>>;
 
