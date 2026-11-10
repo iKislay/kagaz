@@ -10,7 +10,7 @@ namespace Kagaz.ShopAgent.Core;
 /// <list type="bullet">
 /// <item>Every call except enrollment sends <c>Authorization: Bearer &lt;deviceToken&gt;</c>, loaded from
 /// the DPAPI <see cref="ISecureStore"/>, and <c>X-Agent-Version</c>.</item>
-/// <item>Human actions (accept, reject, ready, resolve, pickup verify, mode, printers PUT, logout) also
+/// <item>Human actions (accept, reject, resolve, mode change, printers PUT, logout) also
 /// send <c>X-Operator-Token</c> from the in-memory <see cref="AgentSession"/> (P2.3). Agent-only calls
 /// (jobs, lease, status, heartbeat) never do.</item>
 /// <item>Errors surface as <see cref="ApiException"/> with the server error code; the client never throws
@@ -117,6 +117,13 @@ public sealed class ShopApiClient
 
     // ─── Shop mode ───
 
+    /// <summary><c>GET /shop/mode</c> (device token only): the shop's approval mode as the server has it.</summary>
+    public async Task<ShopModeResponse> GetModeAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/mode", null, ct);
+        return await ReadAsync<ShopModeResponse>(response, ct);
+    }
+
     public async Task<ShopModeResponse> SetModeAsync(ShopModeRequest request, string? idempotencyKey = null, CancellationToken ct = default)
     {
         using var response = await SendAsync(HttpMethod.Patch, "/shop/mode", request, ct, auth: Auth.Operator, idempotencyKey: idempotencyKey);
@@ -196,14 +203,6 @@ public sealed class ShopApiClient
         }
     }
 
-    /// <summary>Mark Ready (FR-SHOP-12): the operator has confirmed the printed stack and slip.</summary>
-    public async Task<ShopJob> MarkReadyAsync(string orderId, CancellationToken ct = default)
-    {
-        using var response = await SendAsync(HttpMethod.Post, $"/shop/jobs/{Uri.EscapeDataString(orderId)}/ready",
-            new { confirmed = true }, ct, auth: Auth.Operator);
-        return await ReadAsync<ShopJob>(response, ct);
-    }
-
     /// <summary>
     /// <c>POST /shop/jobs/:orderId/resolve</c> (P2.11): <c>CONFIRM_PRINTED</c>, <c>REPRINT</c> (only with
     /// <c>confirm: true</c> after two explicit operator confirmations) or <c>MARK_FAILED</c>.
@@ -213,14 +212,6 @@ public sealed class ShopApiClient
         using var response = await SendAsync(HttpMethod.Post, $"/shop/jobs/{Uri.EscapeDataString(orderId)}/resolve",
             request, ct, auth: Auth.Operator, idempotencyKey: idempotencyKey);
         return await ReadAsync<ShopJob>(response, ct);
-    }
-
-    // ─── Pickup ───
-
-    public async Task<VerifyPickupResponse> VerifyPickupAsync(string code, CancellationToken ct = default)
-    {
-        using var response = await SendAsync(HttpMethod.Post, "/shop/pickups/verify", new VerifyPickupRequest(code), ct, auth: Auth.Operator);
-        return await ReadAsync<VerifyPickupResponse>(response, ct);
     }
 
     // ─── Helpers ───

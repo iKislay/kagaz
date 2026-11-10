@@ -8,7 +8,10 @@ using Kagaz.ShopAgent.Core;
 
 namespace Kagaz.ShopAgent.App.ViewModels;
 
-/// <summary>App details: server, pairing, device-token rotation (P2.4), where local state and logs live.</summary>
+/// <summary>
+/// Order approval mode (ADR-002), app details: server, pairing, device-token rotation (P2.4), where local
+/// state and logs live.
+/// </summary>
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AgentPaths _paths;
@@ -33,8 +36,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     private string? _startupMessage;
 
     public SettingsViewModel(AgentSettings settings, AgentPaths paths, AppStatus status, TokenRotationService rotation,
-        StartupRegistration startup, UpdateViewModel update)
+        StartupRegistration startup, UpdateViewModel update, ShopModeViewModel mode)
     {
+        Mode = mode;
         _paths = paths;
         _rotation = rotation;
         _startup = startup;
@@ -50,6 +54,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     public UpdateViewModel Update { get; }
+
+    /// <summary>Order approval (Manual | Auto, pause auto-accept) — a shop setting since ADR-002.</summary>
+    public ShopModeViewModel Mode { get; }
     public AgentSettings Settings { get; }
     public AppStatus Status { get; }
     public string Version { get; }

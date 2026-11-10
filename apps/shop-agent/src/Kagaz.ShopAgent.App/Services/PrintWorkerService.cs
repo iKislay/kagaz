@@ -21,10 +21,10 @@ namespace Kagaz.ShopAgent.App.Services;
 /// <item><b>Print</b>: download → verify SHA-256 → one spooler job → report SUBMITTED. The local phase is
 /// persisted <em>before</em> each irreversible step so a crash is reconciled safely.</item>
 /// <item><b>Monitor</b> each submitted attempt in the background with <see cref="SpoolerMonitor"/> and report
-/// SPOOLER_COMPLETE (telemetry only), FAILED or UNCERTAIN. Monitored attempts are listed in the heartbeat's
+/// SPOOLER_COMPLETE (the server then marks the order ready, ADR-002), FAILED or UNCERTAIN. Monitored attempts are listed in the heartbeat's
 /// <c>activePrintJobIds</c>, which renews their leases.</item>
 /// </list>
-/// READY is never set here — only the operator's Mark Ready / Confirm printed does that (invariant 9).
+/// READY is never set here: the server moves the order to READY_FOR_PICKUP when it receives SPOOLER_COMPLETE (ADR-002).
 /// </summary>
 public sealed class PrintWorkerService : BackgroundService
 {
@@ -324,7 +324,7 @@ public sealed class PrintWorkerService : BackgroundService
                     // Persist the observation first: if the report is lost, reconciliation re-sends it.
                     _state.SetPhase(job, LocalPhase.Done);
                     await WithRetryAsync(() => _api.ReportPrintStatusAsync(job.PrintJobId, PrintStatusReportDto.SpoolerComplete(), CancellationToken.None));
-                    _status.ShowToast($"{job.PublicRef} printed", "Check the stack and pickup slip, then Mark Ready.");
+                    _status.ShowToast($"{job.PublicRef} printed", "It moves to Ready for pickup.");
                     _signals.Jobs.Pulse();
                     return;
                 case SpoolerOutcome.Failed:

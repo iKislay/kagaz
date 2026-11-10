@@ -14,9 +14,13 @@ public sealed partial class JobItem : ObservableObject
     private static readonly CultureInfo India = new("en-IN");
     private static readonly TimeZoneInfo Kolkata = FindKolkata();
 
-    public JobItem(ShopJob shopJob)
+    private readonly DateOnly _today;
+
+    /// <param name="today">Today's business date in Asia/Kolkata (tests pass a fixed one).</param>
+    public JobItem(ShopJob shopJob, DateOnly? today = null)
     {
         ShopJob = shopJob;
+        _today = today ?? PickupLabel.Today();
     }
 
     public ShopJob ShopJob { get; }
@@ -46,13 +50,32 @@ public sealed partial class JobItem : ObservableObject
 
     public string DisplayPaidAt => FormatTime(ShopJob.PaidAt ?? ShopJob.CreatedAt);
 
+    // ─── Pickup number (ADR-002) ───
+
+    public int? PickupNumber => ShopJob.PickupNumber;
+    public bool HasPickupNumber => ShopJob.PickupNumber is not null;
+
+    /// <summary>Business date of the pickup number; falls back to the paid date in Asia/Kolkata.</summary>
+    public DateOnly? PickupDate => PickupLabel.ParseDate(ShopJob.PickupDate) ?? PickupLabel.KolkataDate(ShopJob.PaidAt);
+
+    public bool IsToday => PickupDate == _today;
+
+    /// <summary>"#7" — the big number on the row and in the detail pane.</summary>
+    public string DisplayPickupNumber => PickupLabel.Number(ShopJob.PickupNumber);
+
+    /// <summary>"7 Nov" when the number is not from today, otherwise null (so yesterday's #7 is never mistaken).</summary>
+    public string? DisplayPickupDate => HasPickupNumber && PickupDate is { } d && d != _today ? PickupLabel.Date(d) : null;
+
+    /// <summary>"#7" or "#7 · 7 Nov".</summary>
+    public string DisplayPickup => DisplayPickupDate is { } date ? $"{DisplayPickupNumber} · {date}" : DisplayPickupNumber;
+
     public string StatusLabel => Status switch
     {
         "PENDING_REVIEW" => "Needs review",
         "QUEUED" => "Queued",
         "PRINTING" => PrintJob?.Status switch
         {
-            "SPOOLER_COMPLETE" => "Printed — check & mark ready",
+            "SPOOLER_COMPLETE" => "Printed — moving to Ready",
             "SUBMITTED" => "Printing",
             _ => "Starting print",
         },
@@ -70,6 +93,16 @@ public sealed partial class JobItem : ObservableObject
 
     public string? PrintError => PrintJob?.Error;
 
+    /// <summary>Status on the Today's pickups list; null for orders that are not (or no longer) for pickup.</summary>
+    public string? PickupStatus => Status switch
+    {
+        "PENDING_REVIEW" or "QUEUED" => "Waiting",
+        "PRINTING" => "Printing",
+        "READY_FOR_PICKUP" or "COLLECTED" => "Ready",
+        "NEEDS_OPERATOR_CHECK" => "Needs check",
+        _ => null,
+    };
+
     public string TabCategory => Status switch
     {
         "PENDING_REVIEW" => "Pending",
@@ -85,10 +118,6 @@ public sealed partial class JobItem : ObservableObject
     /// <summary>Accessible name of the list row.</summary>
     public override string ToString() => PublicRef;
     public bool CanReject => Status is "PENDING_REVIEW" or "QUEUED";
-
-    /// <summary>READY needs a human (invariant 9) and a print that reached the spooler.</summary>
-    public bool CanMarkReady => Status == "PRINTING" && PrintJob is { Status: "SUBMITTED" or "SPOOLER_COMPLETE" };
-
     /// <summary>P2.11: the print outcome is unknown or failed; the operator decides.</summary>
     public bool NeedsCheck => Status == "NEEDS_OPERATOR_CHECK";
 
@@ -127,9 +156,10 @@ public sealed record RejectReason(string Code, string Label)
 
 /// <summary>
 /// Jobs screen (P1.9/P1.10): polls <c>GET /api/shop/jobs</c> every few seconds; Pending / Queue /
-/// Printing / Needs check / Ready; accept, reject with reason, open preview, Mark Ready with
-/// explicit confirmation. Runs on the UI thread (the awaits resume there), so collections are
-/// only touched by the dispatcher.
+/// Printing / Needs check / Ready; accept, reject with reason, open preview, resolve needs-check.
+/// ADR-002: no Mark Ready — the server moves a finished print to Ready by itself, and it shows up
+/// on the next refresh. Runs on the UI thread (the awaits resume there), so collections are only
+/// touched by the dispatcher.
 /// </summary>
 public sealed partial class JobsViewModel : ObservableObject
 {
@@ -146,12 +176,12 @@ public sealed partial class JobsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelection))]
-    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(OpenRejectCommand), nameof(OpenMarkReadyCommand), nameof(OpenPreviewCommand),
+    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(OpenRejectCommand), nameof(OpenPreviewCommand),
         nameof(OpenConfirmPrintedCommand), nameof(OpenReprintCommand), nameof(OpenMarkFailedCommand))]
     private JobItem? _selectedJob;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(SubmitRejectCommand), nameof(ConfirmMarkReadyCommand),
+    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(SubmitRejectCommand),
         nameof(SubmitResolveCommand), nameof(ContinueReprintCommand))]
     private bool _isBusy;
 
@@ -175,14 +205,6 @@ public sealed partial class JobsViewModel : ObservableObject
     [ObservableProperty]
     private string? _rejectNote;
 
-    // Mark Ready sheet
-    [ObservableProperty]
-    private bool _isMarkReadyOpen;
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmMarkReadyCommand))]
-    private bool _markReadyChecked;
-
     public JobsViewModel(ShopApiClient api, AgentStateStore state, AppStatus status, AgentSettings settings, AgentSignals signals)
     {
         _signals = signals;
@@ -198,6 +220,9 @@ public sealed partial class JobsViewModel : ObservableObject
 
     public IReadOnlyList<JobTab> Tabs { get; }
     public ObservableCollection<JobItem> Jobs { get; } = new();
+
+    /// <summary>Raised on the UI thread after every successful refresh with the full job list.</summary>
+    public event Action<IReadOnlyList<ShopJob>>? Refreshed;
     public bool HasSelection => SelectedJob is not null;
     public bool IsEmpty => Jobs.Count == 0;
 
@@ -268,6 +293,7 @@ public sealed partial class JobsViewModel : ObservableObject
             LastUpdated = $"Updated {DateTime.Now:h:mm:ss tt}";
             NotifyNewPending();
             ApplyFilter();
+            Refreshed?.Invoke(jobs);
         }
         catch (ApiException ex)
         {
@@ -294,9 +320,21 @@ public sealed partial class JobsViewModel : ObservableObject
 
         string? selectedId = SelectedJob?.OrderId;
         Jobs.Clear();
-        foreach (var job in _all.Where(j => j.TabCategory == SelectedTab.Key)) Jobs.Add(job);
+        foreach (var job in ForTab(_all, SelectedTab.Key)) Jobs.Add(job);
         SelectedJob = Jobs.FirstOrDefault(j => j.OrderId == selectedId) ?? Jobs.FirstOrDefault();
         OnPropertyChanged(nameof(IsEmpty));
+    }
+
+    /// <summary>
+    /// The jobs of one tab. Ready is sorted by pickup number, newest first (latest date, then highest
+    /// number), so "#12" is on top and the stack order matches; other tabs keep the server's order.
+    /// </summary>
+    public static IEnumerable<JobItem> ForTab(IEnumerable<JobItem> jobs, string tabKey)
+    {
+        var inTab = jobs.Where(j => j.TabCategory == tabKey);
+        return tabKey == "Ready"
+            ? inTab.OrderByDescending(j => j.PickupDate ?? DateOnly.MinValue).ThenByDescending(j => j.PickupNumber ?? int.MinValue)
+            : inTab;
     }
 
     private void NotifyNewPending()
@@ -327,7 +365,7 @@ public sealed partial class JobsViewModel : ObservableObject
         {
             // The server picks the shop's default printer; the shop comes from the device token.
             await _api.AcceptJobAsync(job.OrderId, printerId: null);
-            _status.ShowToast($"Accepted {job.PublicRef}", "Queued for printing.");
+            _status.ShowToast(job.HasPickupNumber ? $"Accepted {job.DisplayPickupNumber} · {job.PublicRef}" : $"Accepted {job.PublicRef}", "Queued for printing.");
         });
     }
 
@@ -359,35 +397,6 @@ public sealed partial class JobsViewModel : ObservableObject
             await _api.RejectJobAsync(job.OrderId, new RejectJobRequest(RejectReason!.Code, note));
             IsRejectOpen = false;
             _status.ShowToast($"Rejected {job.PublicRef}", job.IsDemoPayment ? "Demo refund — no money moved" : "The customer will be refunded.");
-        });
-    }
-
-    // ─── Mark Ready ───
-
-    private bool CanOpenMarkReady() => SelectedJob is { CanMarkReady: true };
-
-    [RelayCommand(CanExecute = nameof(CanOpenMarkReady))]
-    private void OpenMarkReady()
-    {
-        MarkReadyChecked = false;
-        IsMarkReadyOpen = true;
-    }
-
-    [RelayCommand]
-    private void CancelMarkReady() => IsMarkReadyOpen = false;
-
-    private bool CanConfirmMarkReady() => !IsBusy && MarkReadyChecked;
-
-    [RelayCommand(CanExecute = nameof(CanConfirmMarkReady))]
-    private async Task ConfirmMarkReadyAsync()
-    {
-        var job = SelectedJob;
-        if (job is null) return;
-        await RunActionAsync(async () =>
-        {
-            await _api.MarkReadyAsync(job.OrderId);
-            IsMarkReadyOpen = false;
-            _status.ShowToast($"{job.PublicRef} is ready for pickup", "The customer can now collect it with their code.");
         });
     }
 
@@ -474,7 +483,7 @@ public sealed partial class JobsViewModel : ObservableObject
                     _status.ShowToast($"{job.PublicRef} is ready for pickup", "Confirmed as printed.");
                     break;
                 case ResolveSheet.ReprintFinal:
-                    _status.ShowToast($"Reprinting {job.PublicRef}", "A new attempt was queued with the same packet and pickup code.");
+                    _status.ShowToast($"Reprinting {job.PublicRef}", $"A new attempt was queued with the same packet and pickup number {job.DisplayPickup}.");
                     _signals.Jobs.Pulse();
                     break;
                 default:
