@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { type Customer, type MyOrder, formatPaise } from '@kagaz/shared';
-import { Chevron, Group, Notice, Pill, Spinner } from '@/components/ui';
+import { type Customer, type MyOrder, formatPaise, formatPickupDate } from '@kagaz/shared';
+import { Chevron, Group, Notice, Pill, Spinner, cx } from '@/components/ui';
 import { ApiRequestError } from '@/lib/api';
 import { getMe, listMyOrders, signOut } from '@/lib/customer-api';
 import { STATUS_COPY } from '@/lib/status';
@@ -103,10 +103,37 @@ export function MyOrders() {
               href={`/order/${o.id}`}
               className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-selection/60"
             >
+              <div
+                className={cx(
+                  'grid w-14 shrink-0 place-items-center rounded-lg py-1 text-center',
+                  o.pickupNumber !== null ? 'bg-selection' : 'opacity-0',
+                )}
+                aria-label={
+                  o.pickupNumber !== null && o.pickupDate
+                    ? `Pickup code ${o.pickupNumber}, ${formatPickupDate(o.pickupDate)}`
+                    : undefined
+                }
+                aria-hidden={o.pickupNumber === null}
+              >
+                {o.pickupNumber !== null && o.pickupDate && (
+                  <>
+                    <span className="text-[20px] leading-tight font-bold tabular-nums">
+                      #{o.pickupNumber}
+                    </span>
+                    <span className="text-[11px] text-text-secondary">
+                      {formatPickupDate(o.pickupDate)}
+                    </span>
+                  </>
+                )}
+              </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[14px] font-semibold">{o.publicRef}</span>
-                  <Pill tone={copy.tone}>{copy.label}</Pill>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-mono text-[14px] font-semibold whitespace-nowrap">
+                    {o.publicRef}
+                  </span>
+                  <span className="whitespace-nowrap">
+                    <Pill tone={copy.tone}>{copy.label}</Pill>
+                  </span>
                 </div>
                 <div className="mt-0.5 truncate text-[13px] text-text-secondary">
                   {o.shopName} ·{' '}

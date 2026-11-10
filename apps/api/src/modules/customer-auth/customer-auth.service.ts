@@ -6,6 +6,7 @@ import { type AppConfig } from '../../common/config/config.schema.js';
 import { hmacHex, safeEqualHex } from '../../common/crypto/tokens.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { pickupDateString } from '../pickup/pickup-number.service.js';
 import { maskPhoneLast4 } from './demo-otp.provider.js';
 import { OTP_PROVIDER, type OtpProvider } from './otp-provider.js';
 
@@ -180,6 +181,8 @@ export class CustomerAuthService {
       amountPaise: o.amountPaise,
       paymentStatus: o.payments[0]?.status ?? null,
       isSimulated: o.payments[0]?.isSimulated ?? false,
+      pickupNumber: o.pickupNumber,
+      pickupDate: pickupDateString(o.pickupDate),
       createdAt: o.createdAt.toISOString(),
     }));
   }

@@ -171,6 +171,9 @@ export const MyOrderSchema = z.object({
   amountPaise: z.int().nullable(),
   paymentStatus: z.enum(enumValues(PaymentStatus)).nullable(),
   isSimulated: z.boolean(),
+  /** ADR-002 daily pickup code (null until paid). */
+  pickupNumber: z.int().nullable(),
+  pickupDate: z.string().nullable(),
   createdAt: z.string(),
 });
 export type MyOrder = z.infer<typeof MyOrderSchema>;
