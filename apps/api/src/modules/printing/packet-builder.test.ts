@@ -5,7 +5,8 @@ import { buildPrintPacket } from './packet-builder.js';
 import { type SlipData } from './slip.js';
 
 const slip: SlipData = {
-  code: 'ABCD2345',
+  pickupNumber: 7,
+  pickupDate: '2026-11-07',
   publicRef: 'KGZ-TEST23',
   shopName: 'Kagaz Demo Shop A - College Road',
   pages: 0,
@@ -67,7 +68,7 @@ describe('buildPrintPacket (Appendix A.1, T10 logic)', () => {
     ]);
   });
 
-  it('puts exactly one slip at the end with the code and ref, and no phone number', async () => {
+  it('ADR-002: puts exactly one slip at the end with the pickup number + date, ref, no phone', async () => {
     const packet = await buildPrintPacket(
       await makePdf(2),
       { copies: 2, duplex: false },
@@ -81,7 +82,10 @@ describe('buildPrintPacket (Appendix A.1, T10 logic)', () => {
     const slipPages = texts.filter((t) => t.includes('PICKUP CODE'));
     expect(slipPages).toHaveLength(1);
     const last = texts.at(-1)!;
-    expect(last).toMatch(/ABCD\s+2345/);
+    expect(last).toMatch(/#7(?!\d)/);
+    expect(last).toContain('7 Nov');
+    expect(last).not.toContain('ABCD');
+    expect(last).toContain('Kagaz Demo Shop A');
     expect(last).toContain('KGZ-TEST23');
     expect(last).toContain('REMOVE THIS SLIP BEFORE HANDOVER');
     expect(last).toContain('2 pages x 2 copies');

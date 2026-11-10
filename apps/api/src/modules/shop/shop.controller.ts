@@ -15,7 +15,6 @@ import {
   type AcceptJobRequest,
   AcceptJobRequestSchema,
   type LeaseResponse,
-  MarkReadyRequestSchema,
   type OrderStatus,
   OrderStatusSchema,
   type PrintStatusReport,
@@ -29,9 +28,6 @@ import {
   type ShopJob,
   type ShopJobDetail,
   type ShopPrinter,
-  type VerifyPickupRequest,
-  VerifyPickupRequestSchema,
-  type VerifyPickupResponse,
 } from '@kagaz/shared';
 import { AgentVersionGuard } from '../../common/auth/agent-version.guard.js';
 import {
@@ -111,17 +107,6 @@ export class ShopController {
     return this.jobs.reject(device, orderId, body);
   }
 
-  @Post('jobs/:orderId/ready')
-  @RequireOperator()
-  @HttpCode(200)
-  ready(
-    @CurrentDevice() device: DeviceContext,
-    @Param('orderId', Uuid) orderId: string,
-    @Body(new ZodValidationPipe(MarkReadyRequestSchema)) _body: unknown,
-  ): Promise<ShopJob> {
-    return this.jobs.markReady(device, orderId);
-  }
-
   /** Needs-check resolution (contract §2): CONFIRM_PRINTED | REPRINT | MARK_FAILED. */
   @Post('jobs/:orderId/resolve')
   @HttpCode(200)
@@ -166,15 +151,5 @@ export class ShopController {
     @Body(new ZodValidationPipe(RegisterPrintersRequestSchema)) body: RegisterPrintersRequest,
   ): Promise<ShopPrinter[]> {
     return this.printers.register(device, body);
-  }
-
-  @Post('pickups/verify')
-  @RequireOperator()
-  @HttpCode(200)
-  verifyPickup(
-    @CurrentDevice() device: DeviceContext,
-    @Body(new ZodValidationPipe(VerifyPickupRequestSchema)) body: VerifyPickupRequest,
-  ): Promise<VerifyPickupResponse> {
-    return this.jobs.verifyPickup(device, body.code);
   }
 }

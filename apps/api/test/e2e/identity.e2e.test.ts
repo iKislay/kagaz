@@ -83,8 +83,6 @@ describe('operator sessions (P2.3, contract §4)', () => {
     for (const [path, body] of [
       [`/api/shop/jobs/${order.order.id}/accept`, {}],
       [`/api/shop/jobs/${order.order.id}/reject`, { reasonCode: 'OTHER' }],
-      [`/api/shop/jobs/${order.order.id}/ready`, { confirmed: true }],
-      ['/api/shop/pickups/verify', { code: 'ABCD-EFGH' }],
     ] as const) {
       const res = await h.http().post(path).set(paired.auth).send(body).expect(401);
       expect(res.body.error.code).toBe('OPERATOR_LOGIN_REQUIRED');
@@ -166,9 +164,9 @@ describe('operator sessions (P2.3, contract §4)', () => {
     await h.prisma.shopUser.deleteMany({ where: { userId: paired.operatorId } });
     const res = await h
       .http()
-      .post('/api/shop/pickups/verify')
+      .post('/api/shop/jobs/00000000-0000-4000-8000-000000000000/reject')
       .set(paired.opAuth)
-      .send({ code: 'ABCD-EFGH' })
+      .send({ reasonCode: 'OTHER' })
       .expect(401);
     expect(res.body.error.code).toBe('OPERATOR_LOGIN_REQUIRED');
   });
@@ -194,9 +192,9 @@ describe('device tokens (contract §4)', () => {
     // The operator session is bound to the device, not the token: it survives rotation.
     await h
       .http()
-      .post('/api/shop/pickups/verify')
+      .post('/api/shop/jobs/00000000-0000-4000-8000-000000000000/reject')
       .set({ Authorization: `Bearer ${fresh}`, 'X-Operator-Token': paired.operatorToken })
-      .send({ code: 'ZZZZ-ZZZZ' })
+      .send({ reasonCode: 'OTHER' })
       .expect(404);
   });
 });

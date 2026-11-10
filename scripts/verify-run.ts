@@ -60,7 +60,6 @@ async function main(): Promise<void> {
       payments: true,
       events: { orderBy: { id: 'asc' } },
       printJobs: { include: { printer: { select: { shopId: true } } } },
-      pickupCode: { select: { consumedAt: true, consumedByDeviceId: true } },
     },
   });
   const byId = new Map(orders.map((o) => [o.id, o]));
@@ -143,11 +142,6 @@ async function main(): Promise<void> {
       if (e.actorType === 'DEVICE' && e.actorId && devices.get(e.actorId) !== o.shopId)
         cross.push(`${o.publicRef}: ${e.toStatus} by a device of another shop`);
     }
-    if (
-      o.pickupCode?.consumedByDeviceId &&
-      devices.get(o.pickupCode.consumedByDeviceId) !== o.shopId
-    )
-      cross.push(`${o.publicRef}: collected by another shop's device`);
   }
   for (const a of audits) {
     const o = byId.get(a.orderId!);
@@ -159,7 +153,7 @@ async function main(): Promise<void> {
   check(
     'No cross-tenant jobs or actions',
     cross,
-    'Printer, leasing device, acting devices (order events + audit log) and pickup device all belong to the order’s shop.',
+    'Printer, leasing device and acting devices (order events + audit log) all belong to the order’s shop.',
   );
 
   // 4. Payments == paid transitions.
@@ -201,14 +195,25 @@ async function main(): Promise<void> {
     'Every status change has an OrderEvent; each event starts where the previous ended and the last matches the order.',
   );
 
-  // 6. READY needs a human; pickup one-time; refunds recorded.
+  // 6. ADR-002: READY only from a finished print (SYSTEM) or an operator's CONFIRM_PRINTED;
+  //    every paid order has one pickup number, unique per shop and business date; refunds.
   const rules: string[] = [];
+  const numbers = new Map<string, string>();
   for (const o of orders) {
-    for (const e of o.events.filter((x) => x.toStatus === 'READY_FOR_PICKUP'))
-      if (e.actorType === 'SYSTEM') rules.push(`${o.publicRef}: READY set by SYSTEM`);
-    const collectedEvents = o.events.filter((e) => e.toStatus === 'COLLECTED').length;
-    if (o.status === 'COLLECTED' && (!o.pickupCode?.consumedAt || collectedEvents !== 1))
-      rules.push(`${o.publicRef}: COLLECTED without a single consumed pickup code`);
+    for (const e of o.events.filter((x) => x.toStatus === 'READY_FOR_PICKUP')) {
+      const ok =
+        (e.fromStatus === 'PRINTING' && e.actorType === 'SYSTEM') ||
+        (e.fromStatus === 'NEEDS_OPERATOR_CHECK' && e.actorType !== 'SYSTEM');
+      if (!ok) rules.push(`${o.publicRef}: READY from ${e.fromStatus} by ${e.actorType}`);
+    }
+    if (o.paidAt && (o.pickupNumber === null || o.pickupDate === null))
+      rules.push(`${o.publicRef}: paid without a pickup number`);
+    if (o.pickupNumber !== null && o.pickupDate) {
+      const key = `${o.shopId}|${o.pickupDate.toISOString().slice(0, 10)}|${o.pickupNumber}`;
+      const other = numbers.get(key);
+      if (other) rules.push(`${o.publicRef}: pickup number #${o.pickupNumber} also on ${other}`);
+      numbers.set(key, o.publicRef);
+    }
     const wasPaid = o.payments.some((p) => CAPTURED.has(p.status));
     if (
       ['REJECTED', 'REFUND_PENDING', 'REFUNDED'].includes(o.status) &&
@@ -218,9 +223,9 @@ async function main(): Promise<void> {
       rules.push(`${o.publicRef}: ${o.status} paid order without a refund record`);
   }
   check(
-    'Business rules (READY by operator, one-time pickup, refunds)',
+    'Business rules (ADR-002 auto-ready, pickup numbers, refunds)',
     rules,
-    'READY_FOR_PICKUP is never a SYSTEM transition; COLLECTED orders have exactly one consumed code; rejected paid orders have a refund.',
+    'READY_FOR_PICKUP comes only from PRINTING (SYSTEM, print finished) or from NEEDS_OPERATOR_CHECK (operator); every paid order has a pickup number unique per shop and day; rejected paid orders have a refund.',
   );
 
   // ─── Report ───
@@ -273,7 +278,7 @@ async function main(): Promise<void> {
     '',
     `- API: \`${manifest.api}\` (database \`${dbName()}\`), DEMO payments (mock provider, no money moved).`,
     `- Run \`${manifest.runId}\`: ${placed.length} orders created through the public API (create → signed upload → upload-complete → pay), round-robin over ${manifest.shops.map((s) => `\`${s.slug}\``).join(', ')}; mixed copies/colour/duplex/page ranges; ${placed.filter((m) => m.abandoned).length} abandoned before payment; ${placed.filter((m) => m.doublePay).length} with a concurrent double "Pay".`,
-    `- Shops worked by \`scripts/sim-agent.ts\` (real device API: pairing, heartbeat, socket hints, accept/reject, lease, download + SHA-256 check, SUBMITTED → SPOOLER_COMPLETE, Mark Ready; randomized delays, rejections and print failures — nothing physically printed).${manifest.collect ? ' Every READY order was then collected with its pickup code at the shop counter.' : ''}`,
+    `- Shops worked by \`scripts/sim-agent.ts\` (real device API: pairing, heartbeat, socket hints, accept/reject, lease, download + SHA-256 check, SUBMITTED → SPOOLER_COMPLETE → READY automatically (ADR-002); randomized delays, rejections and print failures — nothing physically printed).`,
     `- Placement took ${fmtMs(placeMs)}; the whole run ${fmtMs(totalMs)}.`,
     '',
     '## Checks',
@@ -328,7 +333,7 @@ async function main(): Promise<void> {
     '',
     '```bash',
     'pnpm sim:agent -- --shop demo-shop-a --api <api> --exit-when-idle 60   # one per shop',
-    `pnpm load:orders -- --orders ${manifest.requested} --api <api>${manifest.collect ? ' --collect' : ''}`,
+    `pnpm load:orders -- --orders ${manifest.requested} --api <api>`,
     'pnpm verify:run -- --manifest <manifest printed by load:orders> --out docs/testing/T18-load-run.md',
     '```',
     '',

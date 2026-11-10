@@ -267,7 +267,7 @@ async function verifyPacket(lease: LeaseResponse): Promise<boolean> {
   return sha === lease.sha256;
 }
 
-/** Lease → (download + checksum) → SUBMITTED → SPOOLER_COMPLETE → operator Mark Ready. */
+/** Lease → (download + checksum) → SUBMITTED → SPOOLER_COMPLETE (→ READY on the server, ADR-002). */
 async function printOne(job: ShopJob): Promise<void> {
   const printJobId = job.printJob!.id;
   const lease = await api.call<LeaseResponse>(`/shop/print-jobs/${printJobId}/lease`, {
@@ -296,14 +296,9 @@ async function printOne(job: ShopJob): Promise<void> {
     }
     await report({ status: 'SUBMITTED', spoolerJobId: randInt(1, 65_000) });
     await think();
-    await report({ status: 'SPOOLER_COMPLETE' });
+    const done = await report({ status: 'SPOOLER_COMPLETE' });
     state.stats.printed++;
-    await think(); // operator checks the stack and the slip
-    await api.call(`/shop/jobs/${job.orderId}/ready`, {
-      idempotent: true,
-      body: { confirmed: true },
-    });
-    state.stats.ready++;
+    if (done.status === 'READY_FOR_PICKUP') state.stats.ready++;
     log(`${job.publicRef} A${lease.attempt} ${lease.pageCount} sheets "printed" → READY`);
   } finally {
     activePrintJobIds.delete(printJobId);
@@ -346,25 +341,6 @@ async function cycle(): Promise<boolean> {
     } catch (err) {
       log(`${job.publicRef} print failed: ${countError(err)}`);
       break; // re-list next cycle; queue order may have changed
-    }
-  }
-  // Already submitted but not marked ready (e.g. agent restarted): the operator confirms.
-  // A LEASED-but-never-submitted attempt is left alone — never resubmitted (invariant 8).
-  for (const job of jobs.filter(
-    (j) =>
-      j.status === 'PRINTING' &&
-      (j.printJob?.status === 'SUBMITTED' || j.printJob?.status === 'SPOOLER_COMPLETE') &&
-      !activePrintJobIds.has(j.printJob.id),
-  )) {
-    try {
-      await api.call(`/shop/jobs/${job.orderId}/ready`, {
-        idempotent: true,
-        body: { confirmed: true },
-      });
-      state.stats.ready++;
-      worked = true;
-    } catch (err) {
-      countError(err);
     }
   }
   return worked;

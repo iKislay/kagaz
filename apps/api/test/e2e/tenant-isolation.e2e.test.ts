@@ -59,9 +59,7 @@ describe('T09: three-shop separation', () => {
     ) => {
       const r = await res;
       expect(r.status).toBe(404);
-      expect(['ORDER_NOT_FOUND', 'PRINT_JOB_NOT_FOUND', 'PICKUP_CODE_INVALID']).toContain(
-        r.body.error!.code,
-      );
+      expect(['ORDER_NOT_FOUND', 'PRINT_JOB_NOT_FOUND']).toContain(r.body.error!.code);
     };
 
     // Read + preview (the detail is the only way to get a preview URL).
@@ -72,11 +70,9 @@ describe('T09: three-shop separation', () => {
     await notFound(a.human(`jobs/${pending.order.id}/accept`));
     await notFound(a.human(`jobs/${pending.order.id}/reject`, { reasonCode: 'OTHER' }));
     await notFound(a.human(`jobs/${queued.created.order.id}/reject`, { reasonCode: 'OTHER' }));
-    await notFound(a.human(`jobs/${printing.created.order.id}/ready`, { confirmed: true }));
     for (const action of ['CONFIRM_PRINTED', 'REPRINT', 'MARK_FAILED']) {
       await notFound(a.human(`jobs/${check.created.order.id}/resolve`, { action, confirm: true }));
     }
-    await notFound(a.human('pickups/verify', { code: ready.code }));
     // Agent calls on B's print jobs.
     await notFound(a.agent(`print-jobs/${queued.printJobId}/lease`));
     await notFound(

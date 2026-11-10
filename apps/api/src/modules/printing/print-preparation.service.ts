@@ -6,7 +6,7 @@ import { type AppConfig } from '../../common/config/config.schema.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { StorageService } from '../files/storage.service.js';
-import { PickupCrypto } from '../pickup/pickup-crypto.js';
+import { pickupDateString } from '../pickup/pickup-number.service.js';
 import { buildPrintPacket } from './packet-builder.js';
 
 export interface PreparedPacket {
@@ -14,13 +14,12 @@ export interface PreparedPacket {
   sha256: string;
   pageCount: number;
   bytes: number;
-  /** Plaintext pickup code — only held in memory to print the slip and hash/encrypt it. */
-  code: string;
 }
 
 /**
  * Builds and stores the combined print packet for an accepted order (PRD §8.6):
- * generates the pickup code, renders customer pages × copies + spacers + slip into one PDF,
+ * renders customer pages × copies + spacers + the pickup slip (with the ADR-002 daily pickup
+ * number taken at payment) into one PDF,
  * and uploads it privately. Database rows are written by the caller in its transaction.
  */
 @Injectable()
@@ -29,7 +28,6 @@ export class PrintPreparationService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
-    private readonly pickup: PickupCrypto,
   ) {}
 
   async prepare(orderId: string, options: PrintOptions): Promise<PreparedPacket> {
@@ -50,12 +48,19 @@ export class PrintPreparationService {
     }
 
     const source = await this.storage.getBuffer(original.objectKey, this.config.MAX_UPLOAD_BYTES);
-    const code = this.pickup.generate();
+    if (order.pickupNumber === null || !order.pickupDate) {
+      throw new AppError(
+        'PICKUP_NUMBER_MISSING',
+        'The order has no pickup code yet (payment not verified)',
+        HttpStatus.CONFLICT,
+      );
+    }
     const packet = await buildPrintPacket(
       source,
       { pageRange: options.pageRange, copies: options.copies, duplex: options.duplex },
       {
-        code,
+        pickupNumber: order.pickupNumber,
+        pickupDate: pickupDateString(order.pickupDate)!,
         publicRef: order.publicRef,
         shopName: order.shop.name,
         pages: parsePageRange(options.pageRange, original.pageCount).length,
@@ -74,7 +79,6 @@ export class PrintPreparationService {
       sha256: packet.sha256,
       pageCount: packet.pageCount,
       bytes: packet.bytes.length,
-      code,
     };
   }
 

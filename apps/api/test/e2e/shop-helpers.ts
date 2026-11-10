@@ -24,8 +24,8 @@ type Headers = Record<string, string>;
  * A shop with one paired device and one confirmed printer.
  *
  * `human(path, body, headers)` is THE single entry point for operator (human) actions —
- * accept / reject / ready / resolve / pickups/verify. When operator sessions land
- * (contract §4, `X-Operator-Token`), add the header here once.
+ * accept / reject / resolve / printers. It carries the device's operator session
+ * (contract §4, `X-Operator-Token`).
  */
 export async function pairedShop(h: Harness, caps: { colour?: boolean; duplex?: boolean } = {}) {
   const shop = await createShop(h.prisma);
@@ -130,10 +130,13 @@ export async function needsCheckOrder(h: Harness, s: PairedShop) {
   return { created, printJobId };
 }
 
-/** Mark ready via the operator path and return the customer's pickup code. */
+/** paid → … → SPOOLER_COMPLETE → READY_FOR_PICKUP automatically (ADR-002). */
 export async function readyOrder(h: Harness, s: PairedShop) {
   const { created, printJobId } = await printingOrder(h, s);
-  await s.human(`jobs/${created.order.id}/ready`, { confirmed: true }).expect(200);
-  const code = (await customerView(h, created)).pickupCode!;
-  return { created, printJobId, code };
+  const res = await s
+    .agent(`print-jobs/${printJobId}/status`, { status: 'SPOOLER_COMPLETE' })
+    .expect(200);
+  expect(res.body.status).toBe('READY_FOR_PICKUP');
+  const view = await customerView(h, created);
+  return { created, printJobId, pickupNumber: view.pickupNumber!, pickupDate: view.pickupDate! };
 }

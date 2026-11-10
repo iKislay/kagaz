@@ -91,6 +91,8 @@ async function main(): Promise<void> {
       await tx.fileAsset.deleteMany({ where });
       // Audit rows are append-only history and are kept (order_id has no FK).
       await tx.order.deleteMany({ where: { id: { in: orderIds } } });
+      // ADR-002: the demo shops' daily pickup numbers start again at #1.
+      await tx.pickupCounter.deleteMany({ where: { shopId: { in: shopIds } } });
       await tx.auditLog.create({
         data: {
           actorType: 'SYSTEM',

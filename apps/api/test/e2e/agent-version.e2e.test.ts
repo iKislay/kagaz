@@ -25,7 +25,11 @@ describe('agent upgrade gate (P4.4)', () => {
       code: 'AGENT_UPGRADE_REQUIRED',
       details: { minAgentVersion: '0.3.0', appVersion: '0.2.9' },
     });
-    await h.http().post('/api/shop/pickups/verify').set(old).send({ code: 'ZZZZZZZZ' }).expect(426);
+    await h
+      .http()
+      .post('/api/shop/print-jobs/00000000-0000-4000-8000-000000000000/lease')
+      .set(old)
+      .expect(426);
 
     const hb = await h
       .http()

@@ -1,12 +1,12 @@
 /**
  * T18 load generator (P4.7): places N orders across the demo shops through the PUBLIC API —
  * create → signed upload → upload-complete (server quote) → pay with the DEMO provider — with
- * mixed options, then waits for the shop agents (sim-agent / real app) to work them and, with
- * --collect, plays the customer showing the pickup code at the counter.
+ * mixed options, then waits for the shop agents (sim-agent / real app) to work them. Orders
+ * become READY on their own once printed (ADR-002): there is no pickup step to play.
  *
  *   pnpm load:orders -- [--orders 200] [--api http://localhost:4105/api]
  *        [--shops demo-shop-a,demo-shop-b,demo-shop-c] [--concurrency 8]
- *        [--abandon-rate 0.03] [--double-pay-rate 0.1] [--collect] [--wait 600]
+ *        [--abandon-rate 0.03] [--double-pay-rate 0.1] [--wait 600]
  *        [--manifest <path>]
  *
  * Writes a run manifest (order ids, shops, outcomes, timings) for verify-run. Tracking tokens
@@ -23,7 +23,6 @@ import {
   type ShopSummary,
   type UploadUrlResponse,
 } from '@kagaz/shared';
-import { readAgentState } from './lib/agent-state.js';
 import {
   ApiClient,
   ApiError,
@@ -50,7 +49,6 @@ const args = cliArgs({
   concurrency: { type: 'string', default: '8' },
   'abandon-rate': { type: 'string', default: '0.03' },
   'double-pay-rate': { type: 'string', default: '0.1' },
-  collect: { type: 'boolean', default: false },
   wait: { type: 'string', default: '600' },
   manifest: { type: 'string' },
 });
@@ -149,25 +147,6 @@ async function placeOne(
   return entry;
 }
 
-async function collect(order: ManifestOrder): Promise<void> {
-  const agent = readAgentState(API, order.shopSlug);
-  if (!agent) return;
-  const view = await client.call<PublicOrder>(
-    `/orders/${order.orderId}`,
-    asCustomer(order.trackingToken),
-  );
-  if (view.status !== 'READY_FOR_PICKUP' || !view.pickupCode) return;
-  await client.call(`/shop/pickups/verify`, {
-    body: { code: view.pickupCode },
-    idempotent: true,
-    headers: {
-      Authorization: `Bearer ${agent.deviceToken}`,
-      ...(agent.operatorToken ? { 'X-Operator-Token': agent.operatorToken } : {}),
-    },
-  });
-  order.collectedAt = new Date().toISOString();
-}
-
 async function pool<T>(items: T[], size: number, fn: (item: T) => Promise<void>): Promise<void> {
   let next = 0;
   await Promise.all(
@@ -197,7 +176,7 @@ async function main(): Promise<void> {
     requested: TOTAL,
     shops: chosen.map((c) => ({ id: c.shop.id, slug: c.slug, name: c.shop.name })),
     orders: [],
-    collect: args.collect,
+    collect: false, // ADR-002: no pickup verification step any more
   };
   const save = () => writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
@@ -219,38 +198,25 @@ async function main(): Promise<void> {
       (failedToPlace.length ? ` — ${failedToPlace.length} errors` : ''),
   );
 
-  // Wait for the shops to work the paid orders (and collect them, if asked).
+  // Wait for the shops to work the paid orders.
   const paid = manifest.orders.filter((o) => o.paidAt && !o.error);
   const deadline = Date.now() + WAIT_MS;
   let lastLine = '';
   while (Date.now() < deadline) {
     await pool(paid, CONCURRENCY, async (o) => {
-      if (o.finalStatus === 'COLLECTED' || (!args.collect && SETTLED.includes(o.finalStatus!)))
-        return;
+      if (SETTLED.includes(o.finalStatus!)) return;
       try {
         const view = await client.call<PublicOrder>(
           `/orders/${o.orderId}`,
           asCustomer(o.trackingToken),
         );
         o.finalStatus = view.status;
-        if (view.status === 'READY_FOR_PICKUP') {
-          o.readyAt ??= new Date().toISOString();
-          if (args.collect) {
-            await collect(o);
-            if (o.collectedAt) o.finalStatus = 'COLLECTED';
-          }
-        }
+        if (view.status === 'READY_FOR_PICKUP') o.readyAt ??= new Date().toISOString();
       } catch (err) {
         o.error = err instanceof ApiError ? err.code : (err as Error).message;
       }
     });
-    const open = paid.filter((o) =>
-      args.collect
-        ? !['COLLECTED', 'NEEDS_OPERATOR_CHECK', 'REJECTED', 'REFUND_PENDING', 'REFUNDED'].includes(
-            o.finalStatus!,
-          )
-        : !SETTLED.includes(o.finalStatus!),
-    );
+    const open = paid.filter((o) => !SETTLED.includes(o.finalStatus!));
     const counts: Record<string, number> = {};
     for (const o of paid) counts[o.finalStatus ?? '?'] = (counts[o.finalStatus ?? '?'] ?? 0) + 1;
     const line = `  ${open.length} in flight · ${JSON.stringify(counts)}`;

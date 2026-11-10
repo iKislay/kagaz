@@ -135,8 +135,9 @@ export class PrintJobsService {
 
   /**
    * Agent progress reports (P2.10). Every report renews or clears the lease; repeating the
-   * current status is a no-op (safe retries). FAILED/UNCERTAIN send the order to the operator,
-   * never to READY (invariant 9). A job not leased by this device → 404 (contract §1).
+   * current status is a no-op (safe retries). SPOOLER_COMPLETE moves the order PRINTING →
+   * READY_FOR_PICKUP as SYSTEM (ADR-002); FAILED/UNCERTAIN send it to the operator
+   * (NEEDS_OPERATOR_CHECK), never to READY. A job not leased by this device → 404 (contract §1).
    */
   async report(
     device: DeviceContext,
@@ -200,8 +201,20 @@ export class PrintJobsService {
       // Terminal for this attempt: free the printer for the next job.
       await releaseLease(tx, job.printerId, job.id);
 
-      // SPOOLER_COMPLETE is telemetry only: the order stays PRINTING until Mark Ready.
-      if (report.status !== 'SPOOLER_COMPLETE' && job.order.status === OrderStatus.PRINTING) {
+      if (job.order.status !== OrderStatus.PRINTING) return job.orderId;
+
+      // ADR-002: printing finished = ready. No Mark Ready, no pickup verification.
+      if (report.status === 'SPOOLER_COMPLETE') {
+        await this.stateMachine.transition(tx, {
+          orderId: job.orderId,
+          to: OrderStatus.READY_FOR_PICKUP,
+          from: OrderStatus.PRINTING,
+          actor: SYSTEM_ACTOR,
+          reason: 'Printing finished',
+          metadata: { printJobId: job.id, attempt: job.attempt, reportedBy: device.deviceId },
+          data: { readyAt: now },
+        });
+      } else {
         const reason =
           report.status === 'FAILED' ? report.error : (report.reason ?? 'Outcome unknown');
         await this.stateMachine.transition(tx, {

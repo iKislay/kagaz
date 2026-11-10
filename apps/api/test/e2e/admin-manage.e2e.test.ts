@@ -116,9 +116,9 @@ describe('device enrollment + revocation (P2.4)', () => {
     expect(heartbeat.body.error.code).toBe('DEVICE_REVOKED');
     await h
       .http()
-      .post('/api/shop/pickups/verify')
+      .post('/api/shop/jobs/00000000-0000-4000-8000-000000000000/reject')
       .set({ ...auth, 'X-Operator-Token': op.body.operatorToken })
-      .send({ code: 'ABCD-EFGH' })
+      .send({ reasonCode: 'OTHER' })
       .expect(401);
     expect(
       await h.prisma.operatorSession.count({

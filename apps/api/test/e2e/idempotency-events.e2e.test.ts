@@ -81,13 +81,14 @@ describe('post-commit domain events (P2.1)', () => {
     const s = await pairedShop(h);
     const created = await paidOrder(h, s.shop.id);
     seen = [];
-    await s.human(`jobs/${created.order.id}/ready`, { confirmed: true }).expect(409);
+    // Not in NEEDS_OPERATOR_CHECK → 409.
+    await s.human(`jobs/${created.order.id}/resolve`, { action: 'CONFIRM_PRINTED' }).expect(409);
     expect(seen).toHaveLength(0);
   });
 });
 
 describe('Idempotency-Key (P2.1 done-when, P4.6)', () => {
-  it('replaying accept / ready / verify returns identical responses and no extra events', async () => {
+  it('replaying accept / spooler-complete returns identical responses and no extra events', async () => {
     const s = await pairedShop(h);
     const created = await paidOrder(h, s.shop.id);
     const id = created.order.id;
@@ -106,34 +107,22 @@ describe('Idempotency-Key (P2.1 done-when, P4.6)', () => {
     await s.agent(`print-jobs/${printJobId}/lease`).expect(200);
     await s.agent(`print-jobs/${printJobId}/status`, { status: 'SUBMITTED' }).expect(200);
 
-    const ready = () =>
-      s.human(`jobs/${id}/ready`, { confirmed: true }, { 'Idempotency-Key': 'ready-key-1' });
-    const ready1 = await ready();
-    expect(ready1.status).toBe(200);
+    const complete = () =>
+      s.agent(
+        `print-jobs/${printJobId}/status`,
+        { status: 'SPOOLER_COMPLETE' },
+        { 'Idempotency-Key': 'complete-key-1' },
+      );
+    const c1 = await complete();
+    expect(c1.status).toBe(200);
+    expect(c1.body.status).toBe('READY_FOR_PICKUP');
     const afterReady = await counts(id);
     seen = [];
-    const ready2 = await ready();
-    expect(ready2.status).toBe(200);
-    expect(ready2.body).toEqual(ready1.body);
+    const c2 = await complete();
+    expect(c2.status).toBe(200);
+    expect(c2.body).toEqual(c1.body);
     expect(await counts(id)).toEqual(afterReady);
     expect(seen).toHaveLength(0);
-
-    const code = (
-      await h.http().get(`/api/orders/${id}`).set('x-tracking-token', created.trackingToken)
-    ).body.pickupCode as string;
-    const verify = () => s.human('pickups/verify', { code }, { 'Idempotency-Key': 'verify-key-1' });
-    const v1 = await verify();
-    expect(v1.status).toBe(200);
-    const afterVerify = await counts(id);
-    seen = [];
-    const v2 = await verify();
-    expect(v2.status).toBe(200); // the stored success, not PICKUP_ALREADY_USED
-    expect(v2.body).toEqual(v1.body);
-    expect(await counts(id)).toEqual(afterVerify);
-    expect(seen).toHaveLength(0);
-    // Without the key, a second verify is a genuine reuse attempt.
-    const reuse = await s.human('pickups/verify', { code });
-    expect(reuse.status).toBe(409);
   });
 
   it('same key with a different body → 409 IDEMPOTENCY_KEY_REUSED', async () => {
@@ -159,8 +148,8 @@ describe('Idempotency-Key (P2.1 done-when, P4.6)', () => {
     // An error response is not stored: the same key can be retried after fixing the cause.
     await s
       .human(
-        `jobs/${created.order.id}/ready`,
-        { confirmed: true },
+        `jobs/${created.order.id}/resolve`,
+        { action: 'CONFIRM_PRINTED' },
         { 'Idempotency-Key': 'k-err-001' },
       )
       .expect(409);
@@ -196,9 +185,9 @@ describe('Idempotency-Key (P2.1 done-when, P4.6)', () => {
     expect(events).toHaveLength(1);
   });
 
-  it('ready → collected flow still works end to end with helpers', async () => {
+  it('paid → printed → ready flow works end to end with helpers (ADR-002)', async () => {
     const s = await pairedShop(h);
-    const { code } = await readyOrder(h, s);
-    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    const { pickupNumber } = await readyOrder(h, s);
+    expect(pickupNumber).toBe(1);
   });
 });

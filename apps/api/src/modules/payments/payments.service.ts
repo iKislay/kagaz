@@ -8,6 +8,7 @@ import { ApprovalService } from '../approval/approval.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
 import { OrdersService } from '../orders/orders.service.js';
+import { PickupNumberService, pickupDateValue } from '../pickup/pickup-number.service.js';
 import { PricingService } from '../pricing/pricing.service.js';
 import { calculateQuote } from '../pricing/quote.js';
 import { ShopsService } from '../shops/shops.service.js';
@@ -49,6 +50,7 @@ export class PaymentsService {
     private readonly pricing: PricingService,
     private readonly approval: ApprovalService,
     private readonly shops: ShopsService,
+    private readonly pickupNumbers: PickupNumberService,
   ) {}
 
   /**
@@ -261,6 +263,7 @@ export class PaymentsService {
    * the auto-accept evaluation (P2.6) in the event metadata. A success that arrives after a
    * failure is still recorded (the money moved); if the order can no longer take it
    * (cancelled, already paid by another attempt) it is flagged for refund, never transitioned.
+   * The ADR-002 daily pickup number is taken here, in the same transaction, exactly once.
    */
   private async markPaid(
     tx: Tx,
@@ -296,6 +299,8 @@ export class PaymentsService {
     }
 
     const autoAccept = await this.approval.evaluate(payment.orderId, tx);
+    const pickup =
+      order.pickupNumber === null ? await this.pickupNumbers.next(tx, order.shopId) : null;
     await this.stateMachine.transition(tx, {
       orderId: payment.orderId,
       to: OrderStatus.PENDING_REVIEW,
@@ -307,8 +312,14 @@ export class PaymentsService {
         provider: payment.provider,
         simulated: payment.isSimulated,
         autoAccept: { eligible: autoAccept.eligible, reasons: autoAccept.reasons },
+        ...(pickup ? { pickupNumber: pickup.pickupNumber, pickupDate: pickup.pickupDate } : {}),
       },
-      data: { paidAt: new Date() },
+      data: {
+        paidAt: new Date(),
+        ...(pickup
+          ? { pickupNumber: pickup.pickupNumber, pickupDate: pickupDateValue(pickup.pickupDate) }
+          : {}),
+      },
     });
     return { outcome: 'PAID', paidOrderId: payment.orderId };
   }

@@ -19,27 +19,26 @@ const HOUR = 3_600_000;
 const status = async (url: string) => (await fetch(url)).status;
 
 describe('file retention (T17)', () => {
-  it('T17: 24 h after COLLECTED the PDFs are deleted and old signed URLs stop working', async () => {
+  it('T17: 24 h after READY (ADR-002 end state) the PDFs are deleted and old signed URLs stop working', async () => {
     const s = await pairedShop(h);
-    const { created, code } = await readyOrder(h, s);
+    const { created } = await readyOrder(h, s);
     const id = created.order.id;
     const detail = await h.http().get(`/api/shop/jobs/${id}`).set(s.auth).expect(200);
     const previewUrl = detail.body.previewUrl as string;
-    await s.human('pickups/verify', { code }).expect(200);
     expect(await status(previewUrl)).toBe(200);
 
-    // Collected 23 h ago: still kept.
+    // Ready 23 h ago: still kept.
     await h.prisma.order.update({
       where: { id },
-      data: { collectedAt: new Date(Date.now() - 23 * HOUR) },
+      data: { readyAt: new Date(Date.now() - 23 * HOUR) },
     });
     await retention.run();
     expect(await h.prisma.fileAsset.count({ where: { orderId: id, deletedAt: null } })).toBe(2);
 
-    // Collected 25 h ago: original + packet deleted.
+    // Ready 25 h ago: original + packet deleted.
     await h.prisma.order.update({
       where: { id },
-      data: { collectedAt: new Date(Date.now() - 25 * HOUR) },
+      data: { readyAt: new Date(Date.now() - 25 * HOUR) },
     });
     const result = await retention.run();
     expect(result.deletedFiles).toBeGreaterThanOrEqual(2);
@@ -52,7 +51,7 @@ describe('file retention (T17)', () => {
     expect([403, 404]).toContain(await status(previewUrl));
     // Metadata is retained; the shop detail no longer offers a preview.
     const after = await h.http().get(`/api/shop/jobs/${id}`).set(s.auth).expect(200);
-    expect(after.body).toMatchObject({ status: 'COLLECTED', previewUrl: null });
+    expect(after.body).toMatchObject({ status: 'READY_FOR_PICKUP', previewUrl: null });
     expect(await h.prisma.orderEvent.count({ where: { orderId: id } })).toBeGreaterThan(5);
   });
 
