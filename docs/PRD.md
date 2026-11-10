@@ -67,7 +67,7 @@ Kagaz is a smart print-management platform that connects customers (primarily st
 4. Each shop can be configured for **Manual Approval** or **Auto-accept / Auto-print**. The mode is controlled per shop and can be paused by the operator.
 5. The customer **pays before** the job is released to the print queue. In demo mode, a mock provider marks payment successful without moving money.
 6. The document and the pickup-code slip are combined into **one PDF** and submitted as **one print job**.
-7. The customer sees order status and the pickup code on the website. The operator verifies the code before marking the order collected.
+7. The customer sees order status and the pickup code — a small daily number per shop such as **#7 · 7 Nov** — on the website from payment onward. The order is ready as soon as printing finishes; there is no pickup verification in the software ([ADR-002](decisions/ADR-002-daily-pickup-number.md)).
 8. The software is designed for three independent shop tenants and 100–200 controlled demo/test orders. The prototype is not marketed publicly.
 
 ### 1.3 What "sellable" means for this release
@@ -186,8 +186,8 @@ A credible end-to-end product experience with **real printer output**, clear ope
 2. Operator opens job detail: file preview (first pages), page count, page range, copies, colour, duplex, price, customer short reference (no full phone number).
 3. Operator clicks **Accept** (job enters the printer queue) or **Reject** with a mandatory reason (triggers a refund workflow — simulated in demo).
 4. The agent prints jobs one at a time per printer: downloads the combined packet, verifies its SHA-256 checksum, applies settings, submits **one** spooler job.
-5. Operator checks the physical stack (customer pages followed by the pickup slip) and clicks **Mark Ready**.
-6. Customer website shows **READY FOR PICKUP** and the pickup code.
+5. When the agent reports the spooler job complete (no printer error), the order moves to **READY_FOR_PICKUP** automatically (actor SYSTEM, [ADR-002](decisions/ADR-002-daily-pickup-number.md)). There is no Mark Ready.
+6. Customer website shows **READY FOR PICKUP** with the pickup code (e.g. "Printed — collect at the counter with pickup code #7").
 
 ### 6.3 Operator: auto mode
 
@@ -197,20 +197,21 @@ A credible end-to-end product experience with **real printer output**, clear ope
 
 ### 6.4 Pickup
 
-1. Customer arrives and tells the operator the 8-character code (or shows it on their phone).
-2. Operator types the code in the Windows app's **Verify Pickup** screen.
-3. Backend verifies the code (shop-scoped, rate-limited), marks it consumed and moves the order to **COLLECTED**.
-4. A second use of the same code is rejected and logged.
+ADR-002 ([ADR-002](decisions/ADR-002-daily-pickup-number.md)):
+
+1. Customer arrives and says or shows the pickup code (**#7 · 7 Nov**) on their phone.
+2. The shopkeeper finds packet #7 in the output stack (each packet ends with its slip; packets print in order) and hands it over.
+3. Nothing is entered in the software; `READY_FOR_PICKUP` is the order's normal end state.
 
 ### 6.5 Failure / recovery journeys
 
-| Situation                                | Expected behaviour                                                                                                                                                                             |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Printer offline / paper out              | Agent reports issue; job held; order not shown READY; operator sees banner and can Resume after fixing.                                                                                        |
-| Agent disconnects / PC restarts mid-job  | Agent reconnects, fetches outstanding jobs via REST, reconciles with spooler; **never** auto-resubmits an attempt. Ambiguous jobs → `NEEDS_OPERATOR_CHECK`.                                    |
-| Ambiguous print outcome                  | Order moves to `NEEDS_OPERATOR_CHECK`; operator chooses **Confirm printed (Mark Ready)**, **Reprint with confirmation** (new attempt, warning, audited), or **Mark failed** (reject + refund). |
-| Operator rejects a paid order            | Reason recorded; refund record created (mock: "Demo refund — no money moved"); customer sees Rejected + refund state.                                                                          |
-| Shop paused/closed after a customer paid | Order stays in `PENDING_REVIEW`; admin/owner must explicitly accept later or reject (refund).                                                                                                  |
+| Situation                                | Expected behaviour                                                                                                                                                                |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Printer offline / paper out              | Agent reports issue; job held; order not shown READY; operator sees banner and can Resume after fixing.                                                                           |
+| Agent disconnects / PC restarts mid-job  | Agent reconnects, fetches outstanding jobs via REST, reconciles with spooler; **never** auto-resubmits an attempt. Ambiguous jobs → `NEEDS_OPERATOR_CHECK`.                       |
+| Ambiguous print outcome                  | Order moves to `NEEDS_OPERATOR_CHECK`; operator chooses **Confirm printed**, **Reprint with confirmation** (new attempt, warning, audited), or **Mark failed** (reject + refund). |
+| Operator rejects a paid order            | Reason recorded; refund record created (mock: "Demo refund — no money moved"); customer sees Rejected + refund state.                                                             |
+| Shop paused/closed after a customer paid | Order stays in `PENDING_REVIEW`; admin/owner must explicitly accept later or reject (refund).                                                                                     |
 
 ---
 
@@ -220,23 +221,23 @@ Priority: **P0** = required for the Day 0–1 vertical-slice demo; **P1** = requ
 
 ### 7.1 Customer website (FR-CUST)
 
-| ID         | Requirement                                                                                                                                                                      | Priority                                 |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| FR-CUST-01 | Show list of active shops with name, address, open/closed/paused status, B/W and colour rates, duplex availability. Demo shops display a "DEMO" tag.                             | P0                                       |
-| FR-CUST-02 | Prevent checkout for closed, paused or maintenance shops; show "Currently unavailable".                                                                                          | P1                                       |
-| FR-CUST-03 | Customer identity: phone number + OTP (demo OTP channel in demo env). Order tracking accessible via authenticated session **or** an unguessable tracking link.                   | P0 (guest + tracking link) / P1 (OTP)    |
-| FR-CUST-04 | Upload a single PDF via signed direct-to-storage upload with progress indicator. Max file size and page limits enforced server-side and shown to user.                           | P0                                       |
-| FR-CUST-05 | Display validation errors in plain language: not a PDF, password-protected, corrupt/unreadable, too large, too many pages.                                                       | P0                                       |
-| FR-CUST-06 | Print options: page range (e.g. `1-3,5,8-10`; default all), copies (1–N), B/W or colour (only if shop supports), single/double-sided (only if supported), paper size A4 (fixed). | P0 (copies, colour) / P1 (range, duplex) |
-| FR-CUST-07 | Show server quote with breakdown: selected pages, copies, printed sides, rate, subtotal, minimum-charge adjustment, total in ₹. Re-quote on every option change.                 | P0                                       |
-| FR-CUST-08 | Pay button creates payment for the server amount only; the client never sends an amount.                                                                                         | P0                                       |
-| FR-CUST-09 | Persistent **DEMO PAYMENT — NO MONEY CHARGED** banner on every page in demo environment; payment confirmation screen repeats it.                                                 | P0                                       |
-| FR-CUST-10 | Order tracking page with status timeline, updated in realtime (WebSocket) with polling fallback.                                                                                 | P0 (polling) / P1 (WebSocket)            |
-| FR-CUST-11 | Pickup code shown **only** when order is `READY_FOR_PICKUP`; large, monospace, copy-able; hidden again after `COLLECTED`.                                                        | P0                                       |
-| FR-CUST-12 | Customer can cancel an order before payment. After payment, cancellation requires the shop/admin (refund flow).                                                                  | P1                                       |
-| FR-CUST-13 | "My orders" list for an identified customer.                                                                                                                                     | P2                                       |
-| FR-CUST-14 | Show rejection reason and refund status ("Demo refund — no money moved" in demo).                                                                                                | P1                                       |
-| FR-CUST-15 | Display retention notice: files are deleted automatically after collection/expiry (see §14.3).                                                                                   | P1                                       |
+| ID         | Requirement                                                                                                                                                                                            | Priority                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| FR-CUST-01 | Show list of active shops with name, address, open/closed/paused status, B/W and colour rates, duplex availability. Demo shops display a "DEMO" tag.                                                   | P0                                       |
+| FR-CUST-02 | Prevent checkout for closed, paused or maintenance shops; show "Currently unavailable".                                                                                                                | P1                                       |
+| FR-CUST-03 | Customer identity: phone number + OTP (demo OTP channel in demo env). Order tracking accessible via authenticated session **or** an unguessable tracking link.                                         | P0 (guest + tracking link) / P1 (OTP)    |
+| FR-CUST-04 | Upload a single PDF via signed direct-to-storage upload with progress indicator. Max file size and page limits enforced server-side and shown to user.                                                 | P0                                       |
+| FR-CUST-05 | Display validation errors in plain language: not a PDF, password-protected, corrupt/unreadable, too large, too many pages.                                                                             | P0                                       |
+| FR-CUST-06 | Print options: page range (e.g. `1-3,5,8-10`; default all), copies (1–N), B/W or colour (only if shop supports), single/double-sided (only if supported), paper size A4 (fixed).                       | P0 (copies, colour) / P1 (range, duplex) |
+| FR-CUST-07 | Show server quote with breakdown: selected pages, copies, printed sides, rate, subtotal, minimum-charge adjustment, total in ₹. Re-quote on every option change.                                       | P0                                       |
+| FR-CUST-08 | Pay button creates payment for the server amount only; the client never sends an amount.                                                                                                               | P0                                       |
+| FR-CUST-09 | Persistent **DEMO PAYMENT — NO MONEY CHARGED** banner on every page in demo environment; payment confirmation screen repeats it.                                                                       | P0                                       |
+| FR-CUST-10 | Order tracking page with status timeline, updated in realtime (WebSocket) with polling fallback.                                                                                                       | P0 (polling) / P1 (WebSocket)            |
+| FR-CUST-11 | Pickup code (daily number + date, `#7 · 7 Nov`, ADR-002) shown large at the top of the order page from payment verified onward; READY wording: "Printed — collect at the counter with pickup code #7". | P0                                       |
+| FR-CUST-12 | Customer can cancel an order before payment. After payment, cancellation requires the shop/admin (refund flow).                                                                                        | P1                                       |
+| FR-CUST-13 | "My orders" list for an identified customer.                                                                                                                                                           | P2                                       |
+| FR-CUST-14 | Show rejection reason and refund status ("Demo refund — no money moved" in demo).                                                                                                                      | P1                                       |
+| FR-CUST-15 | Display retention notice: files are deleted automatically after collection/expiry (see §14.3).                                                                                                         | P1                                       |
 
 ### 7.2 Shop Windows app (FR-SHOP)
 
@@ -253,8 +254,8 @@ Priority: **P0** = required for the Day 0–1 vertical-slice demo; **P1** = requ
 | FR-SHOP-09 | Per-printer local queue; never two Kagaz jobs simultaneously on one physical printer; obtain server lease before starting.                                                                                | P0 (sequential) / P1 (lease)  |
 | FR-SHOP-10 | Download packet via short-lived signed URL, verify SHA-256, set driver copy count = 1, apply colour/duplex/A4 settings, submit via Windows print spooler as one job named `KAGAZ-<publicRef>-A<attempt>`. | P0                            |
 | FR-SHOP-11 | Report print progress and spooler job ID; surface spooler states (spooling, printing, offline, paper out, error).                                                                                         | P1                            |
-| FR-SHOP-12 | **Mark Ready** button enabled only after the job left the print step; requires operator confirmation ("I have checked the stack and slip").                                                               | P0                            |
-| FR-SHOP-13 | **Verify Pickup** screen: enter code → shows order summary for confirmation → marks COLLECTED. Clear error for invalid/used/locked-out codes.                                                             | P0                            |
+| FR-SHOP-12 | _Retired by ADR-002:_ no Mark Ready; `SPOOLER_COMPLETE` with no printer error makes the order READY automatically. Jobs show the pickup number + date.                                                    | —                             |
+| FR-SHOP-13 | _Retired by ADR-002:_ no Verify Pickup screen.                                                                                                                                                            | —                             |
 | FR-SHOP-14 | Needs-check resolution: **Confirm printed**, **Reprint with confirmation** (warns about duplicates, creates new attempt), **Mark failed**. All audited.                                                   | P1                            |
 | FR-SHOP-15 | Printer status panel: online/offline, last error, queue depth per printer.                                                                                                                                | P1                            |
 | FR-SHOP-16 | Heartbeat every 15 s with app version, printer statuses, queue depth.                                                                                                                                     | P1                            |
@@ -290,15 +291,15 @@ Priority: **P0** = required for the Day 0–1 vertical-slice demo; **P1** = requ
 
 ### 7.5 Files and print packet (FR-FILE)
 
-| ID         | Requirement                                                                                                                                                                              | Priority                                 |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| FR-FILE-01 | Private bucket only; signed PUT (upload) and GET (download) URLs with short TTL (upload ≤ 10 min, download ≤ 5 min).                                                                     | P0                                       |
-| FR-FILE-02 | Validate by content: `%PDF-` magic bytes, parse success, not encrypted/password-protected, page count ≥ 1, size ≤ limit, pages ≤ limit. Browser MIME/filename are not trusted.           | P0                                       |
-| FR-FILE-03 | Compute and store SHA-256 for original and packet.                                                                                                                                       | P0                                       |
-| FR-FILE-04 | Generate print packet: selected page range × copies **inside** the PDF, duplex spacer pages so each copy starts on a front side, then exactly one pickup slip on its own physical sheet. | P0 (copies + slip) / P1 (duplex spacers) |
-| FR-FILE-05 | Pickup slip layout (see §8.6).                                                                                                                                                           | P0                                       |
-| FR-FILE-06 | Retention: delete original and packet objects 24 h after `COLLECTED`, and abandoned drafts / unpaid orders after expiry (default 24 h). Configurable.                                    | P1                                       |
-| FR-FILE-07 | Normalize to A4 (scale-to-fit, preserve aspect ratio) when source pages are not A4.                                                                                                      | P1                                       |
+| ID         | Requirement                                                                                                                                                                                           | Priority                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| FR-FILE-01 | Private bucket only; signed PUT (upload) and GET (download) URLs with short TTL (upload ≤ 10 min, download ≤ 5 min).                                                                                  | P0                                       |
+| FR-FILE-02 | Validate by content: `%PDF-` magic bytes, parse success, not encrypted/password-protected, page count ≥ 1, size ≤ limit, pages ≤ limit. Browser MIME/filename are not trusted.                        | P0                                       |
+| FR-FILE-03 | Compute and store SHA-256 for original and packet.                                                                                                                                                    | P0                                       |
+| FR-FILE-04 | Generate print packet: selected page range × copies **inside** the PDF, duplex spacer pages so each copy starts on a front side, then exactly one pickup slip on its own physical sheet.              | P0 (copies + slip) / P1 (duplex spacers) |
+| FR-FILE-05 | Pickup slip layout (see §8.6).                                                                                                                                                                        | P0                                       |
+| FR-FILE-06 | Retention: delete original and packet objects 24 h after `READY_FOR_PICKUP` (from `readyAt`, ADR-002) or `COLLECTED`, and abandoned drafts / unpaid orders after expiry (default 24 h). Configurable. | P1                                       |
+| FR-FILE-07 | Normalize to A4 (scale-to-fit, preserve aspect ratio) when source pages are not A4.                                                                                                                   | P1                                       |
 
 ### 7.6 Payments (FR-PAY)
 
@@ -329,14 +330,12 @@ Priority: **P0** = required for the Day 0–1 vertical-slice demo; **P1** = requ
 
 ### 7.8 Pickup (FR-PICK)
 
-| ID         | Requirement                                                                                                                                                    | Priority                           |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| FR-PICK-01 | 8-character uppercase code from a CSPRNG over alphabet `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no `O/0/I/1`).                                                      | P0                                 |
-| FR-PICK-02 | Store a keyed hash (HMAC-SHA256 with server pepper) for verification and an AES-256-GCM encrypted display value for customer retrieval. Never store plaintext. | P0 (hash) / P1 (encrypted display) |
-| FR-PICK-03 | Verification is scoped to the operator's shop and only matches orders in `READY_FOR_PICKUP`.                                                                   | P0                                 |
-| FR-PICK-04 | Code consumable once; second use rejected and logged.                                                                                                          | P0                                 |
-| FR-PICK-05 | Rate-limit failed attempts per device (default 5 failures / 10 min → 10 min lockout) and per order; log every failure.                                         | P1                                 |
-| FR-PICK-06 | Code expiry (default 7 days after READY); expired orders surface in admin for follow-up.                                                                       | P2                                 |
+| ID         | Requirement                                                                                                                                                                                    | Priority |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| FR-PICK-01 | Pickup code = daily number per shop: the first paid order of the day is **#1**, then #2, #3 …; restarts at midnight **Asia/Kolkata** ([ADR-002](decisions/ADR-002-daily-pickup-number.md)).    | P0       |
+| FR-PICK-02 | Assigned exactly once, atomically, in the payment-verified transaction (counter row per shop + business date); unpaid/abandoned orders never use a number; unique per `(shop, business date)`. | P0       |
+| FR-PICK-03 | Never changes for an order (reprints keep it). Always shown with its date (`#7 · 7 Nov`) on the slip, customer page, shop app and admin.                                                       | P0       |
+| FR-PICK-04 | _Retired:_ random 8-character codes, HMAC/AES storage, verify endpoint, lockout and expiry (`pickup_codes` kept, no longer written).                                                           | —        |
 
 ### 7.9 Notifications (FR-NOTIF)
 
@@ -431,65 +430,31 @@ The evaluation result (pass/fail + failing reasons) is stored on the order event
 **Pickup slip (one A4 page):**
 
 - Kagaz logo and wordmark.
-- Pickup code in very large monospace type (e.g. 72 pt), spaced in two groups of four (`ABCD EFGH`).
+- Pickup code (ADR-002): the daily number very large (`#7`) with its date under it (`7 Nov`).
 - Short order reference (`KGZ-XXXXXX`), shop name, date/time printed.
 - Job summary to help the operator verify the stack: `12 pages × 2 copies · B/W · Double-sided`.
 - Prominent: **"REMOVE THIS SLIP BEFORE HANDOVER"**.
 - Never print the customer's full phone number (at most last 2 digits).
 - In demo env: small "DEMO" marker.
 
-### 8.7 Payment provider interface
-
-```ts
-interface PaymentProvider {
-  createPayment(input: {
-    orderId: string;
-    amountPaise: number;
-    currency: 'INR';
-  }): Promise<PaymentSession>;
-  verifyWebhook(rawBody: Buffer, headers: Record<string, string>): Promise<VerifiedPaymentEvent>;
-  fetchPaymentStatus(providerPaymentId: string): Promise<PaymentStatus>;
-  refund(input: {
-    paymentId: string;
-    amountPaise: number;
-    idempotencyKey: string;
-  }): Promise<RefundResult>;
-}
-```
-
-- `DemoMockProvider` implements it now; a live gateway (Razorpay or Cashfree) implements the same contract later.
-- Gateway secrets never reach the browser or the Windows app.
-- Mock mode allowed only when `APP_ENV ∈ {local, demo, staging}`.
-
-### 8.8 Who receives the money (decision required before live)
-
-| Model                          | How it works                                                                                                                                                          | Trade-off                                                                                                                   |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Each shop is the merchant      | Payment processed under the selected shop's own merchant account; Kagaz records reference and order.                                                                  | Direct collection to shop, but each shop needs merchant onboarding and payment configuration.                               |
-| Marketplace / split settlement | Kagaz collects via a marketplace-capable product (e.g. Razorpay Route, Cashfree Easy Split) and routes the vendor share to the shop, optionally retaining commission. | Centralized reconciliation and commission, but requires product approval, vendor KYC, agreements, refund/settlement design. |
-
-Data model keeps `shop.gatewayAccountId`, provider configuration and settlement references now; live collection stays disabled until the model is chosen and approved by the provider in writing.
-
----
-
 ## 9. Order, payment and print-job state models
 
 ### 9.1 Order status
 
-| Status                 | Meaning                                                                            | Allowed next                                                    |
-| ---------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `DRAFT`                | Customer is creating the order / uploading.                                        | `AWAITING_PAYMENT`, `CANCELLED`                                 |
-| `AWAITING_PAYMENT`     | Validated file and quoted price exist; payment not verified.                       | `PENDING_REVIEW`, `QUEUED` (auto), `CANCELLED`                  |
-| `PENDING_REVIEW`       | Payment verified; waiting for manual shop approval (or auto preconditions failed). | `QUEUED`, `REJECTED`                                            |
-| `QUEUED`               | Shop accepted; packet prepared; waiting for this printer's turn.                   | `PRINTING`, `REJECTED`                                          |
-| `PRINTING`             | Agent leased the printer and started the print operation.                          | `READY_FOR_PICKUP`, `NEEDS_OPERATOR_CHECK`                      |
-| `NEEDS_OPERATOR_CHECK` | Printer error or uncertain outcome; blind auto-reprint prevented.                  | `READY_FOR_PICKUP`, `QUEUED` (reprint, new attempt), `REJECTED` |
-| `READY_FOR_PICKUP`     | Operator confirmed printed stack + slip. Customer sees pickup code.                | `COLLECTED`                                                     |
-| `COLLECTED`            | Pickup code verified and consumed; order closed.                                   | — (terminal)                                                    |
-| `REJECTED`             | Shop/admin rejected; if paid, refund initiated.                                    | `REFUND_PENDING`                                                |
-| `CANCELLED`            | Cancelled before payment (or expired).                                             | — (terminal)                                                    |
-| `REFUND_PENDING`       | Refund submitted to provider (simulated in demo).                                  | `REFUNDED`                                                      |
-| `REFUNDED`             | Refund confirmed.                                                                  | — (terminal)                                                    |
+| Status                 | Meaning                                                                                    | Allowed next                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `DRAFT`                | Customer is creating the order / uploading.                                                | `AWAITING_PAYMENT`, `CANCELLED`                                 |
+| `AWAITING_PAYMENT`     | Validated file and quoted price exist; payment not verified.                               | `PENDING_REVIEW`, `QUEUED` (auto), `CANCELLED`                  |
+| `PENDING_REVIEW`       | Payment verified; waiting for manual shop approval (or auto preconditions failed).         | `QUEUED`, `REJECTED`                                            |
+| `QUEUED`               | Shop accepted; packet prepared; waiting for this printer's turn.                           | `PRINTING`, `REJECTED`                                          |
+| `PRINTING`             | Agent leased the printer and started the print operation.                                  | `READY_FOR_PICKUP`, `NEEDS_OPERATOR_CHECK`                      |
+| `NEEDS_OPERATOR_CHECK` | Printer error or uncertain outcome; blind auto-reprint prevented.                          | `READY_FOR_PICKUP`, `QUEUED` (reprint, new attempt), `REJECTED` |
+| `READY_FOR_PICKUP`     | Printing finished (SYSTEM, ADR-002) or operator confirmed after a check. Normal end state. | `COLLECTED` (unused since ADR-002)                              |
+| `COLLECTED`            | Legacy: pickup code verified (no longer reached since ADR-002).                            | — (terminal)                                                    |
+| `REJECTED`             | Shop/admin rejected; if paid, refund initiated.                                            | `REFUND_PENDING`                                                |
+| `CANCELLED`            | Cancelled before payment (or expired).                                                     | — (terminal)                                                    |
+| `REFUND_PENDING`       | Refund submitted to provider (simulated in demo).                                          | `REFUNDED`                                                      |
+| `REFUNDED`             | Refund confirmed.                                                                          | — (terminal)                                                    |
 
 ```mermaid
 stateDiagram-v2
@@ -503,15 +468,14 @@ stateDiagram-v2
   PENDING_REVIEW --> REJECTED: reject (reason)
   QUEUED --> PRINTING: agent lease + start
   QUEUED --> REJECTED: operator cancels before print
-  PRINTING --> READY_FOR_PICKUP: operator Mark Ready
+  PRINTING --> READY_FOR_PICKUP: spooler complete (SYSTEM, ADR-002)
   PRINTING --> NEEDS_OPERATOR_CHECK: error / uncertain
   NEEDS_OPERATOR_CHECK --> READY_FOR_PICKUP: confirm printed
   NEEDS_OPERATOR_CHECK --> QUEUED: reprint (new attempt)
   NEEDS_OPERATOR_CHECK --> REJECTED: mark failed
-  READY_FOR_PICKUP --> COLLECTED: code verified
+  READY_FOR_PICKUP --> [*]
   REJECTED --> REFUND_PENDING: paid order
   REFUND_PENDING --> REFUNDED
-  COLLECTED --> [*]
   REFUNDED --> [*]
   CANCELLED --> [*]
 ```
@@ -582,41 +546,39 @@ REST for all durable commands and reads; WebSocket for notifications only. JSON,
 
 ### 11.1 Public / customer
 
-| Method + path                                              | Purpose                                                                          |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `GET /api/health`                                          | Liveness/readiness.                                                              |
-| `GET /api/config`                                          | Public runtime config: `appEnv`, `paymentMode` (`DEMO`/`LIVE`), limits.          |
-| `GET /api/shops`                                           | Active shops with status, rates, capabilities.                                   |
-| `POST /api/auth/otp/request` · `POST /api/auth/otp/verify` | Customer phone OTP (demo channel in demo env).                                   |
-| `POST /api/orders`                                         | Create draft order, bind shop and options, return server quote + tracking token. |
-| `POST /api/orders/{id}/upload-url`                         | Return signed PUT URL and required headers.                                      |
-| `POST /api/orders/{id}/upload-complete`                    | Validate uploaded file, finalize quote → `AWAITING_PAYMENT`.                     |
-| `PATCH /api/orders/{id}/options`                           | Update options, return new quote (only before payment).                          |
-| `POST /api/orders/{id}/pay`                                | Create payment session via configured provider (amount from snapshot).           |
-| `POST /api/orders/{id}/cancel`                             | Cancel before payment.                                                           |
-| `GET /api/orders/{id}`                                     | Customer-safe order state; pickup code only when `READY_FOR_PICKUP`.             |
-| `POST /api/webhooks/{provider}`                            | Raw-body webhook; verify signature; dedupe; process idempotently.                |
+| Method + path                                              | Purpose                                                                            |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `GET /api/health`                                          | Liveness/readiness.                                                                |
+| `GET /api/config`                                          | Public runtime config: `appEnv`, `paymentMode` (`DEMO`/`LIVE`), limits.            |
+| `GET /api/shops`                                           | Active shops with status, rates, capabilities.                                     |
+| `POST /api/auth/otp/request` · `POST /api/auth/otp/verify` | Customer phone OTP (demo channel in demo env).                                     |
+| `POST /api/orders`                                         | Create draft order, bind shop and options, return server quote + tracking token.   |
+| `POST /api/orders/{id}/upload-url`                         | Return signed PUT URL and required headers.                                        |
+| `POST /api/orders/{id}/upload-complete`                    | Validate uploaded file, finalize quote → `AWAITING_PAYMENT`.                       |
+| `PATCH /api/orders/{id}/options`                           | Update options, return new quote (only before payment).                            |
+| `POST /api/orders/{id}/pay`                                | Create payment session via configured provider (amount from snapshot).             |
+| `POST /api/orders/{id}/cancel`                             | Cancel before payment.                                                             |
+| `GET /api/orders/{id}`                                     | Customer-safe order state; `pickupNumber` + `pickupDate` once payment is verified. |
+| `POST /api/webhooks/{provider}`                            | Raw-body webhook; verify signature; dedupe; process idempotently.                  |
 
 ### 11.2 Shop / device (Windows app)
 
 Shop identity is derived from the device token — never from a path parameter.
 
-| Method + path                           | Purpose                                                                        |
-| --------------------------------------- | ------------------------------------------------------------------------------ |
-| `POST /api/devices/enroll`              | Exchange one-time enrollment code for device token.                            |
-| `POST /api/devices/heartbeat`           | Device, printers and app health; renews leases.                                |
-| `POST /api/shop/auth/login`             | Operator login on a paired device.                                             |
-| `PUT /api/shop/printers`                | Register/update discovered printers + confirmed capabilities.                  |
-| `GET /api/shop/jobs?status=`            | Fetch shop jobs (polling fallback & reconnect reconciliation).                 |
-| `GET /api/shop/jobs/{orderId}`          | Job detail incl. short-lived preview URL.                                      |
-| `POST /api/shop/jobs/{orderId}/accept`  | Operator accept.                                                               |
-| `POST /api/shop/jobs/{orderId}/reject`  | Operator reject `{ reasonCode, note }`.                                        |
-| `POST /api/shop/print-jobs/{id}/lease`  | Acquire printer lease; returns short-lived packet URL + checksum.              |
-| `POST /api/shop/print-jobs/{id}/status` | Report `SUBMITTED` (+spoolerJobId), `SPOOLER_COMPLETE`, `FAILED`, `UNCERTAIN`. |
-| `POST /api/shop/jobs/{orderId}/ready`   | Operator confirms physical stack → `READY_FOR_PICKUP`.                         |
-| `POST /api/shop/jobs/{orderId}/resolve` | Needs-check resolution `{ action: CONFIRM_PRINTED                              | REPRINT | MARK_FAILED, confirm: true }`. |
-| `POST /api/shop/pickups/verify`         | Verify one-time code → `COLLECTED`.                                            |
-| `PATCH /api/shop/mode`                  | Set mode / pause auto.                                                         |
+| Method + path                           | Purpose                                                                                                        |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `POST /api/devices/enroll`              | Exchange one-time enrollment code for device token.                                                            |
+| `POST /api/devices/heartbeat`           | Device, printers and app health; renews leases.                                                                |
+| `POST /api/shop/auth/login`             | Operator login on a paired device.                                                                             |
+| `PUT /api/shop/printers`                | Register/update discovered printers + confirmed capabilities.                                                  |
+| `GET /api/shop/jobs?status=`            | Fetch shop jobs (polling fallback & reconnect reconciliation).                                                 |
+| `GET /api/shop/jobs/{orderId}`          | Job detail incl. short-lived preview URL.                                                                      |
+| `POST /api/shop/jobs/{orderId}/accept`  | Operator accept.                                                                                               |
+| `POST /api/shop/jobs/{orderId}/reject`  | Operator reject `{ reasonCode, note }`.                                                                        |
+| `POST /api/shop/print-jobs/{id}/lease`  | Acquire printer lease; returns short-lived packet URL + checksum.                                              |
+| `POST /api/shop/print-jobs/{id}/status` | Report `SUBMITTED` (+spoolerJobId), `SPOOLER_COMPLETE` (→ `READY_FOR_PICKUP`, ADR-002), `FAILED`, `UNCERTAIN`. |
+| `POST /api/shop/jobs/{orderId}/resolve` | Needs-check resolution `{ action: CONFIRM_PRINTED                                                              | REPRINT | MARK_FAILED, confirm: true }`. |
+| `PATCH /api/shop/mode`                  | Set mode / pause auto.                                                                                         |
 
 ### 11.3 Admin
 
@@ -674,21 +636,21 @@ Events are emitted **after** the DB transaction commits. Missing an event must n
 
 ### 14.1 Required controls
 
-| Area                 | Control                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tenant isolation     | Every shop query/mutation scoped by `shop_id` and role, enforced in a central guard + repository layer. Automated tests prove Shop A cannot view or print Shop B orders.                    |
-| Authentication       | Separate customer sessions, shop operator accounts and admin roles. Device tokens scoped to one shop/device, stored hashed server-side, revocable. Passwords hashed with Argon2id.          |
-| File access          | Private bucket only. Short-lived signed URLs treated as bearer secrets (never logged). Validate bytes and page count; cap size/pages.                                                       |
-| Data retention       | Delete original and packet PDFs 24 h after `COLLECTED` or after abandoned-order expiry (proposed default, subject to legal review). Keep minimal order/payment metadata for reconciliation. |
-| Payment security     | Never store card/UPI credentials. Gateway secrets server-side only. Verify webhook signatures on raw body; dedupe event IDs.                                                                |
-| Pickup codes         | Unpredictable one-time codes; HMAC hash + encrypted display value; rate-limit attempts; log failures.                                                                                       |
-| Print safety         | Limit pages/copies; block unsupported or encrypted PDFs; ensure printer online; require confirmation for ambiguous output.                                                                  |
-| Audit                | Record accept/reject, print started, print recovery, ready, pickup, refund, admin setting changes.                                                                                          |
-| Demo/live separation | Separate keys, databases, buckets, domains. App refuses to start with mock payments in production.                                                                                          |
-| Transport            | HTTPS everywhere; HSTS; secure, httpOnly, SameSite cookies; CORS restricted to known origins.                                                                                               |
-| Input validation     | All request bodies validated with schema (zod / class-validator); reject unknown fields.                                                                                                    |
-| Rate limiting        | OTP request/verify, pickup verify, upload-url, login endpoints.                                                                                                                             |
-| Secrets              | Environment variables / secret manager only; never committed; `.env.example` documents names only.                                                                                          |
+| Area                 | Control                                                                                                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant isolation     | Every shop query/mutation scoped by `shop_id` and role, enforced in a central guard + repository layer. Automated tests prove Shop A cannot view or print Shop B orders.                                                   |
+| Authentication       | Separate customer sessions, shop operator accounts and admin roles. Device tokens scoped to one shop/device, stored hashed server-side, revocable. Passwords hashed with Argon2id.                                         |
+| File access          | Private bucket only. Short-lived signed URLs treated as bearer secrets (never logged). Validate bytes and page count; cap size/pages.                                                                                      |
+| Data retention       | Delete original and packet PDFs 24 h after `READY_FOR_PICKUP` (ADR-002) / `COLLECTED` or after abandoned-order expiry (proposed default, subject to legal review). Keep minimal order/payment metadata for reconciliation. |
+| Payment security     | Never store card/UPI credentials. Gateway secrets server-side only. Verify webhook signatures on raw body; dedupe event IDs.                                                                                               |
+| Pickup codes         | ADR-002: daily number + date per shop (no secret); accepted risk, orders traceable by ref.                                                                                                                                 |
+| Print safety         | Limit pages/copies; block unsupported or encrypted PDFs; ensure printer online; require confirmation for ambiguous output.                                                                                                 |
+| Audit                | Record accept/reject, print started, print recovery, ready, pickup, refund, admin setting changes.                                                                                                                         |
+| Demo/live separation | Separate keys, databases, buckets, domains. App refuses to start with mock payments in production.                                                                                                                         |
+| Transport            | HTTPS everywhere; HSTS; secure, httpOnly, SameSite cookies; CORS restricted to known origins.                                                                                                                              |
+| Input validation     | All request bodies validated with schema (zod / class-validator); reject unknown fields.                                                                                                                                   |
+| Rate limiting        | OTP request/verify, pickup verify, upload-url, login endpoints.                                                                                                                                                            |
+| Secrets              | Environment variables / secret manager only; never committed; `.env.example` documents names only.                                                                                                                         |
 
 ### 14.2 Privacy principles
 
@@ -813,7 +775,7 @@ Hardware tests use at least one real Windows PC + printer; the other two shops m
 | Document exposure                            | Uploads may contain personal/academic/financial info.                                  | Private storage, short-lived URLs, configurable deletion, minimal staff access.                     |
 | Price disputes                               | Rates differ by shop and mode.                                                         | Server-side calculation, immutable quote snapshot, price shown before payment, job summary on slip. |
 | Auto-print error                             | Wrong printer/duplex/colour wastes paper.                                              | Auto only after confirmed capability profile; pause control; page limits.                           |
-| Pickup code abuse                            | Guessing or reuse.                                                                     | High-entropy code, rate limit, one-time consumption, expiry, audit.                                 |
+| Pickup code abuse                            | Guessing or reuse.                                                                     | ADR-002 accepted risk: number + date shown on the phone; option: 2-letter check later.              |
 | Next-day timeline                            | Full platform cannot be built and validated in one day.                                | Day 0–1 is a narrow vertical slice; 30-day plan hardens it.                                         |
 | Unusual PDFs (fonts, huge images, odd sizes) | Rendering/printing failures.                                                           | Validation + A4 normalization + test corpus of odd PDFs; print-engine tested on the demo printer.   |
 
@@ -859,7 +821,7 @@ Engineering proceeds with the **working default** until the team confirms otherw
 | Agent / Windows app | The shop's .NET WPF application that receives and prints jobs.                              |
 | Print packet        | The single combined PDF: customer pages × copies + spacers + one pickup slip.               |
 | Pickup slip         | The final page of the packet carrying the pickup code and job summary.                      |
-| Pickup code         | 8-character one-time code the customer presents at collection.                              |
+| Pickup code         | Daily number per shop (`#7 · 7 Nov`, ADR-002) the customer shows at collection.             |
 | Lease               | Short-lived server-side lock granting one agent the right to print on one printer.          |
 | Attempt             | A numbered try at printing an order; reprints create new attempts.                          |
 | Price snapshot      | Immutable copy of pricing inputs/outputs stored on the order at payment time.               |
