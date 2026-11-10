@@ -46,9 +46,20 @@ pnpm --filter @kagaz/api db:migrate                   # apply/create migrations 
 pnpm --filter @kagaz/api db:seed                      # 3 demo shops, staff, prints a device pairing code
 pnpm --filter @kagaz/api test:e2e                     # e2e vs real Postgres + S3 (isolated <db>_test DB)
 pnpm --filter @kagaz/api demo:order -- --pages 3 --copies 2   # place a paid DEMO order via the API
+pnpm sim:agent -- --shop demo-shop-b --api http://localhost:4105/api   # headless shop agent (never prints)
+pnpm load:orders -- --orders 200 --api http://localhost:4105/api --collect   # T18 load run
+pnpm verify:run -- --manifest <path printed by load:orders> --out docs/testing/T18-load-run.md
+pnpm demo:reset [-- --yes] [-- --shop demo-shop-a]     # wipe demo-shop orders (refuses in production)
+docker build -f apps/api/Dockerfile -t kagaz-api .     # --target migrate for the migration image
+docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=... -t kagaz-web .
+docker compose -f infra/docker-compose.demo.yml --env-file infra/demo.env up -d --build
+pwsh scripts/build-shop-agent-installer.ps1           # Velopack Setup.exe + update feed (needs internet once)
 dotnet build apps/shop-agent/Kagaz.ShopAgent.sln
-dotnet test  apps/shop-agent/Kagaz.ShopAgent.sln
+dotnet test  apps/shop-agent/tests/Kagaz.ShopAgent.Tests/Kagaz.ShopAgent.Tests.csproj   # .sln run can crash MSBuild
 ```
+
+Scripts default to `http://localhost:$API_PORT/api` (4000 = the live printer server): pass `--api` when testing elsewhere.
+Shop app `appsettings.json` keys: `ApiBaseUrl`, `SafetyPollSeconds`, `TokenRotationDays`, `RealtimeEnabled`, `UpdateFeedUrl`.
 
 Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/SeaweedFS aren't running), `GET /api/config` (drives the web DEMO banner).
 
