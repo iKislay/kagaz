@@ -25,7 +25,8 @@ export interface RetentionResult {
  * 1. abandoned DRAFT / AWAITING_PAYMENT orders past `expiresAt` (UNPAID_ORDER_EXPIRY_HOURS
  *    after creation) → CANCELLED (actor SYSTEM);
  * 2. original + packet PDFs deleted from storage and marked `deletedAt` / DELETED:
- *    COLLECTED or CANCELLED for RETENTION_AFTER_COLLECTED_HOURS (24 h),
+ *    READY_FOR_PICKUP (from readyAt, ADR-002), COLLECTED or CANCELLED for
+ *    RETENTION_AFTER_COLLECTED_HOURS (24 h),
  *    REJECTED / REFUNDED for RETENTION_AFTER_REJECTED_HOURS (7-day dispute window);
  * 3. idempotency records older than 24 h purged.
  * Order, payment, refund and audit metadata are kept. Once the object is gone, previously
@@ -114,6 +115,8 @@ export class RetentionService {
         deletedAt: null,
         order: {
           OR: [
+            // ADR-002: READY_FOR_PICKUP is the normal end state; count from readyAt.
+            { status: OrderStatus.READY_FOR_PICKUP, readyAt: { lt: closed } },
             { status: OrderStatus.COLLECTED, collectedAt: { lt: closed } },
             { status: OrderStatus.CANCELLED, updatedAt: { lt: closed } },
             {

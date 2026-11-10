@@ -40,7 +40,8 @@ describe('order creation and tracking', () => {
       .post('/api/orders')
       .send({ shopId: shop.id, options: MONO })
       .expect(201);
-    expect(res.body.order).toMatchObject({ status: 'DRAFT', quote: null, pickupCode: null });
+    expect(res.body.order).toMatchObject({ status: 'DRAFT', quote: null });
+    expect(res.body.order).toMatchObject({ pickupNumber: null, pickupDate: null });
     expect(res.body.order.publicRef).toMatch(/^KGZ-[A-HJ-NP-Z2-9]{6}$/);
     expect(res.body.trackingToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const cookie = String(res.headers['set-cookie']);

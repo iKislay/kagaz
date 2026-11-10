@@ -1,9 +1,13 @@
 import { type PDFDocument, type PDFFont, type PDFPage, StandardFonts, rgb } from 'pdf-lib';
+import { formatPickupCode, formatPickupDate } from '@kagaz/shared';
 
 export const A4_PORTRAIT: [number, number] = [595.28, 841.89];
 
 export interface SlipData {
-  code: string; // 8 chars, unformatted
+  /** ADR-002 daily pickup number (#1, #2 … per shop per Asia/Kolkata day). */
+  pickupNumber: number;
+  /** Its business date, `YYYY-MM-DD`. */
+  pickupDate: string;
   publicRef: string;
   shopName: string;
   pages: number;
@@ -21,8 +25,9 @@ const ALERT = rgb(0.72, 0.11, 0.11);
 
 /**
  * The pickup slip — PRD §8.6. One A4 page appended to the end of the packet:
- * wordmark, very large pickup code, order ref, shop, time, job summary for checking the
- * stack, and "REMOVE THIS SLIP BEFORE HANDOVER". Never prints the customer's phone number.
+ * wordmark, the ADR-002 pickup code very large ("#7") with its date ("7 Nov") under it,
+ * order ref, shop, time, job summary for checking the stack, and "REMOVE THIS SLIP BEFORE
+ * HANDOVER". Never prints the customer's phone number.
  * Uses standard PDF fonts (WinAnsi): keep text to Latin-1 characters.
  */
 export async function drawPickupSlip(doc: PDFDocument, data: SlipData): Promise<PDFPage> {
@@ -30,7 +35,6 @@ export async function drawPickupSlip(doc: PDFDocument, data: SlipData): Promise<
   const [width, height] = A4_PORTRAIT;
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const mono = await doc.embedFont(StandardFonts.CourierBold);
 
   const center = (text: string, font: PDFFont, size: number, y: number, color = INK) => {
     const w = font.widthOfTextAtSize(text, size);
@@ -49,15 +53,17 @@ export async function drawPickupSlip(doc: PDFDocument, data: SlipData): Promise<
     color: rgb(1, 1, 1),
   });
 
-  // Pickup code
-  center('PICKUP CODE', bold, 16, height - 190, MUTED);
-  const display = `${data.code.slice(0, 4)} ${data.code.slice(4)}`;
-  center(display, mono, 76, height - 290);
+  // Pickup code: the daily number, as large as fits, with its date under it.
+  center('PICKUP CODE', bold, 16, height - 180, MUTED);
+  const number = `#${data.pickupNumber}`;
+  const numberSize = Math.min(150, (150 * (width - 160)) / bold.widthOfTextAtSize(number, 150));
+  center(number, bold, numberSize, height - 335);
+  center(formatPickupDate(data.pickupDate), bold, 30, height - 385);
   page.drawRectangle({
     x: 60,
-    y: height - 320,
+    y: height - 410,
     width: width - 120,
-    height: 160,
+    height: 260,
     borderColor: INK,
     borderWidth: 2,
   });
@@ -73,7 +79,7 @@ export async function drawPickupSlip(doc: PDFDocument, data: SlipData): Promise<
     ],
     ['Printed', formatIst(data.printedAt)],
   ];
-  let y = height - 390;
+  let y = height - 460;
   for (const [label, value] of rows) {
     page.drawText(label.toUpperCase(), { x: 80, y, size: 11, font: bold, color: MUTED });
     page.drawText(fit(value, regular, 15, width - 240), {
@@ -97,7 +103,7 @@ export async function drawPickupSlip(doc: PDFDocument, data: SlipData): Promise<
   });
   center('REMOVE THIS SLIP BEFORE HANDOVER', bold, 22, 178, ALERT);
   center(
-    'Ask the customer for this code and verify it in the Kagaz app before handing over.',
+    `Hand these copies to the customer whose phone shows pickup code ${formatPickupCode(data.pickupNumber, data.pickupDate)}.`,
     regular,
     10,
     120,

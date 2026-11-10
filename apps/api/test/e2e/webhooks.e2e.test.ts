@@ -117,6 +117,34 @@ describe('webhook pipeline (P3.3)', () => {
     ).toBe(1);
   });
 
+  it('ADR-002: duplicate and re-sent PAID webhooks keep one pickup number', async () => {
+    const shop = await createShop(h.prisma);
+    const created = await payableOrder(h, shop.id);
+    const payment = await pendingPayment(created);
+    expect(((await view(h, created)).body as PublicOrder).pickupNumber).toBeNull();
+
+    const same = paidWebhook(payment, `evt-num-${payment.id}`);
+    const resent = paidWebhook(payment, `evt-num-again-${payment.id}`);
+    await Promise.all([
+      postWebhook(same.rawBody, same.headers).expect(200),
+      postWebhook(same.rawBody, same.headers).expect(200),
+      postWebhook(resent.rawBody, resent.headers).expect(200),
+    ]);
+    await postWebhook(resent.rawBody, resent.headers).expect(200);
+
+    const order = (await view(h, created)).body as PublicOrder;
+    expect(order.pickupNumber).toBe(1);
+    const counter = await h.prisma.pickupCounter.findFirstOrThrow({ where: { shopId: shop.id } });
+    expect(counter.lastNumber).toBe(1);
+
+    // The next paid order at this shop gets #2.
+    const next = await payableOrder(h, shop.id);
+    const nextPayment = await pendingPayment(next);
+    const w = paidWebhook(nextPayment, `evt-num-next-${nextPayment.id}`);
+    await postWebhook(w.rawBody, w.headers).expect(200);
+    expect(((await view(h, next)).body as PublicOrder).pickupNumber).toBe(2);
+  });
+
   it('invalid signature → 400, logged, no state change', async () => {
     const shop = await createShop(h.prisma);
     const created = await payableOrder(h, shop.id);

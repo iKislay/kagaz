@@ -92,8 +92,10 @@ export const PublicOrderSchema = z.object({
       reference: z.string().nullable(),
     })
     .nullable(),
-  /** Only present while READY_FOR_PICKUP (PRD FR-CUST-11). */
-  pickupCode: z.string().nullable(),
+  /** ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified. */
+  pickupNumber: z.int().nullable(),
+  /** Business date (YYYY-MM-DD, Asia/Kolkata) the pickup number belongs to. */
+  pickupDate: z.string().nullable(),
   rejection: z.object({ code: z.string(), note: z.string().nullable() }).nullable(),
   /** Latest refund for a rejected paid order (P3.4). Simulated → "Demo refund — no money moved". */
   refund: z
@@ -169,6 +171,9 @@ export const MyOrderSchema = z.object({
   amountPaise: z.int().nullable(),
   paymentStatus: z.enum(enumValues(PaymentStatus)).nullable(),
   isSimulated: z.boolean(),
+  /** ADR-002 daily pickup code (null until paid). */
+  pickupNumber: z.int().nullable(),
+  pickupDate: z.string().nullable(),
   createdAt: z.string(),
 });
 export type MyOrder = z.infer<typeof MyOrderSchema>;

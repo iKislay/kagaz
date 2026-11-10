@@ -154,6 +154,10 @@ export const AdminOrderListItemSchema = z.object({
   amountPaise: z.int().nullable(),
   paymentStatus: PaymentStatusSchema.nullable(),
   simulatedPayment: z.boolean(),
+  /** ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified. */
+  pickupNumber: z.int().nullable(),
+  /** Business date (YYYY-MM-DD, Asia/Kolkata) the pickup number belongs to. */
+  pickupDate: z.string().nullable(),
   createdAt: z.string(),
 });
 export type AdminOrderListItem = z.infer<typeof AdminOrderListItemSchema>;
@@ -252,6 +256,10 @@ export const AdminOrderDetailSchema = z.object({
     isDemo: z.boolean(),
   }),
   customerPhoneMasked: z.string().nullable(),
+  /** ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified. */
+  pickupNumber: z.int().nullable(),
+  /** Business date (YYYY-MM-DD, Asia/Kolkata) the pickup number belongs to. */
+  pickupDate: z.string().nullable(),
   options: PrintOptionsSchema,
   quote: QuoteSchema.nullable(),
   /** Immutable price snapshot taken when payment was created. */

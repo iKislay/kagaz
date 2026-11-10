@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { OrderStatus } from '@kagaz/shared';
+import { OrderStatus, formatPickupCode } from '@kagaz/shared';
 import { Pill } from '@/components/ui';
 import { adminApi } from '../_lib/api';
 import { fmtDateTime, humanize, orderTone, rupees } from '../_lib/format';
@@ -90,13 +90,20 @@ export default function OrdersPage() {
         ) : !data || data.items.length === 0 ? (
           <Empty>No orders match.</Empty>
         ) : (
-          <Table head={['Reference', 'Shop', 'Status', 'Payment', 'Amount', 'Created']}>
+          <Table
+            head={['Reference', 'Pickup code', 'Shop', 'Status', 'Payment', 'Amount', 'Created']}
+          >
             {data.items.map((o) => (
               <tr key={o.id} className="hover:bg-selection/40">
                 <Td mono>
                   <Link href={`/admin/orders/${o.id}`} className="text-accent hover:underline">
                     {o.publicRef}
                   </Link>
+                </Td>
+                <Td className="whitespace-nowrap font-semibold tabular-nums">
+                  {o.pickupNumber !== null && o.pickupDate
+                    ? formatPickupCode(o.pickupNumber, o.pickupDate)
+                    : '—'}
                 </Td>
                 <Td>{o.shopName}</Td>
                 <Td>

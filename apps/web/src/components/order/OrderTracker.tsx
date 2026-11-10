@@ -2,7 +2,13 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { DEMO_REFUND_NOTICE, OrderStatus, type PublicOrder, formatPaise } from '@kagaz/shared';
+import {
+  DEMO_REFUND_NOTICE,
+  OrderStatus,
+  type PublicOrder,
+  formatPaise,
+  formatPickupDate,
+} from '@kagaz/shared';
 import { PaymentStatePanel } from '@/components/order/PaymentStatePanel';
 import { Group, Notice, Pill, Row, Spinner, cx } from '@/components/ui';
 import { useOrderUpdates } from '@/lib/realtime';
@@ -41,6 +47,15 @@ export function OrderTracker({ orderId }: { orderId: string }) {
 
   return (
     <section>
+      {order.pickupNumber !== null && order.pickupDate && SHOW_PICKUP.includes(order.status) && (
+        <PickupCodeCard
+          pickupNumber={order.pickupNumber}
+          pickupDate={order.pickupDate}
+          ready={order.status === OrderStatus.READY_FOR_PICKUP}
+          shop={order.shop}
+        />
+      )}
+
       <p className="text-[13px] font-medium text-text-secondary">
         {order.shop.name} · <span className="font-mono">{order.publicRef}</span>
       </p>
@@ -52,10 +67,6 @@ export function OrderTracker({ orderId }: { orderId: string }) {
       {error && <Notice tone="orange">Reconnecting… {error.message}</Notice>}
 
       <PaymentStatePanel order={order} token={token} onChange={setOrder} />
-
-      {order.status === OrderStatus.READY_FOR_PICKUP && order.pickupCode && (
-        <PickupCodeCard code={order.pickupCode} shop={order.shop} />
-      )}
 
       {(order.status === OrderStatus.REJECTED ||
         order.status === OrderStatus.REFUND_PENDING ||
@@ -109,24 +120,68 @@ export function OrderTracker({ orderId }: { orderId: string }) {
   );
 }
 
-function PickupCodeCard({ code, shop }: { code: string; shop: PublicOrder['shop'] }) {
+/** Statuses that show the ADR-002 pickup code (paid and not rejected/refunded). */
+const SHOW_PICKUP: readonly OrderStatus[] = [
+  OrderStatus.PENDING_REVIEW,
+  OrderStatus.QUEUED,
+  OrderStatus.PRINTING,
+  OrderStatus.NEEDS_OPERATOR_CHECK,
+  OrderStatus.READY_FOR_PICKUP,
+  OrderStatus.COLLECTED,
+];
+
+/**
+ * ADR-002 pickup code: the shop's daily number, shown large with its date so the counter can
+ * match it to the slip on top of the printed stack ("#7 · 7 Nov").
+ */
+function PickupCodeCard({
+  pickupNumber,
+  pickupDate,
+  ready,
+  shop,
+}: {
+  pickupNumber: number;
+  pickupDate: string;
+  ready: boolean;
+  shop: PublicOrder['shop'];
+}) {
+  const date = formatPickupDate(pickupDate);
   return (
-    <div className="mac-card mt-6 p-6 text-center">
+    <div
+      className={cx(
+        'mac-card mb-6 px-5 pt-4 pb-5 text-center',
+        ready && 'border-green/60 ring-1 ring-green/40',
+      )}
+      role="group"
+      aria-label={`Pickup code number ${pickupNumber}, ${date}`}
+    >
       <div className="text-[12px] font-semibold uppercase tracking-wide text-text-secondary">
         Pickup code
       </div>
-      <div
-        className="mt-2 select-all font-mono text-[44px] font-bold tracking-[0.12em] text-text sm:text-[56px]"
-        aria-label={`Pickup code ${code.split('').join(' ')}`}
-      >
-        {code.slice(0, 4)}
-        <span className="text-text-secondary/50">-</span>
-        {code.slice(4)}
+      <div className="mt-1 flex items-baseline justify-center gap-3">
+        <span className="text-[72px] leading-none font-bold tracking-[-0.03em] tabular-nums sm:text-[88px]">
+          #{pickupNumber}
+        </span>
+        <span className="text-[22px] font-semibold text-text-secondary sm:text-[26px]">
+          · {date}
+        </span>
       </div>
-      <p className="mt-2 text-[14px] text-text-secondary">
-        Tell this code to the counter at{' '}
-        <span className="font-semibold text-text">{shop.name}</span>, {shop.address}.
+      <p
+        className={cx(
+          'mt-3 text-[15px]',
+          ready ? 'font-semibold text-text' : 'text-text-secondary',
+        )}
+      >
+        {ready ? (
+          <>Printed — collect at the counter with pickup code #{pickupNumber}</>
+        ) : (
+          <>
+            Show this at <span className="font-semibold text-text">{shop.name}</span> when your
+            prints are ready.
+          </>
+        )}
       </p>
+      {ready && <p className="mt-1 text-[13px] text-text-secondary">{shop.address}</p>}
     </div>
   );
 }

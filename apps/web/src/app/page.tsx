@@ -12,7 +12,7 @@ export default async function HomePage() {
     <section>
       <h1 className="mac-title">Print it. Pick it up.</h1>
       <p className="mt-1.5 text-[15px] text-text-secondary">
-        Choose a print shop in Mandya, upload your PDF, pay, and collect it with a pickup code.
+        Choose a print shop in Mandya, upload your PDF, pay, and collect it with your pickup number.
       </p>
 
       {shops === null ? (

@@ -113,7 +113,7 @@ describe('printer lease (P2.7, Appendix A.2)', () => {
     expect(printer).toMatchObject({ activeJobId: null, leaseUntil: null });
     const view = await customerView(h, created);
     expect(view.status).toBe('NEEDS_OPERATOR_CHECK');
-    expect(view.pickupCode).toBeNull();
+    expect(view.pickupNumber).toBe(1); // ADR-002: kept from payment, whatever happens next
     const event = await h.prisma.orderEvent.findFirstOrThrow({
       where: { orderId: created.order.id, toStatus: 'NEEDS_OPERATOR_CHECK' },
     });
@@ -170,8 +170,8 @@ describe('status reports (P2.10)', () => {
     const printer = await h.prisma.printer.findUniqueOrThrow({ where: { id: s.printerId } });
     expect(printer.activeJobId).toBeNull();
     expect((await customerView(h, created)).status).toBe('NEEDS_OPERATOR_CHECK');
-    // The operator can't Mark Ready from here — only resolve.
-    await s.human(`jobs/${created.order.id}/ready`, { confirmed: true }).expect(409);
+    // Only an operator resolve can move it on (ADR-002: no Mark Ready endpoint).
+    await s.human(`jobs/${created.order.id}/ready`, { confirmed: true }).expect(404);
   });
 
   it('a report for a job this device does not hold → 404', async () => {
@@ -220,7 +220,7 @@ describe('status reports (P2.10)', () => {
 });
 
 describe('duplicate accept (P4.6)', () => {
-  it('concurrent accepts of one order: one QUEUED transition, one job, one packet, one code', async () => {
+  it('concurrent accepts of one order: one QUEUED transition, one job, one packet, one number', async () => {
     const s = await pairedShop(h);
     const created = await paidOrder(h, s.shop.id);
     const results = await Promise.all(
@@ -234,7 +234,7 @@ describe('duplicate accept (P4.6)', () => {
     const id = created.order.id;
     expect(await h.prisma.printJob.count({ where: { orderId: id } })).toBe(1);
     expect(await h.prisma.fileAsset.count({ where: { orderId: id, kind: 'PACKET' } })).toBe(1);
-    expect(await h.prisma.pickupCode.count({ where: { orderId: id } })).toBe(1);
+    expect((await h.prisma.order.findUniqueOrThrow({ where: { id } })).pickupNumber).toBe(1);
     expect(await h.prisma.orderEvent.count({ where: { orderId: id, toStatus: 'QUEUED' } })).toBe(1);
   });
 });

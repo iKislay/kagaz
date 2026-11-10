@@ -28,7 +28,7 @@ export const STATUS_COPY: Record<OrderStatus, { label: string; detail: string; t
   },
   READY_FOR_PICKUP: {
     label: 'Ready for pickup',
-    detail: 'Show this code at the counter to collect your prints.',
+    detail: 'Your prints are waiting at the shop counter.',
     tone: 'green',
   },
   COLLECTED: { label: 'Collected', detail: 'Picked up. Thanks for using Kagaz!', tone: 'green' },
@@ -55,11 +55,12 @@ export const TIMELINE_STEPS: { status: OrderStatus; label: string }[] = [
   { status: OrderStatus.PENDING_REVIEW, label: 'Paid' },
   { status: OrderStatus.QUEUED, label: 'Accepted by shop' },
   { status: OrderStatus.PRINTING, label: 'Printing' },
-  { status: OrderStatus.READY_FOR_PICKUP, label: 'Ready for pickup' },
-  { status: OrderStatus.COLLECTED, label: 'Collected' },
+  { status: OrderStatus.READY_FOR_PICKUP, label: 'Printed — ready for pickup' },
 ];
 
+/** No further updates expected (ADR-002: READY_FOR_PICKUP is the normal end state). */
 export const TERMINAL: readonly OrderStatus[] = [
+  OrderStatus.READY_FOR_PICKUP,
   OrderStatus.COLLECTED,
   OrderStatus.CANCELLED,
   OrderStatus.REFUNDED,

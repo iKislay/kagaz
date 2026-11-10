@@ -163,6 +163,7 @@ model Shop {
   printers        Printer[]
   pricing         ShopPricing[]
   orders          Order[]
+  pickupCounters  PickupCounter[]
 
   @@map("shops")
 }
@@ -310,6 +311,11 @@ model Order {
   readyAt           DateTime?   @map("ready_at")
   collectedAt       DateTime?   @map("collected_at")
   expiresAt         DateTime?   @map("expires_at")
+  /// ADR-002 daily pickup code (#1, #2 … per shop per Asia/Kolkata day), set once when
+  /// payment is verified and never changed (reprints keep it).
+  pickupNumber      Int?        @map("pickup_number")
+  /// Business date (Asia/Kolkata) the pickup number belongs to.
+  pickupDate        DateTime?   @map("pickup_date") @db.Date
 
   customer   User?        @relation(fields: [customerId], references: [id])
   shop       Shop         @relation(fields: [shopId], references: [id])
@@ -320,6 +326,7 @@ model Order {
   printJobs  PrintJob[]
   pickupCode PickupCode?
 
+  @@unique([shopId, pickupDate, pickupNumber])
   @@index([shopId, status])
   @@index([customerId])
   @@map("orders")
@@ -457,6 +464,20 @@ model PrintJob {
   @@map("print_jobs")
 }
 
+/// ADR-002: last pickup number handed out per shop per business date (Asia/Kolkata).
+/// Bumped with INSERT … ON CONFLICT DO UPDATE in the payment-verified transaction.
+model PickupCounter {
+  shopId       String   @map("shop_id") @db.Uuid
+  businessDate DateTime @map("business_date") @db.Date
+  lastNumber   Int      @map("last_number")
+
+  shop Shop @relation(fields: [shopId], references: [id])
+
+  @@id([shopId, businessDate])
+  @@map("pickup_counters")
+}
+
+/// Retired by ADR-002 (random 8-char codes): kept for history, no longer written.
 model PickupCode {
   id                    String    @id @default(uuid(7)) @db.Uuid
   orderId               String    @unique @map("order_id") @db.Uuid

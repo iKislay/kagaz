@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type AdminOrdersQuery, maskPhone } from '@kagaz/shared';
+import { pickupDateString } from '../pickup/pickup-number.service.js';
 import { AuditService } from './audit.service.js';
 
 interface PaymentRow {
@@ -38,6 +39,8 @@ export class OrdersService {
           shopId: true,
           status: true,
           amountPaise: true,
+          pickupNumber: true,
+          pickupDate: true,
           createdAt: true,
           shop: { select: { name: true } },
           payments: { select: { id: true, status: true, isSimulated: true, createdAt: true } },
@@ -61,6 +64,8 @@ export class OrdersService {
           amountPaise: o.amountPaise,
           paymentStatus: latest?.status ?? null,
           simulatedPayment: payments.some((p) => p.isSimulated),
+          pickupNumber: o.pickupNumber,
+          pickupDate: pickupDateString(o.pickupDate),
           createdAt: o.createdAt.toISOString(),
         };
       }),
@@ -155,6 +160,8 @@ export class OrdersService {
         isDemo: order.shop.isDemo,
       },
       customerPhoneMasked: maskPhone(order.customerPhone),
+      pickupNumber: order.pickupNumber,
+      pickupDate: pickupDateString(order.pickupDate),
       options: order.options as unknown as Record<string, unknown>,
       quote: order.quote ?? null,
       priceSnapshot: order.priceSnapshot ?? null,

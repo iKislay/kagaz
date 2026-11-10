@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { type AdminOrderDetail, DEMO_REFUND_NOTICE } from '@kagaz/shared';
+import { type AdminOrderDetail, DEMO_REFUND_NOTICE, formatPickupCode } from '@kagaz/shared';
 import { Pill } from '@/components/ui';
 import { adminApi } from '../../_lib/api';
 import { fmtDateTime, humanize, orderTone, rupees } from '../../_lib/format';
@@ -87,6 +87,12 @@ function Detail({ o }: { o: AdminOrderDetail }) {
         <Card title="Order">
           <Facts
             items={[
+              [
+                'Pickup code',
+                o.pickupNumber !== null && o.pickupDate
+                  ? formatPickupCode(o.pickupNumber, o.pickupDate)
+                  : '—',
+              ],
               ['Amount', rupees(o.amountPaise)],
               [
                 'Options',

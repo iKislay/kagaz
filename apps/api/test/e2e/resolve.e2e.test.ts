@@ -19,11 +19,12 @@ const auditActions = async (orderId: string) =>
   );
 
 describe('POST /api/shop/jobs/:orderId/resolve (T14)', () => {
-  it('REPRINT: attempt 2 with the same packet + pickup code, old attempt SUPERSEDED, audited', async () => {
+  it('REPRINT: attempt 2 with the same packet + pickup number, old attempt SUPERSEDED, audited', async () => {
     const s = await pairedShop(h);
     const { created, printJobId } = await needsCheckOrder(h, s);
     const id = created.order.id;
-    const codeBefore = await h.prisma.pickupCode.findUniqueOrThrow({ where: { orderId: id } });
+    const before = await h.prisma.order.findUniqueOrThrow({ where: { id } });
+    expect(before.pickupNumber).toBe(1);
     const attempt1 = await h.prisma.printJob.findUniqueOrThrow({ where: { id: printJobId } });
 
     // Without explicit confirmation → refused, nothing changes (P4.6).
@@ -52,8 +53,11 @@ describe('POST /api/shop/jobs/:orderId/resolve (T14)', () => {
       checksum: attempt1.checksum,
       printerId: attempt1.printerId,
     });
-    const codeAfter = await h.prisma.pickupCode.findUniqueOrThrow({ where: { orderId: id } });
-    expect(codeAfter.codeHmac).toBe(codeBefore.codeHmac);
+    const after = await h.prisma.order.findUniqueOrThrow({ where: { id } });
+    expect([after.pickupNumber, after.pickupDate]).toEqual([
+      before.pickupNumber,
+      before.pickupDate,
+    ]);
 
     const audit = await h.prisma.auditLog.findFirstOrThrow({
       where: { orderId: id, action: 'ORDER_RESOLVE_REPRINT' },
@@ -86,7 +90,7 @@ describe('POST /api/shop/jobs/:orderId/resolve (T14)', () => {
     ).toBe(1);
   });
 
-  it('CONFIRM_PRINTED → READY_FOR_PICKUP; the customer sees the code; it expires in 7 days', async () => {
+  it('CONFIRM_PRINTED → READY_FOR_PICKUP; the customer keeps the same pickup number', async () => {
     const s = await pairedShop(h);
     const { created } = await needsCheckOrder(h, s);
     const res = await s
@@ -94,15 +98,10 @@ describe('POST /api/shop/jobs/:orderId/resolve (T14)', () => {
       .expect(200);
     expect(res.body.status).toBe('READY_FOR_PICKUP');
     const view = await customerView(h, created);
-    expect(view.pickupCode).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
-    const code = await h.prisma.pickupCode.findUniqueOrThrow({
-      where: { orderId: created.order.id },
-    });
-    const days = (code.expiresAt!.getTime() - Date.now()) / 86_400_000;
-    expect(days).toBeGreaterThan(6.9);
-    expect(days).toBeLessThan(7.1);
+    expect(view).toMatchObject({ status: 'READY_FOR_PICKUP', pickupNumber: 1 });
+    const order = await h.prisma.order.findUniqueOrThrow({ where: { id: created.order.id } });
+    expect(order.readyAt).not.toBeNull();
     expect(await auditActions(created.order.id)).toContain('ORDER_RESOLVE_CONFIRM_PRINTED');
-    await s.human('pickups/verify', { code: view.pickupCode }).expect(200);
   });
 
   it('MARK_FAILED → REJECTED → simulated refund', async () => {

@@ -18,7 +18,6 @@ import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PdfValidationError, validatePdf } from '../files/pdf-validator.js';
 import { StorageService } from '../files/storage.service.js';
-import { PickupCrypto } from '../pickup/pickup-crypto.js';
 import { PricingService } from '../pricing/pricing.service.js';
 import { calculateQuote } from '../pricing/quote.js';
 import { ShopsService } from '../shops/shops.service.js';
@@ -46,7 +45,6 @@ export class OrdersService {
     private readonly pricing: PricingService,
     private readonly shops: ShopsService,
     private readonly stateMachine: OrderStateMachine,
-    private readonly pickup: PickupCrypto,
   ) {}
 
   // ─── Queries ───
@@ -57,7 +55,7 @@ export class OrdersService {
       include: ORDER_VIEW_INCLUDE,
     });
     if (!order) throw notFound();
-    return toPublicOrder(order, this.pickup);
+    return toPublicOrder(order);
   }
 
   /** Session check used by the customer guard: is this the signed-in customer's order? */

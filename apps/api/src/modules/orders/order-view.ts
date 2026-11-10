@@ -7,7 +7,7 @@ import {
   QuoteSchema,
 } from '@kagaz/shared';
 import { type Prisma } from '../../generated/prisma/client.js';
-import { type PickupCrypto } from '../pickup/pickup-crypto.js';
+import { pickupDateString } from '../pickup/pickup-number.service.js';
 
 /** Everything needed to render the customer-safe order view. */
 export const ORDER_VIEW_INCLUDE = {
@@ -21,7 +21,6 @@ export const ORDER_VIEW_INCLUDE = {
     orderBy: { createdAt: 'desc' },
     include: { refunds: { orderBy: { createdAt: 'desc' }, take: 1 } },
   },
-  pickupCode: true,
   events: { orderBy: { createdAt: 'asc' } },
 } as const satisfies Prisma.OrderInclude;
 
@@ -50,15 +49,13 @@ export function canCustomerCancel(order: {
 }
 
 /**
- * Customer-safe projection (PRD §11.1). The pickup code is decrypted only while the order is
- * READY_FOR_PICKUP (FR-CUST-11); no staff, device or printer internals are exposed.
+ * Customer-safe projection (PRD §11.1). The ADR-002 pickup code (daily number + date) is
+ * shown from payment verified onward; no staff, device or printer internals are exposed.
  */
-export function toPublicOrder(order: OrderWithView, pickup: PickupCrypto): PublicOrder {
+export function toPublicOrder(order: OrderWithView): PublicOrder {
   const file = order.files[0];
   const payment = order.payments[0];
   const refund = order.payments.flatMap((p) => p.refunds)[0];
-  const showCode =
-    order.status === OrderStatus.READY_FOR_PICKUP && order.pickupCode?.encryptedDisplayValue;
 
   return {
     id: order.id,
@@ -76,7 +73,8 @@ export function toPublicOrder(order: OrderWithView, pickup: PickupCrypto): Publi
           reference: payment.providerPaymentId,
         }
       : null,
-    pickupCode: showCode ? pickup.decrypt(order.pickupCode!.encryptedDisplayValue!) : null,
+    pickupNumber: order.pickupNumber,
+    pickupDate: pickupDateString(order.pickupDate),
     rejection: order.rejectionCode
       ? { code: order.rejectionCode, note: order.rejectionNote }
       : null,

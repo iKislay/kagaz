@@ -5,6 +5,7 @@ import {
   type LeaseResponse,
   type PublicOrder,
   type ShopJob,
+  formatPickupDate,
 } from '@kagaz/shared';
 import { randomCode, sha256Hex } from '../../src/common/crypto/tokens.js';
 import { makePdf } from '../fixtures/pdfs.js';
@@ -126,7 +127,7 @@ describe('vertical slice lifecycle (T07, T10, T15)', () => {
     const detail = await h.http().get(`/api/shop/jobs/${created.order.id}`).set(auth).expect(200);
     expect(detail.body.previewUrl).toMatch(/^http/);
 
-    // Accept: packet built, code generated, job queued.
+    // Accept: packet built (slip carries the pickup number taken at payment), job queued.
     const accepted = await h
       .http()
       .post(`/api/shop/jobs/${created.order.id}/accept`)
@@ -137,7 +138,12 @@ describe('vertical slice lifecycle (T07, T10, T15)', () => {
       status: 'QUEUED',
       printJob: { attempt: 1, status: 'READY' },
     });
-    expect((await customerView(created)).pickupCode).toBeNull(); // not before READY
+    const paid = await customerView(created);
+    expect(paid.pickupNumber).toBe(1); // ADR-002: shown from payment verified onward
+    expect(accepted.body).toMatchObject({
+      pickupNumber: paid.pickupNumber,
+      pickupDate: paid.pickupDate,
+    });
 
     // Lease: one combined packet, checksum, document name, settings.
     const lease = (
@@ -156,22 +162,13 @@ describe('vertical slice lifecycle (T07, T10, T15)', () => {
     const packet = Buffer.from(await (await fetch(lease.downloadUrl)).arrayBuffer());
     expect(sha256Hex(packet)).toBe(lease.sha256);
 
-    // The slip is the last page and carries the code the customer will see.
+    // The slip is the last page and carries the pickup number the customer sees.
     const task = getDocument({ data: new Uint8Array(packet), verbosity: 0 });
     const doc = await task.promise;
     const slipText = (await (await doc.getPage(doc.numPages)).getTextContent()).items
       .map((it) => ('str' in it ? it.str : ''))
       .join('');
     await task.destroy();
-
-    // Can't mark ready before the job reached the printer.
-    const early = await h
-      .http()
-      .post(`/api/shop/jobs/${created.order.id}/ready`)
-      .set(auth)
-      .send({ confirmed: true })
-      .expect(409);
-    expect(early.body.error.code).toBe('PRINT_NOT_SUBMITTED');
 
     await h
       .http()
@@ -191,79 +188,27 @@ describe('vertical slice lifecycle (T07, T10, T15)', () => {
       .set(agentAuth)
       .send({ status: 'SPOOLER_COMPLETE' })
       .expect(200);
-    expect(complete.body.status).toBe('PRINTING'); // spooler success is not READY (invariant 9)
+    expect(complete.body.status).toBe('READY_FOR_PICKUP'); // ADR-002: printing finished = ready
     const printer = await h.prisma.printer.findUniqueOrThrow({ where: { id: printerId } });
     expect(printer.activeJobId).toBeNull(); // lease released for the next job
 
-    await h.http().post(`/api/shop/jobs/${created.order.id}/ready`).set(auth).send({}).expect(400);
-    await h
-      .http()
-      .post(`/api/shop/jobs/${created.order.id}/ready`)
-      .set(auth)
-      .send({ confirmed: true })
-      .expect(200);
-
     const ready = await customerView(created);
     expect(ready.status).toBe('READY_FOR_PICKUP');
-    expect(ready.pickupCode).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
-    expect(slipText.replace(/\s/g, '')).toContain(ready.pickupCode);
-
-    // Pickup: lowercase with a dash is fine; second use is refused (T15).
-    const code = ready.pickupCode!;
-    const verified = await h
-      .http()
-      .post('/api/shop/pickups/verify')
-      .set(auth)
-      .send({ code: `${code.slice(0, 4)}-${code.slice(4)}`.toLowerCase() })
-      .expect(200);
-    expect(verified.body).toMatchObject({
-      publicRef: created.order.publicRef,
-      status: 'COLLECTED',
-    });
-    const reused = await h
-      .http()
-      .post('/api/shop/pickups/verify')
-      .set(auth)
-      .send({ code })
-      .expect(409);
-    expect(reused.body.error.code).toBe('PICKUP_ALREADY_USED');
-
-    const collected = await customerView(created);
-    expect(collected.status).toBe('COLLECTED');
-    expect(collected.pickupCode).toBeNull();
-    expect(collected.timeline.map((e) => e.status)).toEqual([
+    expect(ready.pickupNumber).toBe(1);
+    expect(slipText).toContain('#1');
+    expect(slipText).toContain(formatPickupDate(ready.pickupDate!));
+    expect(ready.timeline.map((e) => e.status)).toEqual([
       'DRAFT',
       'AWAITING_PAYMENT',
       'PENDING_REVIEW',
       'QUEUED',
       'PRINTING',
       'READY_FOR_PICKUP',
-      'COLLECTED',
     ]);
     const audit = await h.prisma.auditLog.findMany({ where: { orderId: created.order.id } });
     expect(audit.map((a) => a.action)).toEqual(
-      expect.arrayContaining([
-        'order.accepted',
-        'print.started',
-        'order.ready',
-        'pickup.verified',
-        'pickup.reused',
-      ]),
+      expect.arrayContaining(['order.accepted', 'print.started']),
     );
-  });
-
-  it('wrong pickup codes are rejected and audited', async () => {
-    const { auth, shop } = await pairedShop();
-    const res = await h
-      .http()
-      .post('/api/shop/pickups/verify')
-      .set(auth)
-      .send({ code: 'ZZZZ-ZZZZ' })
-      .expect(404);
-    expect(res.body.error.code).toBe('PICKUP_CODE_INVALID');
-    expect(
-      await h.prisma.auditLog.count({ where: { shopId: shop.id, action: 'pickup.failed' } }),
-    ).toBe(1);
   });
 
   it('reject records the reason and a simulated refund (T07, T20)', async () => {
@@ -359,7 +304,7 @@ describe('printer queue (T11, T12)', () => {
       status: 'NEEDS_OPERATOR_CHECK',
       printJob: { status: 'FAILED', error: 'Paper out' },
     });
-    expect((await customerView(created)).pickupCode).toBeNull();
+    expect((await customerView(created)).status).toBe('NEEDS_OPERATOR_CHECK'); // never READY
     expect(await h.prisma.printJob.count({ where: { orderId: created.order.id } })).toBe(1);
   });
 });
@@ -403,19 +348,13 @@ describe('tenant isolation (T09)', () => {
       .set(a.auth)
       .send({ status: 'SUBMITTED' })
       .expect(200);
+    // B can't report progress on A's print job.
     await h
       .http()
-      .post(`/api/shop/jobs/${id}/ready`)
-      .set(a.auth)
-      .send({ confirmed: true })
-      .expect(200);
-    const code = (await customerView(created)).pickupCode!;
-    const wrongShop = await h
-      .http()
-      .post('/api/shop/pickups/verify')
+      .post(`/api/shop/print-jobs/${job.printJob!.id}/status`)
       .set(b.auth)
-      .send({ code })
+      .send({ status: 'SPOOLER_COMPLETE' })
       .expect(404);
-    expect(wrongShop.body.error.code).toBe('PICKUP_CODE_INVALID');
+    expect((await customerView(created)).status).toBe('PRINTING');
   });
 });

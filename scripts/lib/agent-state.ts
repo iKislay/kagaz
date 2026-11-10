@@ -1,7 +1,6 @@
 /**
  * Simulated-agent state, kept in the OS temp dir per API (never in the repo): the device token
- * (the real app keeps it in DPAPI), the operator token and run statistics. load-orders reads it
- * to play "customer shows the pickup code at the counter".
+ * (the real app keeps it in DPAPI), the operator token and run statistics.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

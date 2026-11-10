@@ -6,21 +6,16 @@ import {
   type ResolveJobRequest,
   type ShopJob,
   type ShopJobDetail,
-  type VerifyPickupResponse,
 } from '@kagaz/shared';
 import { type Actor } from '../../common/actor.js';
 import { type DeviceContext, deviceActor } from '../../common/auth/device-auth.guard.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type PrintJobStatus } from '../../generated/prisma/client.js';
-import { AuditService } from '../audit/audit.service.js';
 import { StorageService } from '../files/storage.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
-import { parseOptions } from '../orders/order-view.js';
 import { RefundsService } from '../payments/refunds.service.js';
 import { OrderAcceptanceService } from '../approval/order-acceptance.service.js';
-import { PickupAttemptsService } from '../pickup/pickup-attempts.service.js';
-import { PickupCrypto } from '../pickup/pickup-crypto.js';
 import { PrintLeaseService, releaseLease } from '../printing/print-leases.service.js';
 import { SHOP_JOB_INCLUDE, toShopJob } from './shop-job-view.js';
 import { findShopOrder } from './shop-scope.js';
@@ -33,8 +28,6 @@ const ACTIVE_STATUSES: OrderStatus[] = [
   OrderStatus.NEEDS_OPERATOR_CHECK,
   OrderStatus.READY_FOR_PICKUP,
 ];
-/** FR-PICK-06: pickup codes expire 7 days after READY. */
-export const PICKUP_CODE_VALID_DAYS = 7;
 /** Attempts a reprint replaces (everything except already-closed ones). */
 const SUPERSEDABLE: PrintJobStatus[] = [
   'PREPARING',
@@ -59,9 +52,6 @@ export class ShopJobsService {
     private readonly stateMachine: OrderStateMachine,
     private readonly acceptance: OrderAcceptanceService,
     private readonly refunds: RefundsService,
-    private readonly pickup: PickupCrypto,
-    private readonly pickupAttempts: PickupAttemptsService,
-    private readonly audit: AuditService,
     private readonly leases: PrintLeaseService,
   ) {}
 
@@ -125,39 +115,9 @@ export class ShopJobsService {
   }
 
   /**
-   * Operator confirms the physical stack + slip (FR-SHOP-12). Spooler status alone is never
-   * enough (CLAUDE.md invariant 9): the job must at least have been submitted.
-   */
-  async markReady(device: DeviceContext, orderId: string): Promise<ShopJob> {
-    const order = await this.findScoped(device, orderId);
-    const job = order.printJobs[0];
-    if (order.status !== OrderStatus.PRINTING) throw invalidState(order.status, 'marked ready');
-    if (!job || (job.status !== 'SUBMITTED' && job.status !== 'SPOOLER_COMPLETE')) {
-      throw new AppError(
-        'PRINT_NOT_SUBMITTED',
-        'The print job has not been sent to the printer yet',
-        HttpStatus.CONFLICT,
-      );
-    }
-    await this.prisma.$transaction(async (tx) => {
-      await this.stateMachine.transition(tx, {
-        orderId: order.id,
-        to: OrderStatus.READY_FOR_PICKUP,
-        from: OrderStatus.PRINTING,
-        actor: deviceActor(device),
-        auditAction: 'order.ready',
-        data: { readyAt: new Date() },
-      });
-      await this.startPickupClock(tx, order.id);
-      await this.closeLease(tx, job);
-    });
-    return toShopJob(await this.findScoped(device, orderId));
-  }
-
-  /**
    * Needs-check resolution (contract §2, P2.11, T14). Only from NEEDS_OPERATOR_CHECK.
    * CONFIRM_PRINTED → READY_FOR_PICKUP; REPRINT (needs confirm: true) supersedes the old
-   * attempt and queues attempt+1 with the SAME packet and pickup code; MARK_FAILED → REJECTED
+   * attempt and queues attempt+1 with the SAME packet and pickup number; MARK_FAILED → REJECTED
    * + refund. Each action writes one `ORDER_RESOLVE_<ACTION>` audit row.
    */
   async resolve(
@@ -198,7 +158,6 @@ export class ShopJobsService {
           auditMetadata: { printJobId: latest?.id ?? null, attempt: latest?.attempt ?? null, note },
           data: { readyAt: new Date() },
         });
-        await this.startPickupClock(tx, order.id);
         if (latest) await this.closeLease(tx, latest);
         return null;
       }
@@ -265,107 +224,10 @@ export class ShopJobsService {
     return this.detail(device, orderId);
   }
 
-  /**
-   * One-time pickup code check → COLLECTED (FR-PICK-03/04/05, T15/T16). Every failure is
-   * audited and counted per device (5 / 10 min → 10 min lockout, 429 PICKUP_LOCKED) and,
-   * when the code matched an order, on that order's code (failedAttempts).
-   */
-  async verifyPickup(device: DeviceContext, input: string): Promise<VerifyPickupResponse> {
-    const now = new Date();
-    const lockedUntil = await this.pickupAttempts.lockedUntil(device.deviceId, now);
-    if (lockedUntil) {
-      await this.audit.record(this.prisma, deviceActor(device), 'pickup.locked', {
-        shopId: device.shopId,
-        metadata: { deviceId: device.deviceId, lockedUntil: lockedUntil.toISOString() },
-      });
-      throw new AppError(
-        'PICKUP_LOCKED',
-        'Too many wrong pickup codes on this device; try again later',
-        HttpStatus.TOO_MANY_REQUESTS,
-        {
-          lockedUntil: lockedUntil.toISOString(),
-          retryAfterSeconds: Math.ceil((lockedUntil.getTime() - now.getTime()) / 1000),
-        },
-      );
-    }
-
-    const code = this.pickup.normalize(input);
-    const row = code
-      ? await this.prisma.pickupCode.findFirst({
-          where: { codeHmac: this.pickup.hmac(code), order: { shopId: device.shopId } },
-          include: { order: { include: SHOP_JOB_INCLUDE } },
-        })
-      : null;
-
-    if (!row) {
-      await this.pickupFailed(device, null, code ? 'unknown_code' : 'malformed_code');
-      throw new AppError('PICKUP_CODE_INVALID', 'No order matches this code', HttpStatus.NOT_FOUND);
-    }
-    if (row.consumedAt) {
-      await this.pickupFailed(device, row, 'already_used', 'pickup.reused');
-      throw new AppError(
-        'PICKUP_ALREADY_USED',
-        `This code was already used for ${row.order.publicRef}`,
-        HttpStatus.CONFLICT,
-      );
-    }
-    if (row.order.status !== OrderStatus.READY_FOR_PICKUP) {
-      await this.pickupFailed(device, row, 'not_ready');
-      throw new AppError('ORDER_NOT_READY', `${row.order.publicRef} is not ready yet`, 409);
-    }
-    if (row.expiresAt && row.expiresAt < now) {
-      await this.pickupFailed(device, row, 'expired');
-      throw new AppError(
-        'PICKUP_CODE_EXPIRED',
-        `The pickup code for ${row.order.publicRef} has expired; contact support`,
-        HttpStatus.GONE,
-      );
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      const consumed = await tx.pickupCode.updateMany({
-        where: { id: row.id, consumedAt: null },
-        data: {
-          consumedAt: now,
-          consumedByDeviceId: device.deviceId,
-          encryptedDisplayValue: null, // PRD §14.3: cleared on COLLECTED
-        },
-      });
-      if (consumed.count !== 1) {
-        throw new AppError('PICKUP_ALREADY_USED', 'This code was already used', 409);
-      }
-      await this.stateMachine.transition(tx, {
-        orderId: row.orderId,
-        to: OrderStatus.COLLECTED,
-        from: OrderStatus.READY_FOR_PICKUP,
-        actor: deviceActor(device),
-        auditAction: 'pickup.verified',
-        data: { collectedAt: now },
-      });
-    });
-
-    return {
-      orderId: row.orderId,
-      publicRef: row.order.publicRef,
-      status: OrderStatus.COLLECTED,
-      options: parseOptions(row.order.options),
-      pageCount: row.order.files[0]?.pageCount ?? null,
-      collectedAt: now.toISOString(),
-    };
-  }
-
   // ─── Helpers ───
 
   private findScoped(device: DeviceContext, orderId: string) {
     return findShopOrder(this.prisma, device.shopId, orderId, SHOP_JOB_INCLUDE);
-  }
-
-  /** FR-PICK-06: the code is valid for 7 days from READY. */
-  private async startPickupClock(tx: Tx, orderId: string): Promise<void> {
-    await tx.pickupCode.updateMany({
-      where: { orderId },
-      data: { expiresAt: new Date(Date.now() + PICKUP_CODE_VALID_DAYS * 86_400_000) },
-    });
   }
 
   /** The operator has decided this attempt's outcome: free the printer, stop the lease clock. */
@@ -383,33 +245,6 @@ export class ShopJobsService {
    */
   private requestRefund(tx: Tx, orderId: string, actor: Actor): Promise<string | null> {
     return this.refunds.openForRejectedOrder(tx, orderId, actor);
-  }
-
-  private async pickupFailed(
-    device: DeviceContext,
-    row: { id: string; orderId: string } | null,
-    reason: string,
-    action = 'pickup.failed',
-  ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const state = await this.pickupAttempts.recordFailure(tx, device.deviceId);
-      if (row) {
-        await tx.pickupCode.update({
-          where: { id: row.id },
-          data: { failedAttempts: { increment: 1 } },
-        });
-      }
-      await this.audit.record(tx, deviceActor(device), action, {
-        shopId: device.shopId,
-        orderId: row?.orderId ?? null,
-        metadata: {
-          reason,
-          deviceId: device.deviceId,
-          failuresInWindow: state.failuresInWindow,
-          lockedUntil: state.lockedUntil?.toISOString() ?? null,
-        },
-      });
-    });
   }
 }
 

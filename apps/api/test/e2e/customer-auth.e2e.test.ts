@@ -73,7 +73,12 @@ describe('customer OTP sign-in (P2.2)', () => {
     const mine = (await h.http().get('/api/me/orders').set('Cookie', session).expect(200))
       .body as MyOrdersResponse;
     expect(mine.orders.map((o) => o.id)).toEqual([created.order.id]);
-    expect(mine.orders[0]).toMatchObject({ status: 'AWAITING_PAYMENT', shopName: shop.name });
+    expect(mine.orders[0]).toMatchObject({
+      status: 'AWAITING_PAYMENT',
+      shopName: shop.name,
+      pickupNumber: null, // ADR-002: no pickup code before payment
+      pickupDate: null,
+    });
 
     // Session works instead of the tracking token; tracking link still works too.
     await h.http().get(`/api/orders/${created.order.id}`).set('Cookie', session).expect(200);

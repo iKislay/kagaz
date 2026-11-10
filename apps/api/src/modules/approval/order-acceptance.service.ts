@@ -7,7 +7,6 @@ import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type Prisma } from '../../generated/prisma/client.js';
 import { OrderStateMachine } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
-import { PickupCrypto } from '../pickup/pickup-crypto.js';
 import { PrintPreparationService } from '../printing/print-preparation.service.js';
 
 export interface AcceptOrderParams {
@@ -22,8 +21,9 @@ export interface AcceptOrderParams {
 
 /**
  * The ONE accept path (FR-SHOP-07, P2.6): used by the operator's Accept and by guarded
- * auto-accept with actor SYSTEM. Builds the packet, then atomically creates the packet file,
- * pickup code and print job (attempt 1) and moves PENDING_REVIEW → QUEUED.
+ * auto-accept with actor SYSTEM. Builds the packet (slip carries the pickup number taken at
+ * payment), then atomically creates the packet file and print job (attempt 1) and moves
+ * PENDING_REVIEW → QUEUED.
  */
 @Injectable()
 export class OrderAcceptanceService {
@@ -31,7 +31,6 @@ export class OrderAcceptanceService {
     private readonly prisma: PrismaService,
     private readonly stateMachine: OrderStateMachine,
     private readonly preparation: PrintPreparationService,
-    private readonly pickup: PickupCrypto,
     private readonly events: DomainEventBus,
   ) {}
 
@@ -55,7 +54,7 @@ export class OrderAcceptanceService {
     try {
       await this.prisma.$transaction(async (tx) => {
         // Transition FIRST: it locks the order row, so a concurrent duplicate accept fails
-        // cleanly with 409 here instead of colliding on the packet/pickup-code inserts.
+        // cleanly with 409 here instead of colliding on the packet/print-job inserts.
         await this.stateMachine.transition(tx, {
           orderId: order.id,
           to: OrderStatus.QUEUED,
@@ -74,13 +73,6 @@ export class OrderAcceptanceService {
             bytes: packet.bytes,
             pageCount: packet.pageCount,
             sha256: packet.sha256,
-          },
-        });
-        await tx.pickupCode.create({
-          data: {
-            orderId: order.id,
-            codeHmac: this.pickup.hmac(packet.code),
-            encryptedDisplayValue: this.pickup.encrypt(packet.code),
           },
         });
         const job = await tx.printJob.create({

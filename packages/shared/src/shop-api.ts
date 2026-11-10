@@ -151,6 +151,10 @@ export const ShopJobSchema = z.object({
   simulatedPayment: z.boolean(),
   createdAt: z.string(),
   paidAt: z.string().nullable(),
+  /** ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified. */
+  pickupNumber: z.int().nullable(),
+  /** Business date (YYYY-MM-DD, Asia/Kolkata) the pickup number belongs to. */
+  pickupDate: z.string().nullable(),
   printJob: ShopPrintJobSchema.nullable(),
   rejection: z.object({ code: z.string(), note: z.string().nullable() }).nullable(),
 });
@@ -172,10 +176,6 @@ export const RejectJobRequestSchema = z.strictObject({
   note: z.string().max(500).optional(),
 });
 export type RejectJobRequest = z.infer<typeof RejectJobRequestSchema>;
-
-/** Mark Ready requires an explicit operator confirmation (FR-SHOP-12). */
-export const MarkReadyRequestSchema = z.strictObject({ confirmed: z.literal(true) });
-export type MarkReadyRequest = z.infer<typeof MarkReadyRequestSchema>;
 
 /** POST /api/shop/print-jobs/:id/lease — everything the agent needs to print one attempt. */
 export const LeaseResponseSchema = z.object({
@@ -224,21 +224,6 @@ export const ResolveJobRequestSchema = z.strictObject({
   note: z.string().max(500).optional(),
 });
 export type ResolveJobRequest = z.infer<typeof ResolveJobRequestSchema>;
-
-// ─── Pickup ───
-
-export const VerifyPickupRequestSchema = z.strictObject({ code: z.string().min(1).max(20) });
-export type VerifyPickupRequest = z.infer<typeof VerifyPickupRequestSchema>;
-
-export const VerifyPickupResponseSchema = z.object({
-  orderId: z.uuid(),
-  publicRef: z.string(),
-  status: OrderStatusSchema,
-  options: PrintOptionsSchema,
-  pageCount: z.int().nullable(),
-  collectedAt: z.string(),
-});
-export type VerifyPickupResponse = z.infer<typeof VerifyPickupResponseSchema>;
 
 export const printDocumentName = (publicRef: string, attempt: number) =>
   `KAGAZ-${publicRef}-A${attempt}`;
