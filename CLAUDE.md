@@ -77,10 +77,10 @@ These come straight from the PRD. Breaking any of them is a bug, regardless of w
 6. **Payment status ≠ order status.** They are stored separately and never merged.
 7. **One packet, one job.** Customer pages × copies + spacers + exactly **one** pickup slip at the end, in **one PDF**, submitted as **one** spooler job with driver copies = 1. Never print the slip as a separate job.
 8. **No silent duplicate prints.** One active lease per printer. A `PrintJob` attempt is never resubmitted after reconnect/restart. Uncertain outcome → `NEEDS_OPERATOR_CHECK`. Reprint = new attempt + explicit operator confirmation + audit.
-9. **READY needs a human.** Spooler "complete" is telemetry only. `READY_FOR_PICKUP` requires the operator's Mark Ready.
+9. **Printing finished = ready** ([ADR-002](docs/decisions/ADR-002-daily-pickup-number.md)). `SPOOLER_COMPLETE` with no printer error moves `PRINTING → READY_FOR_PICKUP` (actor SYSTEM); there is no Mark Ready and no pickup verification. Failed/uncertain attempts or printer errors go to `NEEDS_OPERATOR_CHECK`, never READY; reprint still needs explicit operator confirmation.
 10. **Tenant isolation.** Every shop/device query is scoped by `shopId` derived from the authenticated device/staff identity — never from a path/body parameter. Cross-tenant access returns 404.
 11. **Files are private.** Private bucket only; short-lived signed URLs (upload ≤ 10 min, download ≤ 5 min); never log signed URLs; validate PDFs by content (magic bytes, parse, encryption, page count, size), never by filename/MIME.
-12. **Pickup codes:** CSPRNG, 8 chars from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; store HMAC (peppered) + AES-GCM display value, never plaintext; one-time consumption via conditional update; rate-limited; failures audited. Never print the customer's full phone number on the slip.
+12. **Pickup code = daily number** ([ADR-002](docs/decisions/ADR-002-daily-pickup-number.md)): per shop, #1, #2, … from midnight Asia/Kolkata, assigned atomically when payment is verified, unique per `(shop, business date)`, never reused or changed for an order (reprints keep it). Slip and customer page show it large with the date (`#7 · 7 Nov`). Call it "pickup code" everywhere. Never print the customer's full phone number on the slip.
 13. **REST for commands, WebSocket for hints.** Anything delivered by socket must also be recoverable via REST polling.
 14. **Secrets stay on the server.** No gateway secrets in `apps/web` or `apps/shop-agent`. Device token is stored with DPAPI on Windows and hashed server-side.
 
@@ -156,6 +156,7 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 
 ## Status
 
+- 2026-11-10: Phase 2–5 workstreams merged (see plan). Pickup model changed by ADR-002.
 - Current phase: **Phase 1 — vertical slice** in progress on `phase-1-vertical-slice` (draft PR #3). Done: P1.1–P1.9. P1.10 verified on a virtual printer; real-printer run (T10) and P1.11 rehearsal wait on **D1**.
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
 - Payments: **DEMO only**; live gateway gated by **D6** (merchant of record).
