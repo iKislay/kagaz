@@ -116,3 +116,22 @@ read orders:
 
 **Open high findings: H1, H2, H3.** P5.2 stays `[~]` until they are fixed and re-verified; M1–M4
 should land before any public demo.
+
+## Remediation (2026-11-10)
+
+| ID                    | Status          | Change                                                                                                                                                     |
+| --------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1                    | Fixed           | Demo compose generates the SeaweedFS identity from required `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` (no Admin action); committed local keys not mounted. |
+| H2                    | Fixed           | Placeholder check is case-insensitive and runs for every `APP_ENV` except `local`; tests for `CHANGE-me` in demo.                                          |
+| H3                    | Fixed           | `@RequireOperator()` on `POST /shop/jobs/:id/resolve` and `PATCH /shop/mode`; mode audit carries `deviceId`; e2e covers both.                              |
+| M1                    | Fixed           | Helmet on the API (HSTS outside local); web sends X-Frame-Options DENY, frame-ancestors 'none', nosniff, Referrer-Policy, HSTS in production.              |
+| M2                    | Fixed           | Log redaction adds `x-operator-token`, `x-tracking-token`, `x-demo-signature`.                                                                             |
+| M3                    | Fixed           | `TRUST_PROXY` env (hop count or CIDR list) sets Express `trust proxy`.                                                                                     |
+| M4                    | In ADR-002      | READY files deleted `RETENTION_AFTER_COLLECTED_HOURS` after `readyAt` (pickup-number workstream).                                                          |
+| L1                    | Fixed           | `/admin` socket checks `typ: 'staff'` and the current ADMIN role via `resolveStaff`.                                                                       |
+| L4                    | Fixed           | Demo OTP codes are logged only in `local`; elsewhere only "sent to …1234".                                                                                 |
+| L7                    | Fixed           | Shop app pairing refuses `http://` for non-loopback servers.                                                                                               |
+| L8                    | Fixed           | Upload/download signed-URL TTLs capped at 600 / 300 s.                                                                                                     |
+| L2, L3, L5, L6, I1–I6 | Open (low/info) | Tracked for RC2; none blocks P5.2 "Done when" (no open high/critical).                                                                                     |
+
+**Result:** no open high or critical findings.

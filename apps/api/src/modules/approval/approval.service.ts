@@ -1,6 +1,6 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { type ShopMode, QuoteSchema, type UpdateShopModeRequest } from '@kagaz/shared';
-import { type Actor, SYSTEM_ACTOR } from '../../common/actor.js';
+import { type Actor, SYSTEM_ACTOR, actorMetadata } from '../../common/actor.js';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
 import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.js';
@@ -151,7 +151,7 @@ export class ApprovalService {
           actorId: actor.id,
           shopId,
           action: 'SHOP_MODE_CHANGED',
-          metadata: { before, after },
+          metadata: { before, after, ...actorMetadata(actor) },
         },
       });
       return { before, after };

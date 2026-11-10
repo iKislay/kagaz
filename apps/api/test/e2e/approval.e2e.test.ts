@@ -162,7 +162,8 @@ describe('PATCH /api/shop/mode (contract §3)', () => {
     const audit = await h.prisma.auditLog.findFirstOrThrow({
       where: { shopId: s.shop.id, action: 'SHOP_MODE_CHANGED' },
     });
-    expect(audit).toMatchObject({ actorType: 'DEVICE', actorId: s.deviceId });
+    expect(audit).toMatchObject({ actorType: 'STAFF' });
+    expect(audit.metadata).toMatchObject({ deviceId: s.deviceId });
 
     await shopAction(h, s.auth, 'patch', '/api/shop/mode', {}).expect(400);
     await shopAction(h, s.auth, 'patch', '/api/shop/mode', { approvalMode: 'YOLO' }).expect(400);

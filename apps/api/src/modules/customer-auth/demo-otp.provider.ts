@@ -28,7 +28,7 @@ export class DemoOtpProvider implements OtpProvider {
   private readonly logger = new Logger('DemoOtpProvider');
   private readonly inbox: DemoOtpMessage[] = [];
 
-  constructor(appEnv: AppEnv) {
+  constructor(private readonly appEnv: AppEnv) {
     if (appEnv === AppEnv.PRODUCTION) {
       throw new Error('DemoOtpProvider must never be loaded with APP_ENV=production');
     }
@@ -37,8 +37,12 @@ export class DemoOtpProvider implements OtpProvider {
   async send(input: { phone: string; code: string; expiresAt: Date }): Promise<void> {
     this.inbox.unshift({ ...input, sentAt: new Date() });
     this.inbox.length = Math.min(this.inbox.length, INBOX_SIZE);
-    // Demo channel only: the code is visible in local/demo logs by design (plan P2.2).
-    this.logger.log(`[DEMO OTP] ${maskPhoneLast4(input.phone)} code ${input.code}`);
+    // Codes go to the admin demo inbox. Only a developer's local log shows them (security review L4).
+    if (this.appEnv === AppEnv.LOCAL) {
+      this.logger.log(`[DEMO OTP] ${maskPhoneLast4(input.phone)} code ${input.code}`);
+    } else {
+      this.logger.log(`[DEMO OTP] sent to ${maskPhoneLast4(input.phone)} (see admin demo inbox)`);
+    }
   }
 
   /** Newest first. */

@@ -6,6 +6,7 @@ import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
 import { sha256Hex } from '../../common/crypto/tokens.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { resolveStaff } from '../identity/staff-session.js';
 import { OrdersService } from '../orders/orders.service.js';
 import { readCookie } from '../orders/tracking.guard.js';
 
@@ -82,8 +83,11 @@ export class RealtimeAuthService {
         new TextEncoder().encode(this.config.SESSION_JWT_SECRET),
         { algorithms: ['HS256'] },
       );
-      if (payload.kind !== 'ADMIN' || typeof payload.sub !== 'string') throw new Error('kind');
-      return payload.sub;
+      if (payload.typ !== 'staff' || typeof payload.sub !== 'string') throw new Error('typ');
+      // Same rule as AdminAuthGuard: the user must currently hold the ADMIN role.
+      const staff = await resolveStaff(this.prisma, payload.sub);
+      if (staff?.role !== 'ADMIN') throw new Error('role');
+      return staff.userId;
     } catch {
       throw new HandshakeError('ADMIN_UNAUTHENTICATED');
     }

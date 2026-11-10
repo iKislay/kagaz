@@ -96,6 +96,31 @@ describe('loadConfig', () => {
     ).toThrow(/placeholder/);
   });
 
+  it('refuses placeholder secrets in demo too, whatever their case (security review H2)', () => {
+    const secret = { DEMO_WEBHOOK_SECRET: 'w'.repeat(32) };
+    expect(() =>
+      loadConfig({
+        ...base,
+        ...secret,
+        APP_ENV: 'demo',
+        SESSION_JWT_SECRET: 'CHANGE-me-session-secret-at-least-32-chars',
+      }),
+    ).toThrow(/placeholder/);
+    expect(() =>
+      loadConfig({
+        ...base,
+        ...secret,
+        APP_ENV: 'demo',
+        DEMO_WEBHOOK_SECRET: 'CHANGE-me-'.repeat(4),
+      }),
+    ).toThrow(/placeholder/);
+  });
+
+  it('caps signed-URL lifetimes (invariant 11)', () => {
+    expect(() => loadConfig({ ...base, UPLOAD_URL_TTL_SECONDS: '601' })).toThrow();
+    expect(() => loadConfig({ ...base, DOWNLOAD_URL_TTL_SECONDS: '301' })).toThrow();
+  });
+
   it('requires a 32-byte pickup encryption key and refuses the dev key in staging', () => {
     expect(() => loadConfig({ ...base, PICKUP_CODE_ENC_KEY: 'c2hvcnQ=' })).toThrow(
       /32 random bytes/,

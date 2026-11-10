@@ -25,8 +25,9 @@ export const EnvSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
   S3_FORCE_PATH_STYLE: bool.default(false),
-  UPLOAD_URL_TTL_SECONDS: int(600),
-  DOWNLOAD_URL_TTL_SECONDS: int(300),
+  // Invariant 11: upload ≤ 10 min, download ≤ 5 min.
+  UPLOAD_URL_TTL_SECONDS: int(600).pipe(z.number().max(600)),
+  DOWNLOAD_URL_TTL_SECONDS: int(300).pipe(z.number().max(300)),
 
   MAX_UPLOAD_BYTES: int(26_214_400),
   MAX_PAGES: int(300),
@@ -49,6 +50,14 @@ export const EnvSchema = z.object({
 
   PRINTER_LEASE_TTL_SECONDS: int(60),
   DEVICE_ONLINE_THRESHOLD_SECONDS: int(45),
+  /**
+   * Express `trust proxy` (hop count like "1", or a CIDR/IP list). Unset = trust nothing (direct
+   * exposure). Set it behind a reverse proxy so per-IP rate limits see real client IPs.
+   */
+  TRUST_PROXY: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? undefined : /^\d+$/.test(v) ? Number(v) : v)),
   RETENTION_AFTER_COLLECTED_HOURS: int(24),
   /** PRD §14.3 dispute window: files of REJECTED/REFUNDED orders are kept 7 days. */
   RETENTION_AFTER_REJECTED_HOURS: int(168),
@@ -70,7 +79,7 @@ export class ConfigError extends Error {
 }
 
 /** Placeholder secrets shipped in .env.example; never acceptable outside local/demo. */
-const PLACEHOLDER = /^change-me/;
+const PLACEHOLDER = /^change-me/i;
 
 /**
  * Parse and validate the environment, then apply the safety guards from CLAUDE.md:
@@ -99,7 +108,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     }
   }
 
-  if (config.APP_ENV === AppEnv.PRODUCTION || config.APP_ENV === AppEnv.STAGING) {
+  // Every shared environment (demo, staging, production) must use its own secrets (SEC H2).
+  if (config.APP_ENV !== AppEnv.LOCAL) {
     for (const key of [
       'SESSION_JWT_SECRET',
       'PICKUP_CODE_PEPPER',

@@ -1,5 +1,6 @@
 import { type AddressInfo } from 'node:net';
 import { SignJWT } from 'jose';
+import { signStaffToken } from '../../src/modules/identity/staff-session.js';
 import { type Socket, io } from 'socket.io-client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -184,10 +185,15 @@ describe('realtime gateway (P2.9)', () => {
     const user = await h.prisma.user.create({
       data: { email: `rt-${randomCode(6).toLowerCase()}@kagaz.local`, kind: 'ADMIN' },
     });
-    const jwt = await new SignJWT({ sub: user.id, kind: 'ADMIN', email: user.email })
+    // An old-style token (no staff typ) is refused; the real staff session is accepted.
+    const legacy = await new SignJWT({ sub: user.id, kind: 'ADMIN', email: user.email })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('5m')
       .sign(new TextEncoder().encode(process.env.SESSION_JWT_SECRET));
+    await expect(
+      connected(connect('/admin', { extraHeaders: { cookie: `kgz_admin=${legacy}` } })),
+    ).rejects.toThrow('ADMIN_UNAUTHENTICATED');
+    const jwt = await signStaffToken(process.env.SESSION_JWT_SECRET!, user.id);
     const admin = connect('/admin', { extraHeaders: { cookie: `kgz_admin=${jwt}` } });
     await connected(admin);
 

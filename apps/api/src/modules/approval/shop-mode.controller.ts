@@ -11,6 +11,7 @@ import {
   deviceActor,
 } from '../../common/auth/device-auth.guard.js';
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
+import { RequireOperator } from '../identity/operator-auth.guard.js';
 import { ApprovalService } from './approval.service.js';
 
 /**
@@ -28,6 +29,7 @@ export class ShopModeController {
   }
 
   @Patch()
+  @RequireOperator()
   set(
     @CurrentDevice() device: DeviceContext,
     @Body(new ZodValidationPipe(UpdateShopModeRequestSchema)) body: UpdateShopModeRequest,

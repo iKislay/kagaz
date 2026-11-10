@@ -124,6 +124,7 @@ export class ShopController {
 
   /** Needs-check resolution (contract §2): CONFIRM_PRINTED | REPRINT | MARK_FAILED. */
   @Post('jobs/:orderId/resolve')
+  @RequireOperator()
   @HttpCode(200)
   resolve(
     @CurrentDevice() device: DeviceContext,

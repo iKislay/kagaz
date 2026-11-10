@@ -85,10 +85,19 @@ describe('operator sessions (P2.3, contract §4)', () => {
       [`/api/shop/jobs/${order.order.id}/reject`, { reasonCode: 'OTHER' }],
       [`/api/shop/jobs/${order.order.id}/ready`, { confirmed: true }],
       ['/api/shop/pickups/verify', { code: 'ABCD-EFGH' }],
+      // Security review H3: reprint / mark-failed resolution is a human action too.
+      [`/api/shop/jobs/${order.order.id}/resolve`, { action: 'REPRINT', confirm: true }],
     ] as const) {
       const res = await h.http().post(path).set(paired.auth).send(body).expect(401);
       expect(res.body.error.code).toBe('OPERATOR_LOGIN_REQUIRED');
     }
+    const mode = await h
+      .http()
+      .patch('/api/shop/mode')
+      .set(paired.auth)
+      .send({ approvalMode: 'AUTO' })
+      .expect(401);
+    expect(mode.body.error.code).toBe('OPERATOR_LOGIN_REQUIRED');
     const put = await h
       .http()
       .put('/api/shop/printers')
