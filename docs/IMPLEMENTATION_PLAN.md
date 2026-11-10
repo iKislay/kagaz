@@ -491,7 +491,7 @@ kagaz/
 - Code signing when a certificate is available (document unsigned SmartScreen behaviour otherwise).
 - **Done when:** fresh Windows machine → install → pair → print works; update from vN to vN+1 works.
 
-### P5.5 — Documentation `[ ]`
+### P5.5 — Documentation `[~]`
 
 - `docs/guides/CUSTOMER_GUIDE.md`, `OPERATOR_GUIDE.md` (with screenshots), `ADMIN_GUIDE.md`.
 - `docs/runbooks/SUPPORT_RUNBOOK.md` (stuck jobs, needs-check, refunds, device re-pair, printer issues), `BACKUP_RESTORE.md`, `INCIDENT_CHECKLIST.md`.
