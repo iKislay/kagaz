@@ -101,6 +101,14 @@ enum PaymentStatus {
   REFUNDED
 }
 
+/// ADR-003: customer "I paid" report, decided by the shop.
+enum PaymentReportStatus {
+  OPEN
+  APPROVED
+  DECLINED
+  SUPERSEDED
+}
+
 enum RefundStatus {
   PENDING
   SUCCEEDED
@@ -164,6 +172,8 @@ model Shop {
   pricing         ShopPricing[]
   orders          Order[]
   pickupCounters  PickupCounter[]
+  paymentAccount  ShopPaymentAccount?
+  paymentReports  PaymentReport[]
 
   @@map("shops")
 }
@@ -317,14 +327,15 @@ model Order {
   /// Business date (Asia/Kolkata) the pickup number belongs to.
   pickupDate        DateTime?   @map("pickup_date") @db.Date
 
-  customer   User?        @relation(fields: [customerId], references: [id])
-  shop       Shop         @relation(fields: [shopId], references: [id])
-  printer    Printer?     @relation(fields: [printerId], references: [id])
-  events     OrderEvent[]
-  files      FileAsset[]
-  payments   Payment[]
-  printJobs  PrintJob[]
-  pickupCode PickupCode?
+  customer       User?           @relation(fields: [customerId], references: [id])
+  shop           Shop            @relation(fields: [shopId], references: [id])
+  printer        Printer?        @relation(fields: [printerId], references: [id])
+  events         OrderEvent[]
+  files          FileAsset[]
+  payments       Payment[]
+  paymentReports PaymentReport[]
+  printJobs      PrintJob[]
+  pickupCode     PickupCode?
 
   @@unique([shopId, pickupDate, pickupNumber])
   @@index([shopId, status])
@@ -388,11 +399,14 @@ model Payment {
   verifiedAt        DateTime?     @map("verified_at")
   /// Settlement / transfer reference from the provider — present, not active (PRD §8.8, D6).
   settlementRef     String?       @map("settlement_ref")
+  /// ADR-003: hosted UPI checkout for this attempt (not a secret: holds no credentials).
+  checkoutUrl       String?       @map("checkout_url")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  order   Order    @relation(fields: [orderId], references: [id])
+  order   Order           @relation(fields: [orderId], references: [id])
   refunds Refund[]
+  reports PaymentReport[]
 
   @@unique([provider, providerOrderId])
   @@unique([provider, providerPaymentId])
@@ -409,6 +423,8 @@ model Refund {
   idempotencyKey   String       @unique @map("idempotency_key")
   reason           String?
   isSimulated      Boolean      @default(false) @map("is_simulated")
+  /// ADR-003: the shop sends the money back itself and confirms it (provider cannot refund).
+  isManual         Boolean      @default(false) @map("is_manual")
   createdAt        DateTime     @default(now()) @map("created_at")
   completedAt      DateTime?    @map("completed_at")
 
@@ -416,6 +432,52 @@ model Refund {
 
   @@index([paymentId])
   @@map("refunds")
+}
+
+/// ADR-003: the shop's own payment-provider account (YouPI merchant + UPI ID). One per shop.
+model ShopPaymentAccount {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  shopId             String   @unique @map("shop_id") @db.Uuid
+  provider           String
+  upiId              String   @map("upi_id")
+  payeeName          String   @map("payee_name")
+  /// Provider-side merchant id (YouPI merchants.id).
+  externalMerchantId String?  @map("external_merchant_id")
+  /// AES-256-GCM sealed JSON {apiKey, webhookSecret} (PAYMENT_SECRETS_KEY). Never returned by any API.
+  credentialsSealed  String?  @map("credentials_sealed")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  shop Shop @relation(fields: [shopId], references: [id])
+
+  @@index([provider, externalMerchantId])
+  @@map("shop_payment_accounts")
+}
+
+/// ADR-003 fallback: customer reports a UPI payment the automatic check did not confirm.
+/// Hand-written partial unique indexes (migration): one OPEN report per order; a UTR is used by
+/// at most one non-declined report per shop.
+model PaymentReport {
+  id              String              @id @default(uuid(7)) @db.Uuid
+  shopId          String              @map("shop_id") @db.Uuid
+  orderId         String              @map("order_id") @db.Uuid
+  paymentId       String              @map("payment_id") @db.Uuid
+  utr             String
+  amountPaise     Int                 @map("amount_paise")
+  status          PaymentReportStatus @default(OPEN)
+  declineReason   String?             @map("decline_reason")
+  declineNote     String?             @map("decline_note")
+  decidedByUserId String?             @map("decided_by_user_id") @db.Uuid
+  decidedAt       DateTime?           @map("decided_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  shop    Shop    @relation(fields: [shopId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([shopId, status, createdAt])
+  @@index([orderId, createdAt])
+  @@map("payment_reports")
 }
 
 model WebhookEvent {

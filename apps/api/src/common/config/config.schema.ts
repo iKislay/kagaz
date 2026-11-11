@@ -34,13 +34,33 @@ export const EnvSchema = z.object({
   MAX_COPIES: int(20),
   MAX_SIDES: int(1000),
 
-  PAYMENT_PROVIDER: z.enum(['demo', 'razorpay', 'cashfree']),
+  /** ADR-003: `youpi` (direct-to-shop UPI) is the default; `demo` for local/tests/investor demo. */
+  PAYMENT_PROVIDER: z.enum(['youpi', 'demo', 'razorpay', 'cashfree']).default('youpi'),
   OTP_PROVIDER: z.enum(['demo']),
   DEMO_WEBHOOK_SECRET: z.string().optional(),
   /** Demo gateway only: delay before simulated webhooks are delivered (P3.5). */
   DEMO_WEBHOOK_DELAY_MS: z.coerce.number().int().nonnegative().default(300),
   /** Demo gateway only: PENDING outcome resolves to PAID after this many seconds. */
   DEMO_PENDING_RESOLVE_SECONDS: int(10),
+
+  /** Public base URL of THIS API including `/api` (YouPI posts webhooks to `<url>/webhooks/youpi`). */
+  PUBLIC_API_URL: z.url().optional(),
+  /** YouPI payment-api base URL as seen from the Kagaz API (server-to-server). */
+  YOUPI_API_URL: z.url().optional(),
+  /** YouPI base URL as seen from the shopkeeper's phone (APK download + pairing). Defaults to YOUPI_API_URL. */
+  YOUPI_PUBLIC_URL: z.url().optional(),
+  /** YouPI `ADMIN_API_TOKEN`: provisions shop merchants. Server-side only. */
+  YOUPI_ADMIN_TOKEN: z.string().optional(),
+  YOUPI_HTTP_TIMEOUT_MS: int(8000),
+  /** AES-256-GCM key (32 bytes, base64) for per-shop provider credentials at rest. */
+  PAYMENT_SECRETS_KEY: z
+    .string()
+    .refine((v) => Buffer.from(v, 'base64').length === 32, {
+      message: 'PAYMENT_SECRETS_KEY must be 32 random bytes, base64-encoded',
+    })
+    .optional(),
+  /** ADR-003 fallback: a customer may report a payment this long after checkout started. */
+  PAYMENT_CLAIM_AFTER_SECONDS: z.coerce.number().int().nonnegative().default(90),
 
   SESSION_JWT_SECRET: secret('SESSION_JWT_SECRET'),
   PICKUP_CODE_PEPPER: secret('PICKUP_CODE_PEPPER'),
@@ -114,6 +134,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       'SESSION_JWT_SECRET',
       'PICKUP_CODE_PEPPER',
       'DEMO_WEBHOOK_SECRET',
+      'YOUPI_ADMIN_TOKEN',
     ] as const) {
       const value = config[key];
       if (value && PLACEHOLDER.test(value)) {
@@ -122,6 +143,29 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     }
     if (PLACEHOLDER.test(Buffer.from(config.PICKUP_CODE_ENC_KEY, 'base64').toString('latin1'))) {
       throw new ConfigError('Refusing to start: PICKUP_CODE_ENC_KEY is the local development key.');
+    }
+  }
+
+  if (config.PAYMENT_PROVIDER === 'youpi') {
+    const missing = (
+      ['YOUPI_API_URL', 'YOUPI_ADMIN_TOKEN', 'PUBLIC_API_URL', 'PAYMENT_SECRETS_KEY'] as const
+    ).filter((key) => !config[key]);
+    if (missing.length > 0) {
+      throw new ConfigError(
+        `Refusing to start: PAYMENT_PROVIDER=youpi needs ${missing.join(', ')} (see .env.example).`,
+      );
+    }
+    if (config.APP_ENV !== AppEnv.LOCAL) {
+      if (config.YOUPI_ADMIN_TOKEN!.length < 32) {
+        throw new ConfigError(
+          'Refusing to start: YOUPI_ADMIN_TOKEN must be at least 32 characters.',
+        );
+      }
+      if (PLACEHOLDER.test(Buffer.from(config.PAYMENT_SECRETS_KEY!, 'base64').toString('latin1'))) {
+        throw new ConfigError(
+          'Refusing to start: PAYMENT_SECRETS_KEY is the local development key.',
+        );
+      }
     }
   }
 

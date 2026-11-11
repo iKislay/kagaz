@@ -509,6 +509,55 @@ kagaz/
 
 ---
 
+## Phase 6 — Direct-to-shop UPI with YouPI ([ADR-003](decisions/ADR-003-youpi-direct-upi.md))
+
+**Goal:** real payments without a gateway: customers pay the shop's own UPI ID, YouPI detects the
+credit, the job prints. Highest priority: the shopkeeper's setup is two steps. Contract:
+[docs/contracts/UPI_PAYMENTS_CONTRACT.md](contracts/UPI_PAYMENTS_CONTRACT.md).
+
+### P6.1 — Decision, contract, configuration `[x]`
+
+- ADR-003; `PAYMENT_PROVIDER=youpi` default with `YOUPI_API_URL`, `YOUPI_PUBLIC_URL`, `YOUPI_ADMIN_TOKEN`, `PUBLIC_API_URL`, `PAYMENT_SECRETS_KEY`, `PAYMENT_CLAIM_AFTER_SECONDS`; boot refuses youpi with anything missing, placeholders outside local.
+- Shared contract `packages/shared/src/upi-payments.ts`.
+- **Done when:** config unit tests cover the guards (`config.schema.test.ts`).
+
+### P6.2 — Data model `[x]`
+
+- `shop_payment_accounts` (per-shop provider merchant, credentials sealed AES-256-GCM bound to the shop), `payment_reports` (partial unique: one OPEN per order, a UTR once per shop), `payments.checkout_url`, `refunds.is_manual`. Both new tables in the tenant guard.
+- **Done when:** migration applies on a fresh DB (e2e global setup) and `sealed-box.test.ts` passes.
+
+### P6.3 — `YoupiProvider` `[x]`
+
+- `PaymentProvider` gains `shopId`/`returnUrl` and `refundMode`; YouPI adapter: per-shop merchant key, V2 timestamped HMAC over the raw body with the shop's secret, freshness ≤ 2 h, delivery-id dedupe, conservative status mapping (only UPI `OBSERVED_SUCCESS`/`RECONCILED` → PAID), manual refunds.
+- **Done when:** the shared contract suite and YouPI-specific tests pass against `FakeYoupi`.
+
+### P6.4 — Shop payment setup `[x]`
+
+- `GET/PUT /api/shop/payments/setup`, `POST /api/shop/payments/pairing`: first save provisions the YouPI merchant (Kagaz-generated keys, webhook URL, active VPA); later saves switch the VPA; readiness from the paired phone's heartbeat.
+- **Done when:** e2e `youpi-payments.e2e.test.ts` (setup block) passes.
+
+### P6.5 — "I paid" fallback + manual refunds `[x]`
+
+- Customer `POST /api/orders/:id/payment-report` (after `PAYMENT_CLAIM_AFTER_SECONDS` or a failed checkout); shop approve/decline (operator, audited); approve uses the same exactly-once paid transition; automatic confirmation supersedes open reports; pay/cancel/expiry blocked while a report is open. Manual refunds listed and confirmed by the shop.
+- **Done when:** e2e fallback, isolation and refund blocks pass.
+
+### P6.6 — Website `[x]`
+
+- Pay → hosted UPI checkout; waiting state with "Open payment page"/"Check again"; report form with countdown; report states; manual refund wording; no DEMO wording in LIVE mode.
+- **Done when:** web typecheck, lint and build pass.
+
+### P6.7 — Windows app `[x]`
+
+- Payments page: readiness line, step 1 (UPI ID), step 2 (install QR + pairing QR, phone list), "Customers who say they paid" with approve/decline, "Refunds to send"; badge + notice bar; realtime `payment_report.changed` + 30 s poll.
+- **Done when:** `dotnet build` and the shop-agent test project pass.
+
+### P6.8 — Run YouPI next to Kagaz `[~]`
+
+- `infra/docker-compose.youpi.yml` + `pnpm youpi:up`; smoke test of provisioning, checkout and a signed webhook against a real YouPI container.
+- **Remaining (hardware/real money):** pair a real Android phone, take a ₹1 UPI payment end to end, record evidence in `docs/testing/`. Written licence from the YouPI authors before real customers.
+
+---
+
 ## Traceability matrix (acceptance tests → stages)
 
 | Test | Scenario                               | Built in         | Verified in |

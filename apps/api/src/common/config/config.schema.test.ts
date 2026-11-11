@@ -149,3 +149,53 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...base, MIN_AGENT_VERSION: 'latest' })).toThrow(ConfigError);
   });
 });
+
+describe('ADR-003 youpi provider config', () => {
+  const youpi = {
+    ...base,
+    PAYMENT_PROVIDER: 'youpi',
+    YOUPI_API_URL: 'http://localhost:6100',
+    YOUPI_ADMIN_TOKEN: 'a'.repeat(40),
+    PUBLIC_API_URL: 'http://localhost:4000/api',
+    PAYMENT_SECRETS_KEY: Buffer.alloc(32, 7).toString('base64'),
+  };
+
+  it('is the default provider and runs in LIVE mode (no DEMO banner)', () => {
+    const { PAYMENT_PROVIDER: _omit, ...rest } = youpi;
+    const config = loadConfig(rest);
+    expect(config.PAYMENT_PROVIDER).toBe('youpi');
+    expect(toPublicConfig(config).paymentMode).toBe('LIVE');
+  });
+
+  it('refuses to start without the YouPI settings, naming each missing one', () => {
+    expect(() => loadConfig({ ...base, PAYMENT_PROVIDER: 'youpi' })).toThrow(
+      /YOUPI_API_URL, YOUPI_ADMIN_TOKEN, PUBLIC_API_URL, PAYMENT_SECRETS_KEY/,
+    );
+  });
+
+  it('rejects a PAYMENT_SECRETS_KEY that is not 32 bytes', () => {
+    expect(() => loadConfig({ ...youpi, PAYMENT_SECRETS_KEY: 'c2hvcnQ=' })).toThrow(
+      /PAYMENT_SECRETS_KEY/,
+    );
+  });
+
+  it('outside local: refuses placeholder/short admin tokens and the local secrets key', () => {
+    const staging = { ...youpi, APP_ENV: 'staging', DEMO_WEBHOOK_SECRET: 'z'.repeat(32) };
+    expect(loadConfig(staging).PAYMENT_PROVIDER).toBe('youpi');
+    expect(() =>
+      loadConfig({
+        ...staging,
+        YOUPI_ADMIN_TOKEN: 'change-me-youpi-admin-token-at-least-32-chars',
+      }),
+    ).toThrow(/YOUPI_ADMIN_TOKEN/);
+    expect(() => loadConfig({ ...staging, YOUPI_ADMIN_TOKEN: 'short' })).toThrow(
+      /YOUPI_ADMIN_TOKEN/,
+    );
+    expect(() =>
+      loadConfig({
+        ...staging,
+        PAYMENT_SECRETS_KEY: Buffer.from('change-me-local-payments-key-32b').toString('base64'),
+      }),
+    ).toThrow(/PAYMENT_SECRETS_KEY/);
+  });
+});

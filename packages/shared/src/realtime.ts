@@ -22,6 +22,8 @@ export const RealtimeEvent = {
   ORDER_UPDATED: 'order.updated',
   DEVICE_STATUS: 'device.status',
   PRINTER_STATUS: 'printer.status',
+  /** ADR-003: a customer payment report was opened/decided (room `shop:{shopId}`). */
+  PAYMENT_REPORT: 'payment_report.changed',
 } as const;
 export type RealtimeEvent = (typeof RealtimeEvent)[keyof typeof RealtimeEvent];
 
@@ -58,6 +60,12 @@ export interface PrinterStatusHint {
   printerId: string;
   shopId: string;
   status: string;
+}
+
+export interface PaymentReportHint {
+  reportId: string;
+  orderId: string;
+  status: 'OPEN' | 'APPROVED' | 'DECLINED' | 'SUPERSEDED';
 }
 
 /** `connect_error` messages for refused handshakes (the error also carries `data.code`). */
