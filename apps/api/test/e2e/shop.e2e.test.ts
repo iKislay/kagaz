@@ -358,3 +358,61 @@ describe('tenant isolation (T09)', () => {
     expect((await customerView(created)).status).toBe('PRINTING');
   });
 });
+
+describe('printer registration ("Use for Kagaz" set)', () => {
+  it('enables listed printers and disables the ones this device no longer lists', async () => {
+    const { shop, auth } = await pairedShop();
+    const printer = (printerName: string, isDefault = false) => ({
+      printerName,
+      colourCapable: false,
+      duplexCapable: false,
+      capabilitiesConfirmed: true,
+      isDefault,
+    });
+    const names = async () =>
+      (
+        await h.prisma.printer.findMany({
+          where: { shopId: shop.id },
+          orderBy: { printerName: 'asc' },
+        })
+      )
+        .filter((p) => ['Old USB', 'New USB'].includes(p.printerName))
+        .map((p) => `${p.printerName}:${p.enabled}:${p.isDefault}`);
+
+    await h
+      .http()
+      .put('/api/shop/printers')
+      .set(auth)
+      .send({ printers: [printer('Old USB', true)] })
+      .expect(200);
+    expect(await names()).toEqual(['Old USB:true:true']);
+
+    // Operator unplugs the old printer and picks the new one.
+    await h
+      .http()
+      .put('/api/shop/printers')
+      .set(auth)
+      .send({ printers: [printer('New USB', true)] })
+      .expect(200);
+    expect(await names()).toEqual(['New USB:true:true', 'Old USB:false:false']);
+
+    // Ticking the old one again re-enables it (even after an earlier disable).
+    await h
+      .http()
+      .put('/api/shop/printers')
+      .set(auth)
+      .send({ printers: [printer('New USB', true), printer('Old USB')] })
+      .expect(200);
+    expect(await names()).toEqual(['New USB:true:true', 'Old USB:true:false']);
+
+    // Another device's printers in the same shop are left alone.
+    const other = await pairDevice(h, shop.id, { deviceName: 'Second PC' });
+    await h
+      .http()
+      .put('/api/shop/printers')
+      .set(other.opAuth)
+      .send({ printers: [printer('Second PC printer')] })
+      .expect(200);
+    expect(await names()).toEqual(['New USB:true:true', 'Old USB:true:false']);
+  });
+});
