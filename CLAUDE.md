@@ -168,6 +168,7 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 ## Status
 
 - 2026-11-10: Phase 2–5 workstreams merged (see plan). Pickup model changed by ADR-002.
-- Current phase: **Phase 1 — vertical slice** in progress on `phase-1-vertical-slice` (draft PR #3). Done: P1.1–P1.9. P1.10 verified on a virtual printer; real-printer run (T10) and P1.11 rehearsal wait on **D1**.
+- 2026-11-11: `phase-1-vertical-slice` merged to `main` (PR #3); CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit, API e2e and shop-agent tests. P4.1, P4.8, P5.2 done.
+- Remaining: hardware drills and rehearsal (P1.11, P2.8–P2.10, P4.6, P5.1), P4.2 three devices, deployment (P5.3), installer test (P5.4), docs (P5.5), investor assets (P5.7).
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
 - Payments: **DEMO only**; live gateway gated by **D6** (merchant of record).

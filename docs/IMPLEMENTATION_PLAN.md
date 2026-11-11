@@ -409,12 +409,12 @@ kagaz/
 
 **Goal:** three independent shops running concurrently with proven isolation, complete admin, health visibility and 100–200 orders without loss or duplication.
 
-### P4.1 — Tenant isolation enforcement + tests `[~]`
+### P4.1 — Tenant isolation enforcement + tests `[x]`
 
 - Central repository helpers require `shopId` for every shop-owned query (no unscoped `findUnique` by id in shop paths); Prisma query extension that asserts `shopId` presence for shop-owned models in shop/device contexts.
 - Cross-tenant e2e suite: Shop A device/operator tries to list, read, accept, reject, lease, ready, verify pickup, read preview/packet URLs of Shop B orders → all 404 (not 403, to avoid enumeration).
 - **Done when:** T09 suite passes and runs in CI.
-- _Status 2026-11-11:_ Prisma query extension in `apps/api/src/common/prisma/tenant-scope.ts` — every HTTP request gets a tenant scope, `DeviceAuthGuard` binds it to the device's shop, and any query on a shop-owned model (Order, Printer, PrintJob via order/printer, ShopDevice, ShopUser, ShopPricing, EnrollmentCode, PickupCounter, PrinterUptimeDaily, OperatorSession) that isn't pinned to that shop throws `TenantScopeViolation` instead of running. Shared code (state machine, refunds, packet prep, leases) adds `tenantWhere()`. Full e2e suite (147) passes with the guard on; unit tests cover the checker; e2e proves it bites inside transactions. Not covered: raw SQL and socket handlers (no request scope). CI workflow `.github/workflows/ci.yml` added — mark `[x]` after its first green run on GitHub.
+- _Status 2026-11-11:_ Prisma query extension in `apps/api/src/common/prisma/tenant-scope.ts` — every HTTP request gets a tenant scope, `DeviceAuthGuard` binds it to the device's shop, and any query on a shop-owned model (Order, Printer, PrintJob via order/printer, ShopDevice, ShopUser, ShopPricing, EnrollmentCode, PickupCounter, PrinterUptimeDaily, OperatorSession) that isn't pinned to that shop throws `TenantScopeViolation` instead of running. Shared code (state machine, refunds, packet prep, leases) adds `tenantWhere()`. Full e2e suite (147) passes with the guard on; unit tests cover the checker; e2e proves it bites inside transactions. Not covered: raw SQL and socket handlers (no request scope). CI workflow `.github/workflows/ci.yml` — first run green on GitHub 2026-11-11 (run 42979014524).
 
 ### P4.2 — Enroll three devices + printer mapping `[ ]`
 
