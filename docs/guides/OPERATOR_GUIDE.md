@@ -53,7 +53,7 @@ Open **Payments** in the sidebar (signed in as operator):
    customers should see, then **Save**.
 2. **Connect your phone** — use the phone that gets your UPI payment messages (the one your
    payment soundbox / PhonePe / GPay for Business app is on):
-   - scan **"1. Install the app"** with the phone camera and install the Kagaz payments helper;
+   - scan **"1. Install the app"** with the phone camera and install the phone app (**YouPI SMS Gateway**);
    - click **Show pairing code** and scan **"2. Scan in the app"** from inside that app;
    - allow it to read notifications and SMS, and turn **off battery saver** for it.
 

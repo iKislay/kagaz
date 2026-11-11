@@ -67,6 +67,17 @@ Highest priority from the product owner: **shopkeeper setup must be as simple as
   battery optimisation. The shop app and admin show its last heartbeat.
 - YouPI's own guidance is "experimental, ≤ 20 payments/day/VPA for experiments". Fine for the
   pilot (3 shops, 100–200 orders); re-assess with the bank before scaling.
+- **Rehearsal against a real YouPI container (2026-11-11)** confirmed: provisioning, phone pairing
+  (YouPI's Android protocol, emulated), checkout, SMS attribution, signed webhook → order PAID with
+  the UTR and a pickup code. Found and fixed: YouPI refuses new UPI sessions while no phone has
+  reported for 5 min (`OBSERVERS_UNHEALTHY`) → Kagaz now answers `503 SHOP_PAYMENTS_OFFLINE`;
+  YouPI device times are UTC SQLite strings → parsed as UTC. YouPI's anonymous
+  `simulate-observation` endpoint is refused in production (`DEV_TOOLS_DISABLED`).
+- **Customer friction:** YouPI's checkout only activates a UPI session after the customer signs
+  up/in on the YouPI page (name, email, mobile, password; no OTP; remembered per device). Accepted
+  for the pilot. Better: ask the YouPI authors for merchant-activated guest sessions, then Kagaz can
+  bind the session server-side and show its own one-screen checkout.
 - Follow-ups in YouPI (reported upstream, not patched here): the Android pairing QR embeds a
   gateway-wide enrollment secret, and the device list for a merchant also includes the default
-  merchant's devices.
+  merchant's devices; the Android heartbeat endpoint is unsigned (anyone with a device id can keep a
+  phone looking "online").

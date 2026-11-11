@@ -38,6 +38,11 @@ pnpm install
 cp .env.example .env                                  # PowerShell: Copy-Item .env.example .env
 pnpm infra:up                                         # Postgres :5432, SeaweedFS S3 API :9000, private bucket
 pnpm youpi:up                                         # YouPI (ADR-003) :6100 API, :7000 checkout; needs YouPI-PG checkout (YOUPI_SRC)
+node scripts/pilot-env.mjs --domain <domain> [--tunnel-token <t>]   # pilot: writes infra/pilot.env (secrets generated)
+docker compose -f infra/docker-compose.pilot.yml --env-file infra/pilot.env up -d --build      # pilot stack + Cloudflare Tunnel
+docker compose -f infra/docker-compose.pilot.yml --env-file infra/pilot.env exec api node dist/cli/pilot-bootstrap.js /config/pilot-shops.json
+pnpm --filter @kagaz/api pilot:smoke -- --api https://api.<domain>/api --shop <slug> --login <owner> --password <pw> --code <pairing code>
+powershell -ExecutionPolicy Bypass -File scripts\build-pilot-release.ps1 -Domain <domain> -Version 0.3.0   # release/pilot-<v>/: Setup.exe + phone APK
 pnpm dev                                              # builds shared, then api :4000 (watch) + web :3000
 pnpm test                                             # shared + api unit tests (vitest)
 pnpm lint && pnpm typecheck && pnpm format:check

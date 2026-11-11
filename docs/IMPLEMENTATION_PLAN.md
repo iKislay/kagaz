@@ -553,8 +553,9 @@ credit, the job prints. Highest priority: the shopkeeper's setup is two steps. C
 
 ### P6.8 — Run YouPI next to Kagaz `[~]`
 
-- `infra/docker-compose.youpi.yml` + `pnpm youpi:up`; smoke test of provisioning, checkout and a signed webhook against a real YouPI container.
-- **Remaining (hardware/real money):** pair a real Android phone, take a ₹1 UPI payment end to end, record evidence in `docs/testing/`. Written licence from the YouPI authors before real customers.
+- `infra/docker-compose.youpi.yml` (local) and `infra/docker-compose.pilot.yml` (one machine + Cloudflare Tunnel), `scripts/pilot-env.mjs` (all secrets generated), `pilot-bootstrap` CLI (admin + real shop + staff + pairing code), `scripts/build-pilot-release.ps1` (installer with server baked in + checksum-verified phone APK), `pilot:smoke`, runbook [PILOT_SHOP_TEST.md](runbooks/PILOT_SHOP_TEST.md).
+- Done: rehearsal against a real YouPI container (provisioning → phone pairing → checkout → SMS attribution → signed webhook → PAID + pickup code); two bugs fixed.
+- **Remaining (real money/hardware):** in-shop test with a real Android phone and printer (runbook §6), evidence in `docs/testing/P6.8-pilot-shop-test.md`. Written licence from the YouPI authors before real customers.
 
 ---
 

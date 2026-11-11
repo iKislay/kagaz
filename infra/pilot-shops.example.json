@@ -1,0 +1,25 @@
+{
+  "admin": { "email": "you@example.com", "name": "Kagaz Admin" },
+  "shops": [
+    {
+      "slug": "ganesh-xerox-mandya",
+      "name": "Sri Ganesh Xerox",
+      "address": "Near PES College, Mandya, Karnataka",
+      "contactPhone": "+919876543210",
+      "approvalMode": "MANUAL",
+      "open": true,
+      "hours": {
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat"],
+        "from": "09:00",
+        "to": "20:00"
+      },
+      "pricing": {
+        "monoRatePaise": 200,
+        "colourRatePaise": 1000,
+        "minimumChargePaise": 500,
+        "duplexRule": "SAME_AS_SIMPLEX"
+      },
+      "staff": [{ "name": "Ganesh", "phone": "+919876543210", "role": "OWNER" }]
+    }
+  ]
+}

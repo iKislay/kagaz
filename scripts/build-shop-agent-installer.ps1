@@ -14,7 +14,7 @@
   appsettings.json; installed apps update from there. Packing a newer -Version into the same
   releases folder produces the delta update.
 
-  Unsigned builds trigger SmartScreen ("Windows protected your PC") — see
+  Unsigned builds trigger SmartScreen ("Windows protected your PC") - see
   docs/guides/SHOP_AGENT_INSTALL.md. Pass -SignParams to sign when a certificate is available.
 
 .EXAMPLE
@@ -26,7 +26,11 @@ param(
     [string]$OutputDir = "artifacts/shop-agent",
     [string]$Channel = "win",
     # Optional signtool parameters, e.g. '/a /fd sha256 /tr http://timestamp.digicert.com /td sha256'
-    [string]$SignParams = ""
+    [string]$SignParams = "",
+    # Pilot/production server baked into appsettings.json, so pairing only asks for the code.
+    [string]$ApiBaseUrl = "",
+    # Optional Velopack update feed URL baked into appsettings.json.
+    [string]$UpdateFeedUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,6 +53,19 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
 
 foreach ($required in @($MainExe, "Kagaz.ShopAgent.PrintHost.exe", "appsettings.json")) {
     if (-not (Test-Path (Join-Path $publishDir $required))) { throw "Publish output is missing $required" }
+}
+
+if ($ApiBaseUrl -or $UpdateFeedUrl) {
+    $settingsPath = Join-Path $publishDir "appsettings.json"
+    $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+    if ($ApiBaseUrl) {
+        if ($ApiBaseUrl -notmatch '^https://') { throw "ApiBaseUrl must be https:// (got $ApiBaseUrl)" }
+        $settings.ApiBaseUrl = $ApiBaseUrl.TrimEnd('/')
+    }
+    if ($UpdateFeedUrl) { $settings.UpdateFeedUrl = $UpdateFeedUrl }
+    # UTF-8 without BOM: the app's JSON reader expects plain UTF-8.
+    [System.IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "==> appsettings.json: ApiBaseUrl=$($settings.ApiBaseUrl) UpdateFeedUrl=$($settings.UpdateFeedUrl)"
 }
 
 if (-not (Test-Path $vpk)) {

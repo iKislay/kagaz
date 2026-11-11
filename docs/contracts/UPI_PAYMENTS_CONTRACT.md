@@ -13,7 +13,11 @@ actions. Mutating shop routes accept `Idempotency-Key`.
 | `POST /api/orders/:id/payment-report` | `{ utr: "123456789012" }` | `PublicOrder` | Fallback "I paid but it isn't confirmed". Errors: `PAYMENT_REPORT_TOO_EARLY` (409, `details.after`), `PAYMENT_REPORT_OPEN` (409), `PAYMENT_REPORT_LIMIT` (409, max 3), `PAYMENT_REPORT_UTR_USED` (409), `ORDER_NOT_PAYABLE` (409). |
 | `GET /api/orders/:id`                 | —                         | `PublicOrder` | New fields: `payment.checkoutUrl`, `paymentReport`, `canReportPayment`, `reportPaymentAfter`, `refund.manual`.                                                                                                                     |
 
-`POST /api/orders/:id/pay` answers `409 PAYMENT_REPORT_OPEN` while a report is open (no second payment while the shop is checking).
+`POST /api/orders/:id/pay` answers `409 PAYMENT_REPORT_OPEN` while a report is open (no second payment while the shop is checking),
+`409 SHOP_PAYMENTS_NOT_SET_UP` before the shop saved its UPI ID, and `503 SHOP_PAYMENTS_OFFLINE`
+(`details.retryAfterSeconds`) when YouPI refuses new sessions because the shop's phone has not
+reported in 5 minutes — nobody could detect the payment, so the customer is not sent to pay.
+`503 PAYMENT_PROVIDER_UNAVAILABLE` when YouPI is unreachable. All are retryable.
 
 ## Shop app (device token; shop always from the token)
 

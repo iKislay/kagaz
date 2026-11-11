@@ -3,8 +3,9 @@
 How to print a PDF at a Kagaz shop in Mandya and collect it. You need a phone or computer with a
 browser. No app to install.
 
-> **Demo notice.** In the prototype every page shows an amber bar: **DEMO PAYMENT — NO MONEY
+> **Demo notice.** In the demo build every page shows an amber bar: **DEMO PAYMENT — NO MONEY
 > CHARGED**. Payments are simulated. No money leaves your account and no real refund is made.
+> In the **pilot** (no amber bar) you pay the shop for real with UPI — see §5a.
 
 ## 1. Choose a shop
 
@@ -58,6 +59,25 @@ Tip: to print a Word file or photo, first save it as PDF on your phone or comput
 5. Before you pay you can **Cancel order**. Unpaid orders expire after 24 hours.
 
 The shop only gets your order after Kagaz has confirmed the payment with the payment provider.
+
+## 5a. Pay with UPI (pilot shops)
+
+You pay the shop **directly** from your own UPI app (GPay, PhonePe, Paytm, BHIM, your bank app).
+Kagaz never holds your money.
+
+1. Tap **Pay ₹X with UPI**. A payment page opens with the shop's QR code and app buttons.
+2. First time only: enter your name, email, mobile and a password (remembered on this phone).
+3. Pay the exact amount in your UPI app, then tap **Payment done**.
+4. Within about 30 seconds the order page shows your **pickup code**. Don't pay twice — if it says
+   _"Waiting for your UPI payment to be confirmed"_, wait or tap **Check again**.
+5. **Paid but not confirmed?** If money left your account but the page still waits (or says the
+   payment timed out), enter the **12-digit UPI Ref No.** (in your UPI app → the payment → details)
+   under **Paid but not confirmed?**. The shop checks its account and confirms. If the shop can't
+   find it, the page tells you why.
+6. If the page says _"The shop can't confirm UPI payments right now"_, the shop's payment phone is
+   offline: you have **not** been asked to pay — try again in a minute.
+
+Refunds for UPI orders are sent back by the shop from their UPI app; the page says when it's done.
 
 ## 6. Your pickup number
 

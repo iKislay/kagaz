@@ -1,0 +1,193 @@
+# Kagaz PILOT stack — one machine, real shops, real UPI payments (ADR-003).
+# postgres + seaweedfs (files) + migrate + api + web + YouPI + Cloudflare Tunnel (HTTPS, no open ports).
+#
+#   node scripts/pilot-env.mjs --domain example.in          # writes infra/pilot.env (secrets generated)
+#   docker compose -f infra/docker-compose.pilot.yml --env-file infra/pilot.env up -d --build
+#   docker compose -f infra/docker-compose.pilot.yml --env-file infra/pilot.env \
+#     exec api node dist/cli/pilot-bootstrap.js /config/pilot-shops.json
+#
+# Public hostnames (create them in Cloudflare Zero Trust → Tunnels → your tunnel → Public Hostnames):
+#   app.<domain>     → http://web:3000         customer website + /admin
+#   api.<domain>     → http://api:4000         Kagaz API (+ WebSocket) — shop app, YouPI webhooks
+#   files.<domain>   → http://seaweedfs:8333   private PDF storage (signed URLs only)
+#   pay.<domain>     → http://youpi:7000       YouPI checkout page (QR / UPI app buttons)
+#   pay-api.<domain> → http://youpi:6100       YouPI API (phone app pairing + payment alerts)
+# Full guide: docs/runbooks/PILOT_SHOP_TEST.md
+name: ${COMPOSE_PROJECT_NAME:-kagaz-pilot}
+
+x-api-env:
+  &api-env # staging: real UPI payments are allowed; demo OTP stays allowed (customers order as guests).
+  APP_ENV: staging
+  API_PORT: '4000'
+  PUBLIC_WEB_URL: https://app.${PILOT_DOMAIN:?set PILOT_DOMAIN}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  TRUST_PROXY: '1'
+  DATABASE_URL: postgresql://kagaz:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/kagaz
+  S3_ENDPOINT: https://files.${PILOT_DOMAIN}
+  S3_REGION: auto
+  S3_BUCKET: kagaz-pilot
+  S3_FORCE_PATH_STYLE: 'true'
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+  PAYMENT_PROVIDER: youpi
+  OTP_PROVIDER: demo
+  PUBLIC_API_URL: https://api.${PILOT_DOMAIN}/api
+  YOUPI_API_URL: http://youpi:6100
+  YOUPI_PUBLIC_URL: https://pay-api.${PILOT_DOMAIN}
+  YOUPI_ADMIN_TOKEN: ${YOUPI_ADMIN_TOKEN:?set YOUPI_ADMIN_TOKEN}
+  PAYMENT_SECRETS_KEY: ${PAYMENT_SECRETS_KEY:?set PAYMENT_SECRETS_KEY}
+  PAYMENT_CLAIM_AFTER_SECONDS: ${PAYMENT_CLAIM_AFTER_SECONDS:-90}
+  SESSION_JWT_SECRET: ${SESSION_JWT_SECRET:?set SESSION_JWT_SECRET}
+  PICKUP_CODE_PEPPER: ${PICKUP_CODE_PEPPER:?set PICKUP_CODE_PEPPER}
+  PICKUP_CODE_ENC_KEY: ${PICKUP_CODE_ENC_KEY:?set PICKUP_CODE_ENC_KEY}
+  MIN_AGENT_VERSION: ${MIN_AGENT_VERSION:-}
+  SENTRY_DSN: ${SENTRY_DSN:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kagaz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: kagaz
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kagaz -d kagaz']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.51
+    restart: unless-stopped
+    environment:
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - >
+        printf '{"identities":[{"name":"kagaz","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Read","Write","List","Tagging"]}]}'
+        "$$S3_ACCESS_KEY_ID" "$$S3_SECRET_ACCESS_KEY" > /tmp/s3.json &&
+        exec weed server -dir=/data -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=128
+        -s3 -s3.port=8333 -s3.config=/tmp/s3.json
+    volumes:
+      - seaweeddata:/data
+
+  storage-init:
+    image: amazon/aws-cli:2.39.2
+    depends_on: [seaweedfs]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: us-east-1
+      BUCKET: kagaz-pilot
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        for i in $$(seq 1 60); do
+          if aws --endpoint-url http://seaweedfs:8333 s3api head-bucket --bucket "$$BUCKET" 2>/dev/null; then
+            echo "bucket $$BUCKET ready (private)"; exit 0
+          fi
+          aws --endpoint-url http://seaweedfs:8333 s3api create-bucket --bucket "$$BUCKET" >/dev/null 2>&1 || true
+          sleep 2
+        done
+        echo 'storage-init: S3 API did not become ready' >&2; exit 1
+    restart: 'no'
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    image: kagaz-api-migrate:pilot
+    environment:
+      DATABASE_URL: postgresql://kagaz:${POSTGRES_PASSWORD}@postgres:5432/kagaz
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    image: kagaz-api:pilot
+    restart: unless-stopped
+    environment: *api-env
+    volumes:
+      # pilot-shops.json for the bootstrap command (read-only).
+      - ./pilot-shops.json:/config/pilot-shops.json:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+    ports:
+      # Loopback only: for health checks from this machine. Public traffic comes via the tunnel.
+      - '127.0.0.1:4000:4000'
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://api.${PILOT_DOMAIN}/api
+    image: kagaz-web:pilot
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:3000:3000'
+
+  youpi:
+    build:
+      context: ${YOUPI_SRC:-../../YouPI-PG}
+      dockerfile: Dockerfile
+      target: runner
+    image: kagaz-youpi:pilot
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      YOUPI_MODE: production
+      YOUPI_BIND_HOST: 0.0.0.0
+      # YouPI derives https://pay.<domain> (checkout) and https://pay-api.<domain> (API).
+      CLOUDFLARE_DOMAIN: ${PILOT_DOMAIN}
+      DEPLOYMENT_PREFIX: pay
+      USE_SQLITE_FALLBACK: 'true'
+      SQLITE_DB_PATH: /app/data/youpi_pg.sqlite
+      PAYMENT_API_PORT: 6100
+      CHECKOUT_PORTAL_PORT: 7000
+      MERCHANT_ADMIN_PORT: 6001
+      ADMIN_API_TOKEN: ${YOUPI_ADMIN_TOKEN}
+      ANDROID_ENROLLMENT_SECRET: ${YOUPI_ANDROID_ENROLLMENT_SECRET:?set YOUPI_ANDROID_ENROLLMENT_SECRET}
+      YOUPI_ALLOWED_RETURN_ORIGINS: https://app.${PILOT_DOMAIN}
+      DEFAULT_APP_NAME: Kagaz
+      DEFAULT_HIDE_POWERED_BY: 'true'
+    volumes:
+      - youpidata:/app/data
+    ports:
+      # YouPI's own merchant admin, loopback only (Kagaz never needs it; for support).
+      - '127.0.0.1:6001:6001'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:6100/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  tunnel:
+    image: cloudflare/cloudflared:2025.10.1
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on: [web, api, youpi, seaweedfs]
+
+volumes:
+  pgdata:
+  seaweeddata:
+  youpidata:
