@@ -667,6 +667,8 @@ verify(shopId, input):
 | `RETENTION_AFTER_COLLECTED_HOURS`           | `24`                                            |                                                          |
 | `UNPAID_ORDER_EXPIRY_HOURS`                 | `24`                                            |                                                          |
 | `SENTRY_DSN`                                | —                                               | Optional                                                 |
+| `SUPERADMIN_EMAIL`                          | —                                               | Optional; Kagaz superadmin login, synced at API start    |
+| `SUPERADMIN_PASSWORD`                       | —                                               | Secret, 12+ chars; set with `SUPERADMIN_EMAIL`           |
 | `NEXT_PUBLIC_API_URL`                       | `http://localhost:4000/api`                     | Web                                                      |
 
 Windows agent `appsettings.json`: `ApiBaseUrl`, `PollIntervalSeconds` (10), `HeartbeatSeconds` (15), `PrintEngine` (`Pdfium` | `Sumatra`), `MaxRenderDpi` (300). Device token is **not** in this file — it's in the DPAPI store.

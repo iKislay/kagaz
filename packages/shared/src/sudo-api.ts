@@ -307,6 +307,8 @@ export const SudoAdminSchema = z.object({
   phone: z.string().nullable(),
   createdAt: z.string(),
   isSelf: z.boolean(),
+  /** The SUPERADMIN_EMAIL account: managed in the server's .env, can't be removed or reset here. */
+  managedByEnv: z.boolean(),
 });
 export type SudoAdmin = z.infer<typeof SudoAdminSchema>;
 export const SudoAdminListSchema = z.object({ admins: z.array(SudoAdminSchema) });

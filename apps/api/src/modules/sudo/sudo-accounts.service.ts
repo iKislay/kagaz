@@ -12,6 +12,7 @@ import {
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { auditStaffAction } from '../admin/admin-audit.js';
+import { SuperAdminService } from '../admin/auth/super-admin.service.js';
 import { type StaffContext } from '../identity/staff-session.js';
 import { findOrCreateStaffUser, passwordFor } from './accounts.js';
 
@@ -24,11 +25,15 @@ const TX_OPTS = { timeout: 15_000 }; // Argon2 hashing runs inside the transacti
  * working on the next request because roles are re-read from the DB).
  *
  * Error codes: SHOP_NOT_FOUND, MEMBER_NOT_FOUND, MEMBER_EXISTS, ACCOUNT_CONFLICT,
- * ACCOUNT_IS_ADMIN, EMAIL_TAKEN, ADMIN_NOT_FOUND, CANNOT_REMOVE_SELF, LAST_ADMIN.
+ * ACCOUNT_IS_ADMIN, EMAIL_TAKEN, ADMIN_NOT_FOUND, CANNOT_REMOVE_SELF, LAST_ADMIN,
+ * SUPERADMIN_MANAGED.
  */
 @Injectable()
 export class SudoAccountsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly superAdmin: SuperAdminService,
+  ) {}
 
   // ─── Shop team ───
 
@@ -165,6 +170,7 @@ export class SudoAccountsService {
       phone: a.phone,
       createdAt: a.createdAt.toISOString(),
       isSelf: a.id === staff.userId,
+      managedByEnv: this.superAdmin.isSuperAdmin(a),
     }));
   }
 
@@ -191,6 +197,7 @@ export class SudoAccountsService {
           phone: user.phone,
           createdAt: user.createdAt.toISOString(),
           isSelf: false,
+          managedByEnv: false,
         },
         temporaryPassword: pw.temporary,
       };
@@ -205,6 +212,7 @@ export class SudoAccountsService {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
       if (user?.kind !== 'ADMIN') throw adminNotFound();
+      if (this.superAdmin.isSuperAdmin(user)) throw superAdminManaged();
       const pw = await passwordFor(password);
       await tx.user.update({ where: { id: userId }, data: { passwordHash: pw.hash } });
       await auditStaffAction(tx, staff, 'sudo.admin.password_reset', null, {
@@ -227,6 +235,7 @@ export class SudoAccountsService {
     await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
       if (user?.kind !== 'ADMIN') throw adminNotFound();
+      if (this.superAdmin.isSuperAdmin(user)) throw superAdminManaged();
       const admins = await tx.user.count({ where: { kind: 'ADMIN' } });
       if (admins <= 1) {
         throw new AppError('LAST_ADMIN', 'Kagaz needs at least one admin', HttpStatus.CONFLICT);
@@ -245,6 +254,13 @@ function shopNotFound(): AppError {
 }
 function memberNotFound(): AppError {
   return new AppError('MEMBER_NOT_FOUND', 'Team member not found', HttpStatus.NOT_FOUND);
+}
+function superAdminManaged(): AppError {
+  return new AppError(
+    'SUPERADMIN_MANAGED',
+    'The superadmin is set in the server’s .env (SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD); change it there',
+    HttpStatus.CONFLICT,
+  );
 }
 function adminNotFound(): AppError {
   return new AppError('ADMIN_NOT_FOUND', 'Admin not found', HttpStatus.NOT_FOUND);

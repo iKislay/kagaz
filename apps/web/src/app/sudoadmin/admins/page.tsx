@@ -54,13 +54,24 @@ export default function AdminsPage() {
                         <Pill tone="accent">You</Pill>
                       </span>
                     )}
+                    {a.managedByEnv && (
+                      <span className="ml-2">
+                        <Pill tone="neutral">Superadmin · set in .env</Pill>
+                      </span>
+                    )}
                   </Td>
                   <Td>{a.email ?? a.phone}</Td>
                   <Td className="text-text-secondary">{fmtDateTime(a.createdAt)}</Td>
                   <Td>
                     <div className="flex justify-end gap-2">
-                      <Button onClick={() => setResetFor(a)}>Reset password</Button>
-                      {!a.isSelf && (
+                      {a.managedByEnv ? (
+                        <span className="text-[12px] text-text-secondary">
+                          Change it in the server’s .env
+                        </span>
+                      ) : (
+                        <Button onClick={() => setResetFor(a)}>Reset password</Button>
+                      )}
+                      {!a.isSelf && !a.managedByEnv && (
                         <Button
                           variant="danger"
                           disabled={remove.busy}

@@ -5,6 +5,7 @@ import { type AppConfig } from '../../../common/config/config.schema.js';
 import { AppError } from '../../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../../common/prisma/prisma.service.js';
 import { LoginRateLimiter } from '../../identity/login-rate-limiter.js';
+import { SuperAdminService } from './super-admin.service.js';
 import { loginWhere, verifyPassword } from '../../identity/passwords.js';
 import {
   resolveStaff,
@@ -28,12 +29,15 @@ export class AdminAuthService {
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
+    private readonly superAdmin: SuperAdminService,
   ) {}
 
   async login(body: AdminLoginRequest, ip: string) {
     const login = (body.login ?? body.email ?? '').trim();
     const key = `${ip}|${login.toLowerCase()}`;
     if (this.limiter.isBlocked(key)) throw rateLimited();
+    // The .env superadmin exists even if the DB was down when the API started.
+    if (login.toLowerCase() === this.superAdmin.email) await this.superAdmin.ensureSynced();
 
     const user = await this.prisma.user.findUnique({
       where: loginWhere(login),

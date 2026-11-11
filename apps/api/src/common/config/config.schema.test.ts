@@ -40,6 +40,33 @@ describe('loadConfig', () => {
     );
   });
 
+  it('superadmin: optional, both-or-neither, email lowercased, password ≥ 12 chars', () => {
+    expect(loadConfig({ ...base, SUPERADMIN_EMAIL: '', SUPERADMIN_PASSWORD: '' })).toMatchObject({
+      SUPERADMIN_EMAIL: undefined,
+      SUPERADMIN_PASSWORD: undefined,
+    });
+    expect(
+      loadConfig({
+        ...base,
+        SUPERADMIN_EMAIL: 'Boss@Kagaz.Example',
+        SUPERADMIN_PASSWORD: 'x'.repeat(12),
+      }).SUPERADMIN_EMAIL,
+    ).toBe('boss@kagaz.example');
+    expect(() => loadConfig({ ...base, SUPERADMIN_EMAIL: 'boss@kagaz.example' })).toThrow(
+      /both SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD/,
+    );
+    expect(() =>
+      loadConfig({ ...base, SUPERADMIN_EMAIL: 'boss@kagaz.example', SUPERADMIN_PASSWORD: 'short' }),
+    ).toThrow(/SUPERADMIN_PASSWORD/);
+    expect(() =>
+      loadConfig({
+        ...base,
+        SUPERADMIN_EMAIL: 'not-an-email',
+        SUPERADMIN_PASSWORD: 'x'.repeat(12),
+      }),
+    ).toThrow(/SUPERADMIN_EMAIL/);
+  });
+
   // PRD FR-PAY-03: the app must fail to start if mock payments are enabled in production.
   it('refuses to start with mock payments in production', () => {
     expect(() => loadConfig({ ...base, APP_ENV: 'production' })).toThrow(ConfigError);
