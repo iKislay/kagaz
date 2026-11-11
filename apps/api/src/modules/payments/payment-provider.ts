@@ -1,5 +1,7 @@
 /**
- * Provider-independent payment boundary (PRD §8.7, FR-PAY-01) — FROZEN in P3.1.
+ * Provider-independent payment boundary (PRD §8.7, FR-PAY-01) — FROZEN in P3.1, extended by
+ * ADR-003 (P6.3): `createPayment` gets the shop + return URL (per-shop merchant accounts) and
+ * providers declare whether refunds go through their API or are done by the shop by hand.
  *
  * OrderService/PaymentsService call ONLY this interface — never Razorpay/Cashfree code.
  * Every adapter (DemoMockProvider now, a live gateway after D6) must pass the reusable
@@ -28,6 +30,10 @@ export type ProviderRefundState = 'PENDING' | 'SUCCEEDED' | 'FAILED';
 
 export interface CreatePaymentInput {
   orderId: string;
+  /** Shop that receives the money (selects the shop's own merchant account, ADR-003). */
+  shopId: string;
+  /** Where the hosted checkout sends the customer back (the order page). Never proof of payment. */
+  returnUrl: string;
   /** Human reference for the provider dashboard (e.g. KGZ-7H3K2Q). */
   publicRef: string;
   /**
@@ -42,6 +48,8 @@ export interface CreatePaymentInput {
 export type CheckoutInstruction =
   /** Demo only: nothing for the customer to do; the simulated gateway settles server-side. */
   | { kind: 'DEMO_AUTO_APPROVE' }
+  /** ADR-003: send the browser to a hosted UPI page (QR + UPI app links for the shop's VPA). */
+  | { kind: 'UPI_CHECKOUT'; checkoutUrl: string }
   /** Live (P3.9): data the browser needs to open the provider's checkout. */
   | { kind: 'PROVIDER_CHECKOUT'; data: Record<string, unknown> };
 
@@ -111,6 +119,11 @@ export interface PaymentProvider {
   readonly name: string;
   /** True for providers that never move money (DEMO). Drives the UI labels. */
   readonly simulated: boolean;
+  /**
+   * `API`: `refund()` moves the money. `MANUAL` (ADR-003): the provider cannot move money;
+   * `refund()` only returns a PENDING placeholder and the shop confirms it sent the money back.
+   */
+  readonly refundMode: 'API' | 'MANUAL';
 
   createPayment(input: CreatePaymentInput): Promise<PaymentSession>;
   /** Verify the signature over the exact raw body; throws WebhookSignatureError. */

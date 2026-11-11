@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { type INestApplication } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import request from 'supertest';
 import { type CreateOrderResponse, type PrintOptions, type UploadUrlResponse } from '@kagaz/shared';
 import { AppModule } from '../../src/app.module.js';
@@ -16,8 +16,11 @@ export interface Harness {
   close: () => Promise<void>;
 }
 
-export async function createHarness(): Promise<Harness> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+export async function createHarness(
+  /** Optional provider overrides (e.g. an in-memory payment provider backend). */
+  configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
+): Promise<Harness> {
+  const moduleRef = await configure(Test.createTestingModule({ imports: [AppModule] })).compile();
   // rawBody: webhook signatures are verified over the exact bytes (P3.3), as in main.ts.
   const app = moduleRef.createNestApplication({ logger: false, rawBody: true });
   app.setGlobalPrefix('api');

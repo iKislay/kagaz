@@ -1,6 +1,9 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { OrderStatus, type PayResponse, QuoteSchema } from '@kagaz/shared';
-import { SYSTEM_ACTOR } from '../../common/actor.js';
+import { type Actor, SYSTEM_ACTOR } from '../../common/actor.js';
+import { APP_CONFIG } from '../../common/config/config.module.js';
+import { type AppConfig } from '../../common/config/config.schema.js';
+import { tenantWhere } from '../../common/prisma/tenant-scope.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type Payment } from '../../generated/prisma/client.js';
@@ -17,6 +20,7 @@ import {
   type PaymentProvider,
   type ProviderPaymentState,
 } from './payment-provider.js';
+import { ShopPaymentAccountsService } from './shop-payment-accounts.service.js';
 
 const OPEN_PAYMENT = ['CREATED', 'PENDING'] as const;
 
@@ -25,7 +29,10 @@ export interface ProviderPaymentUpdate {
   status: ProviderPaymentState;
   providerPaymentId: string | null;
   amountPaise: number | null;
-  source: 'WEBHOOK' | 'STATUS_FETCH';
+  source: 'WEBHOOK' | 'STATUS_FETCH' | 'MANUAL';
+  /** MANUAL (ADR-003): the shop operator who confirmed the payment; reason for the timeline. */
+  actor?: Actor;
+  reason?: string;
 }
 
 /** What applying an update did — recorded on the webhook event. */
@@ -51,6 +58,8 @@ export class PaymentsService {
     private readonly approval: ApprovalService,
     private readonly shops: ShopsService,
     private readonly pickupNumbers: PickupNumberService,
+    private readonly accounts: ShopPaymentAccountsService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /**
@@ -63,13 +72,31 @@ export class PaymentsService {
   async pay(orderId: string): Promise<PayResponse> {
     const before = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { payments: { select: { status: true } } },
+      include: {
+        payments: { select: { status: true } },
+        paymentReports: { where: { status: 'OPEN' }, select: { id: true } },
+      },
     });
     if (!before) throw new AppError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND);
+    // ADR-003: while the shop checks a reported payment, no second payment can start.
+    if (before.paymentReports.length > 0) {
+      throw new AppError(
+        'PAYMENT_REPORT_OPEN',
+        'The shop is checking the payment you reported. This page updates by itself.',
+        HttpStatus.CONFLICT,
+      );
+    }
     const startsNewAttempt = !before.payments.some((p) => p.status !== 'FAILED');
     if (startsNewAttempt && before.status === OrderStatus.AWAITING_PAYMENT) {
       // P3.6: no new checkout while the shop is closed, paused or outside opening hours.
       await this.shops.requireOrderableShop(before.shopId);
+      if (!(await this.accounts.canTakePayments(before.shopId))) {
+        throw new AppError(
+          'SHOP_PAYMENTS_NOT_SET_UP',
+          'This shop cannot take online payments yet. Please choose another shop.',
+          HttpStatus.CONFLICT,
+        );
+      }
       await this.ensureQuoteCurrent(orderId);
     }
 
@@ -118,7 +145,8 @@ export class PaymentsService {
       });
     });
 
-    let mode: PayResponse['mode'] = 'DEMO_AUTO_APPROVED';
+    let mode: PayResponse['mode'] = this.provider.simulated ? 'DEMO_AUTO_APPROVED' : 'UPI_CHECKOUT';
+    let checkoutUrl: string | null = payment.checkoutUrl;
     if (payment.status === 'CREATED' || payment.status === 'PENDING') {
       if (!payment.providerOrderId) {
         const order = await this.prisma.order.findUniqueOrThrow({
@@ -128,23 +156,37 @@ export class PaymentsService {
         const attempt = order._count.payments;
         const session = await this.provider.createPayment({
           orderId,
+          shopId: order.shopId,
+          returnUrl: `${this.config.PUBLIC_WEB_URL.replace(/\/+$/, '')}/order/${orderId}`,
           publicRef: order.publicRef,
           receipt: attempt <= 1 ? order.publicRef : `${order.publicRef}-${attempt}`,
           amountPaise: payment.amountPaise,
           currency: 'INR',
         });
+        checkoutUrl =
+          session.checkout.kind === 'UPI_CHECKOUT' ? session.checkout.checkoutUrl : null;
         await this.prisma.payment.updateMany({
           where: { id: payment.id, providerOrderId: null },
-          data: { providerOrderId: session.providerOrderId, status: 'PENDING' },
+          data: { providerOrderId: session.providerOrderId, status: 'PENDING', checkoutUrl },
         });
         if (session.checkout.kind === 'PROVIDER_CHECKOUT') mode = 'PROVIDER_CHECKOUT';
+      } else if (!this.provider.simulated) {
+        // "Check again": ask the provider server-to-server; a redirect is never proof.
+        await this.confirmFromProvider(payment.id).catch((err: unknown) =>
+          this.logger.warn({ err, orderId, paymentId: payment.id }, 'status re-check failed'),
+        );
       }
       // Demo: the simulated gateway settles server-side, so confirm by status fetch now.
       // Live providers are confirmed by their webhook (or a later status fetch).
       if (mode === 'DEMO_AUTO_APPROVED') await this.confirmFromProvider(payment.id);
     }
 
-    return { order: await this.orders.getPublic(orderId), mode };
+    const view = await this.orders.getPublic(orderId);
+    return {
+      order: view,
+      mode,
+      checkoutUrl: mode === 'UPI_CHECKOUT' ? (view.payment?.checkoutUrl ?? checkoutUrl) : null,
+    };
   }
 
   /**
@@ -232,7 +274,7 @@ export class PaymentsService {
           );
           return { outcome: 'AMOUNT_MISMATCH', paidOrderId: null };
         }
-        return this.markPaid(tx, payment, update.providerPaymentId);
+        return this.markPaid(tx, payment, update);
       }
       case 'PENDING': {
         const moved = await tx.payment.updateMany({
@@ -268,8 +310,9 @@ export class PaymentsService {
   private async markPaid(
     tx: Tx,
     payment: Payment,
-    providerPaymentId: string | null,
+    update: ProviderPaymentUpdate,
   ): Promise<{ outcome: ApplyOutcome; paidOrderId: string | null }> {
+    const providerPaymentId = update.providerPaymentId;
     const updated = await tx.payment.updateMany({
       where: { id: payment.id, status: { in: [...OPEN_PAYMENT, 'FAILED'] } },
       data: {
@@ -280,7 +323,14 @@ export class PaymentsService {
     });
     if (updated.count !== 1) return { outcome: 'ALREADY_PAID', paidOrderId: null };
 
-    const order = await tx.order.findUniqueOrThrow({ where: { id: payment.orderId } });
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: payment.orderId, ...tenantWhere() },
+    });
+    // ADR-003: the money is confirmed - any open customer report is no longer needed.
+    await tx.paymentReport.updateMany({
+      where: { orderId: order.id, shopId: order.shopId, status: 'OPEN' },
+      data: { status: 'SUPERSEDED', decidedAt: new Date() },
+    });
     if (order.status !== OrderStatus.AWAITING_PAYMENT) {
       this.logger.error(
         { paymentId: payment.id, orderId: order.id, status: order.status },
@@ -305,10 +355,13 @@ export class PaymentsService {
       orderId: payment.orderId,
       to: OrderStatus.PENDING_REVIEW,
       from: OrderStatus.AWAITING_PAYMENT,
-      actor: SYSTEM_ACTOR,
-      reason: payment.isSimulated ? 'Demo payment verified (no money moved)' : 'Payment verified',
+      actor: update.actor ?? SYSTEM_ACTOR,
+      reason:
+        update.reason ??
+        (payment.isSimulated ? 'Demo payment verified (no money moved)' : 'Payment verified'),
       metadata: {
         paymentId: payment.id,
+        source: update.source,
         provider: payment.provider,
         simulated: payment.isSimulated,
         autoAccept: { eligible: autoAccept.eligible, reasons: autoAccept.reasons },

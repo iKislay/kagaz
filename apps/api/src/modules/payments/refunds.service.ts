@@ -12,6 +12,7 @@ export interface RefundSummary {
   status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
   amountPaise: number;
   isSimulated: boolean;
+  manual: boolean;
 }
 
 /** Result of RefundService.request — `refund` is null when the order was never paid. */
@@ -104,6 +105,11 @@ export class RefundsService {
           idempotencyKey: `refund:${payment.id}:${payment.refunds.length + 1}`,
           reason: reason.slice(0, 500),
           isSimulated: payment.isSimulated,
+          // ADR-003: the provider cannot move money — the shop sends it and confirms.
+          isManual:
+            !payment.isSimulated &&
+            payment.provider === this.provider.name &&
+            this.provider.refundMode === 'MANUAL',
         },
       }));
     if (refund.status === 'PENDING') {
@@ -119,7 +125,11 @@ export class RefundsService {
         to: OrderStatus.REFUND_PENDING,
         from: OrderStatus.REJECTED,
         actor,
-        reason: payment.isSimulated ? 'Demo refund requested' : 'Refund requested',
+        reason: payment.isSimulated
+          ? 'Demo refund requested'
+          : refund.isManual
+            ? 'Refund requested — the shop sends it from their UPI app'
+            : 'Refund requested',
         metadata: { refundId: refund.id, idempotencyKey: refund.idempotencyKey },
         auditAction: 'order.refund_requested',
       });
@@ -199,7 +209,11 @@ export class RefundsService {
         to: OrderStatus.REFUNDED,
         from: OrderStatus.REFUND_PENDING,
         actor: SYSTEM_ACTOR,
-        reason: refund.isSimulated ? 'Demo refund — no money moved' : 'Refund confirmed',
+        reason: refund.isSimulated
+          ? 'Demo refund — no money moved'
+          : refund.isManual
+            ? 'Refund sent by the shop'
+            : 'Refund confirmed',
         metadata: { refundId: refund.id, providerRefundId, simulated: refund.isSimulated },
       });
     }
@@ -226,6 +240,7 @@ export class RefundsService {
             status: latest.status,
             amountPaise: latest.amountPaise,
             isSimulated: latest.isSimulated,
+            manual: latest.isManual,
           }
         : null,
     };

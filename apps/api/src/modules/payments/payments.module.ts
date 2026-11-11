@@ -10,6 +10,11 @@ import { AdminOrderActionsService } from './admin-order-actions.service.js';
 import { AdminPaymentsController, DemoPaymentsController } from './admin-payments.controller.js';
 import { DemoControlsService } from './demo-controls.service.js';
 import { DemoMockProvider } from './demo-mock.provider.js';
+import { ManualRefundsService } from './manual-refunds.service.js';
+import { PaymentReportsService } from './payment-reports.service.js';
+import { YoupiClient } from './providers/youpi/youpi-client.js';
+import { YoupiProvider } from './providers/youpi/youpi.provider.js';
+import { ShopPaymentAccountsService, YOUPI_CLIENT } from './shop-payment-accounts.service.js';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.js';
 import { PaymentsController } from './payments.controller.js';
 import { PaymentsService } from './payments.service.js';
@@ -31,11 +36,34 @@ import { WebhooksService } from './webhooks.service.js';
     WebhooksService,
     DemoControlsService,
     AdminOrderActionsService,
+    ShopPaymentAccountsService,
+    PaymentReportsService,
+    ManualRefundsService,
+    {
+      provide: YOUPI_CLIENT,
+      inject: [APP_CONFIG],
+      useFactory: (config: AppConfig): YoupiClient | null =>
+        config.PAYMENT_PROVIDER === 'youpi'
+          ? new YoupiClient({
+              // loadConfig refuses to start youpi without these.
+              baseUrl: config.YOUPI_API_URL!,
+              adminToken: config.YOUPI_ADMIN_TOKEN!,
+              timeoutMs: config.YOUPI_HTTP_TIMEOUT_MS,
+            })
+          : null,
+    },
     {
       provide: PAYMENT_PROVIDER,
-      inject: [APP_CONFIG],
-      useFactory: (config: AppConfig): PaymentProvider => {
+      inject: [APP_CONFIG, YOUPI_CLIENT, ShopPaymentAccountsService],
+      useFactory: (
+        config: AppConfig,
+        youpi: YoupiClient | null,
+        accounts: ShopPaymentAccountsService,
+      ): PaymentProvider => {
         switch (config.PAYMENT_PROVIDER) {
+          case 'youpi':
+            // ADR-003 default: customers pay the shop's own UPI ID; YouPI detects the credit.
+            return new YoupiProvider(youpi!, accounts);
           case 'demo':
             // loadConfig already refuses demo payments in production.
             return new DemoMockProvider({
@@ -50,6 +78,13 @@ import { WebhooksService } from './webhooks.service.js';
       },
     },
   ],
-  exports: [PaymentsService, RefundsService, PAYMENT_PROVIDER],
+  exports: [
+    PaymentsService,
+    RefundsService,
+    PAYMENT_PROVIDER,
+    ShopPaymentAccountsService,
+    PaymentReportsService,
+    ManualRefundsService,
+  ],
 })
 export class PaymentsModule {}

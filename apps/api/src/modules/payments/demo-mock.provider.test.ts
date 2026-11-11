@@ -15,6 +15,8 @@ describePaymentProviderContract('DemoMockProvider', () => {
 
 const input = (orderId: string, receipt: string) => ({
   orderId,
+  shopId: 'shop-1',
+  returnUrl: 'https://kagaz.test/order/1',
   publicRef: receipt,
   receipt,
   amountPaise: 4800,

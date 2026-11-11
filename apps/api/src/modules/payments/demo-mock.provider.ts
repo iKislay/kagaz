@@ -76,6 +76,7 @@ export interface DemoMockOptions {
  */
 export class DemoMockProvider implements PaymentProvider {
   readonly name = 'demo';
+  readonly refundMode = 'API' as const;
   readonly simulated = true;
 
   private readonly payments = new Map<string, DemoPayment>();

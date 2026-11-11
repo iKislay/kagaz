@@ -6,6 +6,7 @@ import {
   type DeviceRevokedEvent,
   type DeviceStatusChangedEvent,
   type OrderStatusChangedEvent,
+  type PaymentReportChangedEvent,
   type PrinterStatusChangedEvent,
   type ShopModeChangedEvent,
 } from '../../common/events/domain-events.js';
@@ -30,6 +31,16 @@ export class RealtimeListener {
     this.publisher.publishToShop(e.shopId, RealtimeEvent.SHOP_MODE_CHANGED, {
       approvalMode: e.approvalMode,
       autoPaused: e.autoPaused,
+    });
+  }
+
+  /** ADR-003: hint the shop app to refetch GET /api/shop/payment-reports. */
+  @OnEvent(DomainEvent.PAYMENT_REPORT_CHANGED, { suppressErrors: true })
+  onPaymentReportChanged(e: PaymentReportChangedEvent): void {
+    this.publisher.publishToShop(e.shopId, RealtimeEvent.PAYMENT_REPORT, {
+      reportId: e.reportId,
+      orderId: e.orderId,
+      status: e.status,
     });
   }
 

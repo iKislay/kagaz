@@ -14,6 +14,8 @@ import {
  */
 export interface PaymentProviderContractHarness {
   provider: PaymentProvider;
+  /** Shop the harness has an account for (providers with per-shop accounts). */
+  shopId?: string;
   /** Move a created payment to a final state on the provider side (sandbox / simulation). */
   settle(providerOrderId: string, state: Exclude<ProviderPaymentState, 'PENDING'>): Promise<void>;
   /** A correctly signed PAYMENT webhook for a payment, exactly as the provider would send it. */
@@ -41,6 +43,8 @@ export function describePaymentProviderContract(
       const r = receipt();
       const session = await h.provider.createPayment({
         orderId: randomUUID(),
+        shopId: h.shopId ?? randomUUID(),
+        returnUrl: 'https://kagaz.test/order/x',
         publicRef: r,
         receipt: r,
         amountPaise,
@@ -61,7 +65,8 @@ export function describePaymentProviderContract(
       const b = await create(h);
       expect(a.providerOrderId).toBeTruthy();
       expect(a.providerOrderId).not.toBe(b.providerOrderId);
-      expect(['DEMO_AUTO_APPROVE', 'PROVIDER_CHECKOUT']).toContain(a.checkout.kind);
+      expect(['DEMO_AUTO_APPROVE', 'UPI_CHECKOUT', 'PROVIDER_CHECKOUT']).toContain(a.checkout.kind);
+      expect(['API', 'MANUAL']).toContain(h.provider.refundMode);
     });
 
     it('accepts only positive integer paise', async () => {
@@ -149,6 +154,18 @@ export function describePaymentProviderContract(
       });
       expect(again.providerRefundId).toBe(first.providerRefundId);
       expect(['PENDING', 'SUCCEEDED', 'FAILED']).toContain(first.status);
+      if (h.provider.refundMode === 'MANUAL') {
+        // Manual refunds: the provider moves nothing; RefundsService caps the amount.
+        expect(first.status).toBe('PENDING');
+        await expect(
+          h.provider.refund({
+            providerPaymentId: providerPaymentId!,
+            amountPaise: 12.5,
+            idempotencyKey: `refund:${randomUUID()}:3`,
+          }),
+        ).rejects.toThrow();
+        return;
+      }
 
       await expect(
         h.provider.refund({
