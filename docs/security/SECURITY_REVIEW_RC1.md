@@ -114,8 +114,8 @@ read orders:
 
 ## Status
 
-**Open high findings: H1, H2, H3.** P5.2 stays `[~]` until they are fixed and re-verified; M1–M4
-should land before any public demo.
+**Closed 2026-11-11** — no open high or critical findings (see Re-verification below). P5.2 `[x]`.
+Low/info items L2, L3, L5, L6, I1–I6 remain tracked for RC2.
 
 ## Remediation (2026-11-10)
 
@@ -127,7 +127,7 @@ should land before any public demo.
 | M1                    | Fixed           | Helmet on the API (HSTS outside local); web sends X-Frame-Options DENY, frame-ancestors 'none', nosniff, Referrer-Policy, HSTS in production.              |
 | M2                    | Fixed           | Log redaction adds `x-operator-token`, `x-tracking-token`, `x-demo-signature`.                                                                             |
 | M3                    | Fixed           | `TRUST_PROXY` env (hop count or CIDR list) sets Express `trust proxy`.                                                                                     |
-| M4                    | In ADR-002      | READY files deleted `RETENTION_AFTER_COLLECTED_HOURS` after `readyAt` (pickup-number workstream).                                                          |
+| M4                    | Fixed           | READY files deleted `RETENTION_AFTER_COLLECTED_HOURS` after `readyAt` (ADR-002, `orders/retention.service.ts`).                                            |
 | L1                    | Fixed           | `/admin` socket checks `typ: 'staff'` and the current ADMIN role via `resolveStaff`.                                                                       |
 | L4                    | Fixed           | Demo OTP codes are logged only in `local`; elsewhere only "sent to …1234".                                                                                 |
 | L7                    | Fixed           | Shop app pairing refuses `http://` for non-loopback servers.                                                                                               |
@@ -135,3 +135,28 @@ should land before any public demo.
 | L2, L3, L5, L6, I1–I6 | Open (low/info) | Tracked for RC2; none blocks P5.2 "Done when" (no open high/critical).                                                                                     |
 
 **Result:** no open high or critical findings.
+
+## Re-verification (2026-11-11, after the ADR-002 merges)
+
+Checked on `phase-1-vertical-slice` at `487ce24` that the fixes survived the ADR-002 merges:
+
+| ID  | Evidence in current code                                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| H1  | `infra/docker-compose.demo.yml` seaweedfs requires `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` (`:?`) and writes `/tmp/s3.json` from them at start |
+| H2  | `config.schema.ts` `PLACEHOLDER = /^change-me/i`; `demo.env.example` S3 keys are `CHANGE-me-…`                                                   |
+| H3  | `@RequireOperator()` on `POST shop/jobs/:orderId/resolve` and `PATCH shop/mode`                                                                  |
+| M1  | `helmet()` in `main.ts` (HSTS outside local)                                                                                                     |
+| M2  | pino redaction of `x-operator-token`, `x-tracking-token` in `app.module.ts`                                                                      |
+| M3  | `TRUST_PROXY` → Express `trust proxy` in `main.ts`                                                                                               |
+| M4  | `retention.service.ts` deletes READY_FOR_PICKUP files from `readyAt`                                                                             |
+| L8  | `UPLOAD_URL_TTL_SECONDS` ≤ 600, `DOWNLOAD_URL_TTL_SECONDS` ≤ 300 enforced by the config schema                                                   |
+
+Tests: `pnpm test` (34 shared + 119 api) and `pnpm --filter @kagaz/api test:e2e` (146) pass, including the H2, H3, L1 regression tests.
+
+Dependency audit:
+
+| Command                                                                                     | Result                                                                                                                                    |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm audit --prod`                                                                         | **No known vulnerabilities found**                                                                                                        |
+| `pnpm audit` (incl. dev)                                                                    | 1 moderate: `minimatch` < 11.0.1 (ReDoS) via `eslint` — dev-only lint tooling, not shipped in any image; bump when ESLint updates its dep |
+| `dotnet list apps/shop-agent/Kagaz.ShopAgent.sln package --vulnerable --include-transitive` | **No vulnerable packages**                                                                                                                |

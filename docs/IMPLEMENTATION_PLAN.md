@@ -471,7 +471,7 @@ kagaz/
 - Load check (P4.7) re-run on the deployed demo env; recovery drills re-run.
 - **Done when:** all 20 pass or have an accepted, documented exception.
 
-### P5.2 — Security review `[ ]`
+### P5.2 — Security review `[x]`
 
 - Checklist: authN (sessions, device tokens, operator login), authZ & tenant isolation, signed URL TTLs & logging redaction, secrets handling, webhook verification, rate limits, CORS/CSRF/cookies, headers (Helmet, HSTS), dependency audit (`pnpm audit`, `dotnet list package --vulnerable`), file retention, demo/live separation, admin demo endpoints disabled in production.
 - Fix findings; record in `docs/security/SECURITY_REVIEW_RC1.md`.
