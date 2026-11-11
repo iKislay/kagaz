@@ -1,17 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { type AdminMe } from '@kagaz/shared';
-import { cx, Notice, Spinner } from '@/components/ui';
-import { ApiRequestError } from '@/lib/api';
+import { cx, Spinner } from '@/components/ui';
 import { adminApi } from '../_lib/api';
 import { icons } from './icons';
 import { AdminSessionContext, type AdminSession } from './session';
 
+/** Unauthenticated /admin/* visits land here. */
+export const ADMIN_LOGIN_PATH = '/admin/login';
+
 const NAV: { href: string; label: string; icon: ReactNode; adminOnly: boolean }[] = [
   { href: '/admin', label: 'Overview', icon: icons.overview, adminOnly: true },
+  { href: '/admin/metrics', label: 'Metrics', icon: icons.metrics, adminOnly: true },
   { href: '/admin/shops', label: 'Shops', icon: icons.shops, adminOnly: false },
   { href: '/admin/orders', label: 'Orders', icon: icons.orders, adminOnly: true },
   { href: '/admin/health', label: 'Health', icon: icons.health, adminOnly: true },
@@ -28,8 +31,14 @@ const NAV: { href: string; label: string; icon: ReactNode; adminOnly: boolean }[
 /**
  * macOS-style window for /admin: translucent source-list sidebar + content area, covering the
  * customer toolbar. The DEMO banner stays visible at the top (invariant 4).
+ *
+ * The sign-in form lives on its own route (/admin/login); every other admin route redirects
+ * there when there is no session.
  */
 export function AdminShell({ banner, children }: { banner: ReactNode; children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const isLogin = pathname === ADMIN_LOGIN_PATH;
   const [me, setMe] = useState<AdminMe | null>(null);
   const [state, setState] = useState<'loading' | 'signed-out' | 'ready'>('loading');
 
@@ -43,8 +52,14 @@ export function AdminShell({ banner, children }: { banner: ReactNode; children: 
     }
   }, []);
   useEffect(() => {
-    void load();
-  }, [load]);
+    // The login page checks the session itself.
+    if (!isLogin) void load();
+  }, [isLogin, load]);
+
+  // No session → the sign-in page.
+  useEffect(() => {
+    if (!isLogin && state === 'signed-out') router.replace(ADMIN_LOGIN_PATH);
+  }, [isLogin, state, router]);
 
   const session = useMemo<AdminSession | null>(
     () =>
@@ -65,6 +80,15 @@ export function AdminShell({ banner, children }: { banner: ReactNode; children: 
     [me],
   );
 
+  if (isLogin) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-bg text-text">
+        {banner}
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-bg text-text">
       {banner}
@@ -73,7 +97,11 @@ export function AdminShell({ banner, children }: { banner: ReactNode; children: 
           <Spinner />
         </div>
       )}
-      {state === 'signed-out' && <SignIn onSignedIn={load} />}
+      {state === 'signed-out' && (
+        <div className="grid flex-1 place-items-center text-text-secondary">
+          <Spinner />
+        </div>
+      )}
       {state === 'ready' && session && (
         <AdminSessionContext.Provider value={session}>
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -166,72 +194,6 @@ function OperatorNotice() {
         Operators work from the Kagaz app on the shop PC. Ask your shop owner or a Kagaz admin if
         you need dashboard access.
       </p>
-    </div>
-  );
-}
-
-function SignIn({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
-  const [login, setLogin] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await adminApi.login(login.trim(), password);
-      setPassword('');
-      await onSignedIn();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Sign-in failed');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="grid flex-1 place-items-center overflow-y-auto px-4 py-10">
-      <form onSubmit={submit} className="mac-card w-full max-w-sm px-6 py-7" aria-label="Sign in">
-        <div className="mb-5 flex flex-col items-center gap-2 text-center">
-          <span className="grid size-11 place-items-center rounded-xl bg-accent text-lg font-bold text-white">
-            K
-          </span>
-          <h1 className="text-[20px] font-semibold tracking-tight">Kagaz Admin</h1>
-          <p className="text-[13px] text-text-secondary">Sign in with your staff account.</p>
-        </div>
-        <label className="mb-1 block text-[12px] text-text-secondary" htmlFor="admin-login">
-          Email or phone
-        </label>
-        <input
-          id="admin-login"
-          autoComplete="username"
-          value={login}
-          onChange={(e) => setLogin(e.target.value)}
-          className="mb-3 w-full rounded-lg border border-separator bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent focus:ring-4 focus:ring-accent/20"
-        />
-        <label className="mb-1 block text-[12px] text-text-secondary" htmlFor="admin-password">
-          Password
-        </label>
-        <input
-          id="admin-password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-separator bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent focus:ring-4 focus:ring-accent/20"
-        />
-        {error && <Notice tone="red">{error}</Notice>}
-        <button
-          type="submit"
-          disabled={busy || !login || !password}
-          className="mac-button mt-5 w-full disabled:opacity-50"
-        >
-          {busy ? <Spinner className="size-3.5" /> : null}
-          Sign in
-        </button>
-      </form>
     </div>
   );
 }

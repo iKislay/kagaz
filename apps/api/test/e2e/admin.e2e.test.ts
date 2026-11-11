@@ -41,9 +41,49 @@ function sessionCookieOf(res: { headers: Record<string, unknown> }): string {
 
 describe('admin auth (FR-ADMIN-01)', () => {
   it('401 on every admin route without a session cookie', async () => {
-    await h.http().get('/api/admin/shops').expect(401);
-    await h.http().get('/api/admin/orders').expect(401);
-    await h.http().get('/api/admin/audit').expect(401);
+    // Every /api/admin/* route except the sign-in endpoints must refuse an anonymous caller.
+    const uuid = '00000000-0000-0000-0000-000000000000';
+    const routes: ['get' | 'post' | 'put' | 'patch', string][] = [
+      ['get', '/api/admin/auth/me'],
+      ['get', '/api/admin/shops'],
+      ['post', '/api/admin/shops'],
+      ['get', `/api/admin/shops/${uuid}`],
+      ['patch', `/api/admin/shops/${uuid}`],
+      ['get', `/api/admin/shops/${uuid}/devices`],
+      ['patch', `/api/admin/shops/${uuid}/devices/${uuid}`],
+      ['get', `/api/admin/shops/${uuid}/enrollment-codes`],
+      ['post', `/api/admin/shops/${uuid}/enrollment-codes`],
+      ['get', `/api/admin/shops/${uuid}/printers`],
+      ['patch', `/api/admin/shops/${uuid}/printers/${uuid}`],
+      ['get', `/api/admin/shops/${uuid}/pricing`],
+      ['post', `/api/admin/shops/${uuid}/pricing`],
+      ['patch', `/api/admin/shops/${uuid}/settlement`],
+      ['get', '/api/admin/orders'],
+      ['get', `/api/admin/orders/${uuid}`],
+      ['post', `/api/admin/orders/${uuid}/reject`],
+      ['post', `/api/admin/orders/${uuid}/refund`],
+      ['get', '/api/admin/held-orders'],
+      ['get', '/api/admin/audit'],
+      ['get', '/api/admin/health'],
+      ['get', '/api/admin/overview'],
+      ['get', '/api/admin/reconciliation'],
+      ['get', '/api/admin/demo/otp-inbox'],
+      ['get', '/api/admin/demo/payments'],
+      ['put', `/api/admin/demo/payments/${uuid}/outcome`],
+    ];
+    for (const [method, path] of routes) {
+      const agent = h.http();
+      const res =
+        method === 'get'
+          ? await agent.get(path)
+          : method === 'post'
+            ? await agent.post(path)
+            : method === 'put'
+              ? await agent.put(path)
+              : await agent.patch(path);
+      expect(res.status, `${method.toUpperCase()} ${path}`).toBe(401);
+      expect(res.body.error.code, `${method.toUpperCase()} ${path}`).toBe('ADMIN_UNAUTHENTICATED');
+    }
   });
 
   it('login success sets the kgz_admin session cookie', async () => {
@@ -405,5 +445,14 @@ describe('admin read API', () => {
       '/api/admin/audit?orderId=00000000-0000-0000-0000-000000000000',
     ).expect(200);
     expect(byOrder.body.items.length).toBe(0);
+  });
+
+  it('login success and failure are audited with actorType ADMIN', async () => {
+    const res = await get('/api/admin/audit?action=ADMIN_LOGIN&pageSize=100').expect(200);
+    const items = res.body.items as { action: string; actorType: string }[];
+    const actions = new Set(items.map((a) => a.action));
+    expect(actions.has('ADMIN_LOGIN_SUCCESS')).toBe(true);
+    expect(actions.has('ADMIN_LOGIN_FAILED')).toBe(true);
+    expect(items.every((a) => a.actorType === 'ADMIN')).toBe(true);
   });
 });

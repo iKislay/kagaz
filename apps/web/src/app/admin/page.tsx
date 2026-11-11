@@ -1,27 +1,31 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { type AdminOverview } from '@kagaz/shared';
-import { Pill, SegmentedControl } from '@/components/ui';
+import { type AdminShop } from '@kagaz/shared';
+import { Dot, Pill } from '@/components/ui';
 import { adminApi } from './_lib/api';
-import { fmtDay, fmtDuration, humanize, orderTone, rupees } from './_lib/format';
-import {
-  Card,
-  Empty,
-  ErrorNote,
-  Loading,
-  PageHeader,
-  StatTile,
-  Table,
-  Td,
-  useLoad,
-} from './_components/kit';
+import { fmtAgo, humanize, printerTone, rupees, shopStatusTone } from './_lib/format';
+import { Card, Empty, ErrorNote, Loading, PageHeader, useLoad } from './_components/kit';
 import { useAdminSession } from './_components/session';
 
-type Range = '7' | '14' | '30';
+/** Live queue counters, in the order the demo script walks through them. */
+const QUEUE_BUCKETS = [
+  { key: 'PENDING_REVIEW', label: 'Pending' },
+  { key: 'QUEUED', label: 'Queue' },
+  { key: 'PRINTING', label: 'Printing' },
+  { key: 'NEEDS_OPERATOR_CHECK', label: 'Needs check' },
+  { key: 'READY_FOR_PICKUP', label: 'Ready' },
+] as const;
 
-/** Overview dashboard (P4.8, FR-ADMIN-11). Shop owners land on their shop list instead. */
+const REFRESH_MS = 10_000;
+
+/**
+ * Live operations overview (P2.13, FR-ADMIN-02; PRD §18 demo script 2:15–2:45).
+ * One card per shop: open status, approval mode, device online dot, printer status,
+ * the live queue and today's orders/revenue. Refreshes every 10 s.
+ */
 export default function AdminOverviewPage() {
   const { me } = useAdminSession();
   const router = useRouter();
@@ -33,206 +37,156 @@ export default function AdminOverviewPage() {
 }
 
 function Overview() {
-  const [range, setRange] = useState<Range>('14');
-  const { data, error, loading } = useLoad(
-    () => adminApi.overview({ days: Number(range) }),
-    [range],
-  );
+  const { data, error, loading, reload } = useLoad(() => adminApi.shops(), []);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (data) setUpdatedAt(new Date());
+  }, [data]);
+
+  // Safety poll: the API is the source of truth, so refresh on a timer (no sockets here).
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.hidden) return;
+      void reload();
+    }, REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [reload]);
 
   return (
     <>
       <PageHeader
         title="Overview"
-        subtitle={data ? `${fmtDay(data.from)} – ${fmtDay(data.to)} · Asia/Kolkata` : ' '}
+        subtitle="Live shop status — refreshes every 10 seconds."
         actions={
-          <SegmentedControl
-            label="Date range"
-            value={range}
-            onChange={setRange}
-            options={[
-              { value: '7', label: '7 days' },
-              { value: '14', label: '14 days' },
-              { value: '30', label: '30 days' },
-            ]}
-          />
+          updatedAt ? (
+            <span className="text-[12px] text-text-secondary">
+              Updated {fmtAgo(updatedAt.toISOString())}
+            </span>
+          ) : null
         }
       />
       <ErrorNote error={error} />
-      {loading && !data ? <Loading /> : data && <OverviewBody data={data} />}
+      {loading && !data ? (
+        <Loading />
+      ) : !data ? null : data.shops.length === 0 ? (
+        <Card>
+          <Empty>No shops yet.</Empty>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {data.shops.map((shop) => (
+            <ShopCard key={shop.id} shop={shop} />
+          ))}
+        </div>
+      )}
     </>
   );
 }
 
-function OverviewBody({ data }: { data: AdminOverview }) {
-  const t = data.turnaround;
+function ShopCard({ shop }: { shop: AdminShop }) {
+  const online = shop.devices.some((d) => d.online);
+  const mode =
+    shop.approvalMode === 'AUTO' ? (shop.autoPaused ? 'Auto · paused' : 'Auto') : 'Manual';
+  const printer = shop.printers[0] ?? null;
+  const simulated = shop.todaySimulatedRevenuePaise > 0;
+
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <StatTile label="Orders" value={data.totals.orders} hint="excluding drafts" />
-        <StatTile
-          label="Paid"
-          value={data.totals.paidOrders}
-          hint={rupees(data.totals.paidPaise)}
-        />
-        <StatTile label="Collected" value={data.totals.collected} />
-        <StatTile label="Rejected" value={data.totals.rejected} hint="incl. refunded" />
-        <StatTile
-          label="Paid → ready"
-          value={fmtDuration(t.paidToReadyMedianSeconds)}
-          hint={`median · ${t.paidToReadySamples} orders`}
-        />
-        <StatTile
-          label="Ready → collected"
-          value={fmtDuration(t.readyToCollectedMedianSeconds)}
-          hint={`median · ${t.readyToCollectedSamples} orders`}
-        />
-      </div>
-
-      <Card title="Orders per day">
-        <DayBars days={data.byDay} />
-      </Card>
-
-      <div className="grid gap-5 2xl:grid-cols-[3fr_2fr]">
-        <Card title="By shop" flush>
-          {data.byShop.length === 0 ? (
-            <Empty>No shops yet.</Empty>
-          ) : (
-            <Table
-              head={[
-                'Shop',
-                'Orders',
-                'Collected',
-                'Rejected',
-                'Paid → ready',
-                'Ready → collected',
-              ]}
-            >
-              {data.byShop.map((s) => (
-                <tr key={s.shopId}>
-                  <Td className="min-w-48 font-medium">{s.shopName}</Td>
-                  <Td className="tabular-nums">{s.total}</Td>
-                  <Td className="tabular-nums">{s.byStatus.COLLECTED ?? 0}</Td>
-                  <Td className="tabular-nums">
-                    {(s.byStatus.REJECTED ?? 0) +
-                      (s.byStatus.REFUND_PENDING ?? 0) +
-                      (s.byStatus.REFUNDED ?? 0)}
-                  </Td>
-                  <Td>{fmtDuration(s.turnaround.paidToReadyMedianSeconds)}</Td>
-                  <Td>{fmtDuration(s.turnaround.readyToCollectedMedianSeconds)}</Td>
-                </tr>
-              ))}
-            </Table>
-          )}
-        </Card>
-
-        <Card title="By status" flush>
-          {Object.keys(data.byStatus).length === 0 ? (
-            <Empty>No orders in this range.</Empty>
-          ) : (
-            <Table head={['Status', 'Orders']}>
-              {Object.entries(data.byStatus)
-                .sort((a, b) => b[1] - a[1])
-                .map(([status, count]) => (
-                  <tr key={status}>
-                    <Td>
-                      <Pill tone={orderTone(status)}>{humanize(status)}</Pill>
-                    </Td>
-                    <Td className="tabular-nums">{count}</Td>
-                  </tr>
-                ))}
-            </Table>
-          )}
-        </Card>
-      </div>
-
-      <Card title="Printer uptime" flush>
-        {data.printerUptime.length === 0 ? (
-          <Empty>No printers registered.</Empty>
-        ) : (
-          <Table head={['Printer', 'Shop', 'Uptime', 'Samples']}>
-            {data.printerUptime.map((p) => (
-              <tr key={p.printerId}>
-                <Td className="font-medium">{p.displayName}</Td>
-                <Td className="text-text-secondary">{p.shopName}</Td>
-                <Td>
-                  <Meter ratio={p.uptimeRatio} />
-                </Td>
-                <Td className="tabular-nums text-text-secondary">{p.observedSamples}</Td>
-              </tr>
-            ))}
-          </Table>
-        )}
-        <p className="border-t border-separator px-4 py-2 text-[12px] text-text-secondary">
-          Approximate: sampled once a minute — up when the printer reports Ready and its shop PC is
-          online.
-        </p>
-      </Card>
-    </div>
-  );
-}
-
-/** Single-series bar chart (accent), baseline-anchored, hover tooltip per bar. */
-function DayBars({ days }: { days: AdminOverview['byDay'] }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(1, ...days.map((d) => d.total));
-  const showEvery = days.length > 14 ? 3 : days.length > 7 ? 2 : 1;
-  const h = hover === null ? null : days[hover];
-  return (
-    <div>
-      <div className="relative">
-        <div
-          className="flex h-40 items-end gap-[2px] border-b border-separator"
-          role="img"
-          aria-label="Orders per day"
-        >
-          {days.map((d, i) => (
-            <div
-              key={d.date}
-              className="flex h-full flex-1 cursor-default items-end px-[1px]"
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-            >
-              <div
-                className={`w-full rounded-t-[4px] transition-opacity ${hover !== null && hover !== i ? 'opacity-50' : ''} bg-accent`}
-                style={{ height: `${d.total === 0 ? 0 : Math.max(3, (d.total / max) * 100)}%` }}
-              />
-            </div>
-          ))}
+    <section className="mac-card flex flex-col overflow-hidden">
+      <header className="flex items-start justify-between gap-3 border-b border-separator px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-[15px] font-semibold">
+            <Link href={`/admin/shops/${shop.id}`} className="hover:text-accent">
+              {shop.name}
+            </Link>
+          </h2>
+          <p className="truncate text-[12px] text-text-secondary">{shop.address}</p>
         </div>
-        {h && hover !== null && (
-          <div
-            className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-lg border border-separator bg-surface px-2.5 py-1.5 text-[12px] shadow-card"
-            style={{ left: `${((hover + 0.5) / days.length) * 100}%` }}
-          >
-            <div className="font-semibold">{fmtDay(h.date)}</div>
-            <div className="tabular-nums text-text-secondary">
-              {h.total} order{h.total === 1 ? '' : 's'}
-              {h.byStatus.COLLECTED ? ` · ${h.byStatus.COLLECTED} collected` : ''}
-            </div>
-          </div>
-        )}
-      </div>
-      <div className="mt-1.5 flex gap-[2px] text-[11px] text-text-secondary">
-        {days.map((d, i) => (
-          <div key={d.date} className="flex-1 truncate text-center">
-            {i % showEvery === 0 ? fmtDay(d.date) : ''}
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 text-right text-[11px] text-text-secondary">max {max} / day</div>
-    </div>
-  );
-}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {shop.isDemo && (
+            <span className="rounded-full bg-notice px-2 py-0.5 text-[10px] font-semibold tracking-wide text-notice-text">
+              DEMO
+            </span>
+          )}
+          <Pill tone={shopStatusTone(shop.status)}>{humanize(shop.status)}</Pill>
+        </div>
+      </header>
 
-function Meter({ ratio }: { ratio: number | null }) {
-  if (ratio === null) return <span className="text-text-secondary">no data</span>;
-  const pct = Math.round(ratio * 100);
-  return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-28 overflow-hidden rounded-full bg-selection">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+      <div className="flex-1 px-4 py-3">
+        <dl className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
+          <div className="flex items-center gap-1.5">
+            <dt className="text-text-secondary">Mode</dt>
+            <dd className="font-medium">{mode}</dd>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <dt className="text-text-secondary">Shop PC</dt>
+            <dd className="inline-flex items-center gap-1.5 font-medium">
+              <Dot tone={online ? 'green' : shop.devices.length ? 'red' : 'neutral'} />
+              {shop.devices.length === 0 ? 'Not paired' : online ? 'Online' : 'Offline'}
+            </dd>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <dt className="text-text-secondary">Printer</dt>
+            <dd className="inline-flex items-center gap-1.5 font-medium">
+              {printer ? (
+                <>
+                  <Dot tone={printerTone(printer.status)} />
+                  {printer.displayName}
+                  <span className="font-normal text-text-secondary">
+                    ({humanize(printer.status)})
+                  </span>
+                </>
+              ) : (
+                <span className="text-text-secondary">None</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+
+        {printer?.activeJob && (
+          <p className="mt-2 text-[12px] text-text-secondary">
+            Printing{' '}
+            <Link
+              href={`/admin/orders/${printer.activeJob.orderId}`}
+              className="text-accent hover:underline"
+            >
+              {printer.activeJob.publicRef}
+            </Link>{' '}
+            (attempt {printer.activeJob.attempt})
+          </p>
+        )}
+
+        <div className="mt-3 grid grid-cols-5 gap-1.5">
+          {QUEUE_BUCKETS.map((b) => {
+            const count = shop.orderCounts[b.key] ?? 0;
+            return (
+              <div
+                key={b.key}
+                className="rounded-lg bg-selection px-1 py-1.5 text-center"
+                title={b.label}
+              >
+                <div
+                  className={`text-[16px] font-semibold tabular-nums ${
+                    b.key === 'NEEDS_OPERATOR_CHECK' && count > 0 ? 'text-orange' : ''
+                  }`}
+                >
+                  {count}
+                </div>
+                <div className="text-[10px] leading-tight text-text-secondary">{b.label}</div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-      <span className="tabular-nums">{pct}%</span>
-    </div>
+
+      <footer className="flex items-baseline justify-between gap-2 border-t border-separator px-4 py-2 text-[12px]">
+        <span className="text-text-secondary">Today</span>
+        <span className="tabular-nums">
+          {shop.todayOrders} order{shop.todayOrders === 1 ? '' : 's'} ·{' '}
+          {rupees(shop.todayRevenuePaise)}
+          {simulated && <span className="ml-1 text-notice-text">demo</span>}
+        </span>
+      </footer>
+    </section>
   );
 }
