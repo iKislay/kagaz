@@ -73,6 +73,8 @@ const DIRECT_MODELS = new Set([
   'PickupCounter',
   'PrinterUptimeDaily',
   'OperatorSession',
+  'ShopSubscription',
+  'SubscriptionPayment',
 ]);
 
 /** Models owned through a relation to a shop-owned model (relation field names). */

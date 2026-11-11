@@ -70,6 +70,23 @@ export const EnvSchema = z.object({
     .or(z.literal('').transform(() => undefined)),
 
   SENTRY_DSN: z.string().optional(),
+
+  /**
+   * Kagaz superadmin (/sudoadmin): kept in sync with an ADMIN user at every API start. The
+   * password is only ever stored as an Argon2id hash; changing it here rotates it on restart.
+   * Set both or neither.
+   */
+  SUPERADMIN_EMAIL: z
+    .email('SUPERADMIN_EMAIL must be an email address')
+    .transform((v) => v.trim().toLowerCase())
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  SUPERADMIN_PASSWORD: z
+    .string()
+    .min(12, 'SUPERADMIN_PASSWORD must be at least 12 characters')
+    .max(200)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
@@ -94,6 +111,12 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     throw new ConfigError(`Invalid environment configuration:\n${issues}`);
   }
   const config = parsed.data;
+
+  if (!config.SUPERADMIN_EMAIL !== !config.SUPERADMIN_PASSWORD) {
+    throw new ConfigError(
+      'Invalid environment configuration: set both SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD, or neither.',
+    );
+  }
 
   if (config.APP_ENV === AppEnv.PRODUCTION) {
     if (config.PAYMENT_PROVIDER === 'demo') {

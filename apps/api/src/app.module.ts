@@ -19,6 +19,7 @@ import { ShopModule } from './modules/shop/shop.module.js';
 import { PickupModule } from './modules/pickup/pickup.module.js';
 import { ShopsModule } from './modules/shops/shops.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { SudoModule } from './modules/sudo/sudo.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { CustomerAuthModule } from './modules/customer-auth/customer-auth.module.js';
@@ -82,6 +83,7 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
     DevicesModule,
     ShopModule,
     AdminModule,
+    SudoModule,
     IdentityModule,
     CustomerAuthModule,
   ],

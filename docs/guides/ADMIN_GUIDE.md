@@ -5,9 +5,13 @@ For the Kagaz team. The dashboard lives at `/admin` on the website, e.g.
 
 ## 1. Sign in
 
+- Kagaz superadmin: the `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` set in the server's `.env`. The
+  API creates (or updates) this admin account every time it starts, so changing the password in
+  `.env` and restarting rotates it. It can't be removed or reset from `/sudoadmin` → Kagaz admins.
 - Platform admin: `admin@kagaz.local`. Its password is `SEED_ADMIN_PASSWORD`, or, when that is
   unset, a random one printed **once** by `pnpm --filter @kagaz/api db:seed`. Keep it in the team's
   password manager.
+- The platform-owner console (shops, accounts, plans, subscriptions, admins) is at `/sudoadmin`.
 - Shop owners can sign in with their staff account too. They see only **Shops** (their own shop:
   settings, hours, pricing). Every other page needs the platform admin.
 - The session lasts 12 hours. Sign out on shared computers.

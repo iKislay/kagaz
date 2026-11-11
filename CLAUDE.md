@@ -18,7 +18,7 @@ Current target: an **investor-ready working prototype** — 3 shop tenants, 100�
 
 ```
 apps/api/          NestJS modular monolith + Prisma (apps/api/prisma)
-apps/web/          Next.js + Tailwind — customer routes and /admin routes
+apps/web/          Next.js + Tailwind — customer routes, /admin (shop operations) and /sudoadmin (Kagaz platform-owner console)
 apps/shop-agent/   .NET WPF Windows app (Kagaz.ShopAgent.sln: App, Core, Printing, Tests)
 packages/shared/   TS enums, zod schemas, DTO types, money + page-range helpers
 infra/             docker-compose (Postgres + SeaweedFS S3), deploy configs
@@ -27,7 +27,9 @@ test-assets/pdfs/  test PDF corpus (no real personal documents)
 docs/              PRD, implementation plan, ADRs, runbooks, guides, test reports
 ```
 
-API modules live in `apps/api/src/modules/`: `identity`, `shops`, `pricing`, `orders`, `files`, `payments`, `printing`, `pickup`, `notifications`, `audit`, `admin`. Cross-cutting code in `apps/api/src/common/`.
+API modules live in `apps/api/src/modules/`: `identity`, `shops`, `pricing`, `orders`, `files`, `payments`, `printing`, `pickup`, `notifications`, `audit`, `admin`, `sudo`. Cross-cutting code in `apps/api/src/common/`.
+
+`sudo` (`/api/sudo/*`, web `/sudoadmin`, role ADMIN only) is the platform owner's console: onboard shops with an owner account, suspend (no new orders, hidden from customers; paid orders still print) / archive (devices revoked, team access ends) / delete (only shops with no orders), shop team accounts, the subscription plan catalogue, shop subscriptions and manually recorded subscription payments, and Kagaz admin accounts. Subscription money is bookkeeping in integer paise — it never goes through `PaymentProvider` and is separate from customer order payments. Plan limits are informational (not enforced) and an unpaid subscription does not suspend a shop automatically.
 
 ## Commands
 

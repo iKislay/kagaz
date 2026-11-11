@@ -169,6 +169,15 @@ function Sidebar({ me, onLogout }: { me: AdminMe; onLogout: () => Promise<void> 
           >
             {icons.logout} Sign out
           </button>
+          {me.role === 'ADMIN' && (
+            <Link
+              href="/sudoadmin"
+              className="flex shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-text-secondary hover:bg-selection/60 md:mt-auto"
+            >
+              <span>{icons.shops}</span>
+              Kagaz console
+            </Link>
+          )}
         </nav>
         <div className="hidden border-t border-separator p-3 md:block">
           <div className="truncate text-[12px] font-medium">{me.name ?? me.email ?? me.phone}</div>

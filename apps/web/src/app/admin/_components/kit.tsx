@@ -150,6 +150,7 @@ export function Input({
   inputMode?: 'text' | 'numeric' | 'decimal';
   min?: string;
   step?: string;
+  disabled?: boolean;
 }) {
   const id = useId();
   return (

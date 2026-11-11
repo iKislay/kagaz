@@ -13,9 +13,13 @@ export interface ShopCapabilities {
 export class ShopsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Public shop list (FR-CUST-01): status, current rates and capabilities. */
+  /**
+   * Public shop list (FR-CUST-01): status, current rates and capabilities.
+   * Shops suspended or archived by the platform owner (/sudoadmin) are not listed.
+   */
   async listPublic(): Promise<ShopSummary[]> {
     const shops = await this.prisma.shop.findMany({
+      where: { suspendedAt: null, archivedAt: null },
       orderBy: { name: 'asc' },
       include: {
         printers: { where: { enabled: true } },
@@ -84,9 +88,16 @@ export class ShopsService {
 
   /** Why a shop can't take new orders right now, or null when it can. */
   unavailableReason(
-    shop: { status: string; openingHours: unknown },
+    shop: {
+      status: string;
+      openingHours: unknown;
+      suspendedAt?: Date | null;
+      archivedAt?: Date | null;
+    },
     now: Date = new Date(),
-  ): 'SHOP_NOT_OPEN' | 'SHOP_MAINTENANCE' | 'OUTSIDE_OPENING_HOURS' | null {
+  ): 'SHOP_SUSPENDED' | 'SHOP_NOT_OPEN' | 'SHOP_MAINTENANCE' | 'OUTSIDE_OPENING_HOURS' | null {
+    // Suspension blocks new orders only; already-paid orders still print and get collected.
+    if (shop.suspendedAt || shop.archivedAt) return 'SHOP_SUSPENDED';
     if (shop.status === ShopStatus.MAINTENANCE) return 'SHOP_MAINTENANCE';
     if (shop.status !== ShopStatus.OPEN) return 'SHOP_NOT_OPEN';
     if (!isWithinOpeningHours(shop.openingHours, now)) return 'OUTSIDE_OPENING_HOURS';
