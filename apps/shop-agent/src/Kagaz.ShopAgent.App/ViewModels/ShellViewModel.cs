@@ -1,88 +1,118 @@
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Threading;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Kagaz.ShopAgent.App.Services;
 using Kagaz.ShopAgent.Core;
 
 namespace Kagaz.ShopAgent.App.ViewModels;
 
-public sealed class ShellViewModel : ObservableObject
+/// <summary>
+/// Source-list sidebar entry. <paramref name="Icon"/> is a Segoe Fluent Icons line glyph;
+/// <paramref name="Page"/> is the page view model shown in the content area.
+/// <paramref name="RequiresOperator"/> pages show the operator sign-in until someone signs in (P2.3).
+/// </summary>
+public sealed record NavigationItem(string Title, string Icon, string Subtitle, object Page, bool RequiresOperator = false)
 {
-    // macOS system status colors (CLAUDE.md "Design language").
-    private static readonly Brush ConnectedBrush = new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59));
-    private static readonly Brush DisconnectedBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
-    private static readonly Brush CheckingBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x95, 0x00));
+    /// <summary>Used as the accessible name of the sidebar row.</summary>
+    public override string ToString() => Title;
+}
 
-    private string _connectionText = "Checking connection...";
-    private Brush _connectionBrush = CheckingBrush;
+/// <summary>
+/// Window shell: sidebar navigation, connection indicator, signed-in operator, read-only
+/// approval-mode indicator (changed in Settings, ADR-002), update-required banner (P4.4), toasts.
+/// </summary>
+public sealed partial class ShellViewModel : ObservableObject
+{
+    private readonly ShopApiClient _api;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentPage))]
     private NavigationItem? _selectedNavigation;
 
-    public ShellViewModel()
+    public ShellViewModel(
+        AppStatus status,
+        ShopApiClient api,
+        PairingViewModel pairing,
+        OperatorLoginViewModel login,
+        PrintersViewModel printers,
+        JobsViewModel jobs,
+        TodaysPickupsViewModel pickups,
+        SettingsViewModel settings,
+        ShopModeViewModel mode,
+        UpdateViewModel update)
     {
-        Version = GetVersion();
-        WindowTitle = $"Kagaz Shop v{Version}";
+        _api = api;
+        Status = status;
+        Login = login;
+        Mode = mode;
+        Update = update;
+        Version = typeof(ShellViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+        WindowTitle = "Kagaz Shop";
+
         NavigationItems =
         [
-            new NavigationItem("Pairing", "", "Connect this PC to your Kagaz shop."),
-            new NavigationItem("Jobs", "", "Paid orders waiting for you, in queue and printing."),
-            new NavigationItem("Pickup", "", "Verify a customer's pickup code and hand over."),
-            new NavigationItem("Printers", "", "Printers on this PC and what they can do."),
-            new NavigationItem("Settings", "", "Connection and app preferences."),
+            new NavigationItem("Jobs", "", "Paid orders to accept, print and hand over.", jobs, RequiresOperator: true),
+            new NavigationItem("Today's pickups", "", "Today's paid orders by pickup number.", pickups, RequiresOperator: true),
+            new NavigationItem("Printers", "", "Printers on this PC and what they can do.", printers, RequiresOperator: true),
+            new NavigationItem("Pairing", "", "Connect this PC to your Kagaz shop.", pairing),
+            new NavigationItem("Settings", "", "Order approval, connection and app details.", settings),
         ];
-        SelectedNavigation = NavigationItems[0];
+        Jobs = NavigationItems[0];
+        Printers = NavigationItems[2];
+        Pairing = NavigationItems[3];
+        Settings = NavigationItems[4];
+
+        SelectedNavigation = status.IsPaired ? Jobs : Pairing;
+
+        // After pairing, set up printers first (behind the sign-in); after unpairing/revoke, back to pairing.
+        status.Paired += () => SelectedNavigation = Printers;
+        status.Unpaired += () => SelectedNavigation = Pairing;
+        status.PropertyChanged += OnStatusChanged;
     }
 
+    public AppStatus Status { get; }
+    public OperatorLoginViewModel Login { get; }
+    public ShopModeViewModel Mode { get; }
+    public UpdateViewModel Update { get; }
     public string Version { get; }
     public string WindowTitle { get; }
-    public List<NavigationItem> NavigationItems { get; }
+    public IReadOnlyList<NavigationItem> NavigationItems { get; }
 
-    public NavigationItem SelectedNavigation
+    private NavigationItem Jobs { get; }
+    private NavigationItem Printers { get; }
+    private NavigationItem Pairing { get; }
+    private NavigationItem Settings { get; }
+
+    partial void OnSelectedNavigationChanged(NavigationItem? value)
     {
-        get => _selectedNavigation!;
-        set => SetProperty(ref _selectedNavigation, value);
+        // Show the server's approval mode as soon as Settings opens (never PATCHes).
+        if (value is not null && ReferenceEquals(value, Settings)) _ = Mode.LoadAsync();
     }
 
-    public string ConnectionText
+    /// <summary>
+    /// The page to show. Operator pages need a paired PC and a signed-in operator: otherwise the
+    /// pairing screen or the operator sign-in is shown in their place.
+    /// </summary>
+    public object? CurrentPage => SelectedNavigation switch
     {
-        get => _connectionText;
-        private set => SetProperty(ref _connectionText, value);
+        null => null,
+        { RequiresOperator: true } when !Status.IsPaired => Pairing.Page,
+        { RequiresOperator: true } when !Status.IsOperatorSignedIn => Login,
+        var item => item.Page,
+    };
+
+    [RelayCommand]
+    private async Task SignOutAsync()
+    {
+        await _api.OperatorLogoutAsync();
+        Status.ShowToast("Signed out", "Printing of accepted jobs continues.");
     }
 
-    public Brush ConnectionBrush
+    private void OnStatusChanged(object? sender, PropertyChangedEventArgs e)
     {
-        get => _connectionBrush;
-        private set => SetProperty(ref _connectionBrush, value);
-    }
-
-    public Task UpdateConnectionAsync(HealthResult result)
-    {
-        Dispatcher? dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (e.PropertyName is nameof(AppStatus.IsPaired) or nameof(AppStatus.OperatorName))
         {
-            Apply(result);
-            return Task.CompletedTask;
+            OnPropertyChanged(nameof(CurrentPage));
         }
-
-        return dispatcher.InvokeAsync(() => Apply(result)).Task;
-    }
-
-    private void Apply(HealthResult result)
-    {
-        if (result.IsSuccess)
-        {
-            ConnectionText = "Connected";
-            ConnectionBrush = ConnectedBrush;
-        }
-        else
-        {
-            ConnectionText = $"Disconnected: {result.FailureReason ?? "unknown error"}";
-            ConnectionBrush = DisconnectedBrush;
-        }
-    }
-
-    private static string GetVersion()
-    {
-        Version? version = typeof(ShellViewModel).Assembly.GetName().Version;
-        return version is null ? "0.0.0" : version.ToString(3);
     }
 }

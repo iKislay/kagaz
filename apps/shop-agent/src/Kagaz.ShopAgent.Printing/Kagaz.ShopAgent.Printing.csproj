@@ -2,5 +2,10 @@
   <PropertyGroup>
     <RootNamespace>Kagaz.ShopAgent.Printing</RootNamespace>
     <AssemblyName>Kagaz.ShopAgent.Printing</AssemblyName>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Kagaz.ShopAgent.Core/Kagaz.ShopAgent.Core.csproj" />
+    <PackageReference Include="Docnet.Core" Version="2.6.0" />
+  </ItemGroup>
 </Project>

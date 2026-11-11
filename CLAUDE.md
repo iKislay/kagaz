@@ -42,11 +42,24 @@ pnpm test                                             # shared + api unit tests 
 pnpm lint && pnpm typecheck && pnpm format:check
 pnpm build                                            # all TS packages
 pnpm --filter @kagaz/api prisma:generate              # regenerate Prisma client (also run by build/test)
-pnpm --filter @kagaz/api exec prisma migrate dev      # (planned, P1.1) apply migrations
-pnpm --filter @kagaz/api db:seed                      # (planned, P1.1) 3 demo shops, admin, enrollment code
+pnpm --filter @kagaz/api db:migrate                   # apply/create migrations (dev DB)
+pnpm --filter @kagaz/api db:seed                      # 3 demo shops, staff, prints a device pairing code
+pnpm --filter @kagaz/api test:e2e                     # e2e vs real Postgres + S3 (isolated <db>_test DB)
+pnpm --filter @kagaz/api demo:order -- --pages 3 --copies 2   # place a paid DEMO order via the API
+pnpm sim:agent -- --shop demo-shop-b --api http://localhost:4105/api   # headless shop agent (never prints)
+pnpm load:orders -- --orders 200 --api http://localhost:4105/api --collect   # T18 load run
+pnpm verify:run -- --manifest <path printed by load:orders> --out docs/testing/T18-load-run.md
+pnpm demo:reset [-- --yes] [-- --shop demo-shop-a]     # wipe demo-shop orders (refuses in production)
+docker build -f apps/api/Dockerfile -t kagaz-api .     # --target migrate for the migration image
+docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=... -t kagaz-web .
+docker compose -f infra/docker-compose.demo.yml --env-file infra/demo.env up -d --build
+pwsh scripts/build-shop-agent-installer.ps1           # Velopack Setup.exe + update feed (needs internet once)
 dotnet build apps/shop-agent/Kagaz.ShopAgent.sln
-dotnet test  apps/shop-agent/Kagaz.ShopAgent.sln
+dotnet test  apps/shop-agent/tests/Kagaz.ShopAgent.Tests/Kagaz.ShopAgent.Tests.csproj   # .sln run can crash MSBuild
 ```
+
+Scripts default to `http://localhost:$API_PORT/api` (4000 = the live printer server): pass `--api` when testing elsewhere.
+Shop app `appsettings.json` keys: `ApiBaseUrl`, `SafetyPollSeconds`, `TokenRotationDays`, `RealtimeEnabled`, `UpdateFeedUrl`.
 
 Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/SeaweedFS aren't running), `GET /api/config` (drives the web DEMO banner).
 
@@ -75,10 +88,10 @@ These come straight from the PRD. Breaking any of them is a bug, regardless of w
 6. **Payment status ≠ order status.** They are stored separately and never merged.
 7. **One packet, one job.** Customer pages × copies + spacers + exactly **one** pickup slip at the end, in **one PDF**, submitted as **one** spooler job with driver copies = 1. Never print the slip as a separate job.
 8. **No silent duplicate prints.** One active lease per printer. A `PrintJob` attempt is never resubmitted after reconnect/restart. Uncertain outcome → `NEEDS_OPERATOR_CHECK`. Reprint = new attempt + explicit operator confirmation + audit.
-9. **READY needs a human.** Spooler "complete" is telemetry only. `READY_FOR_PICKUP` requires the operator's Mark Ready.
+9. **Printing finished = ready** ([ADR-002](docs/decisions/ADR-002-daily-pickup-number.md)). `SPOOLER_COMPLETE` with no printer error moves `PRINTING → READY_FOR_PICKUP` (actor SYSTEM); there is no Mark Ready and no pickup verification. Failed/uncertain attempts or printer errors go to `NEEDS_OPERATOR_CHECK`, never READY; reprint still needs explicit operator confirmation.
 10. **Tenant isolation.** Every shop/device query is scoped by `shopId` derived from the authenticated device/staff identity — never from a path/body parameter. Cross-tenant access returns 404.
 11. **Files are private.** Private bucket only; short-lived signed URLs (upload ≤ 10 min, download ≤ 5 min); never log signed URLs; validate PDFs by content (magic bytes, parse, encryption, page count, size), never by filename/MIME.
-12. **Pickup codes:** CSPRNG, 8 chars from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; store HMAC (peppered) + AES-GCM display value, never plaintext; one-time consumption via conditional update; rate-limited; failures audited. Never print the customer's full phone number on the slip.
+12. **Pickup code = daily number** ([ADR-002](docs/decisions/ADR-002-daily-pickup-number.md)): per shop, #1, #2, … from midnight Asia/Kolkata, assigned atomically when payment is verified, unique per `(shop, business date)`, never reused or changed for an order (reprints keep it). Slip and customer page show it large with the date (`#7 · 7 Nov`). Call it "pickup code" everywhere. Never print the customer's full phone number on the slip.
 13. **REST for commands, WebSocket for hints.** Anything delivered by socket must also be recoverable via REST polling.
 14. **Secrets stay on the server.** No gateway secrets in `apps/web` or `apps/shop-agent`. Device token is stored with DPAPI on Windows and hashed server-side.
 
@@ -154,6 +167,8 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 
 ## Status
 
-- Current phase: **Phase 0 — Foundation** complete (P0.1–P0.6). Next: Phase 1 vertical slice.
+- 2026-11-10: Phase 2–5 workstreams merged (see plan). Pickup model changed by ADR-002.
+- 2026-11-11: `phase-1-vertical-slice` merged to `main` (PR #3); CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit, API e2e and shop-agent tests. P4.1, P4.8, P5.2 done.
+- Remaining: hardware drills and rehearsal (P1.11, P2.8–P2.10, P4.6, P5.1), P4.2 three devices, deployment (P5.3), installer test (P5.4), docs (P5.5), investor assets (P5.7).
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
 - Payments: **DEMO only**; live gateway gated by **D6** (merchant of record).

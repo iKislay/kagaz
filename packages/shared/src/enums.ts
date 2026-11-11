@@ -97,3 +97,13 @@ export const UserRole = {
   ADMIN: 'ADMIN',
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+/** Simulated gateway outcomes for demo payments (P3.5). Never available in production. */
+export const DemoPaymentOutcome = {
+  SUCCESS: 'SUCCESS',
+  FAIL: 'FAIL',
+  PENDING: 'PENDING',
+  DUPLICATE_WEBHOOK: 'DUPLICATE_WEBHOOK',
+  OUT_OF_ORDER: 'OUT_OF_ORDER',
+} as const;
+export type DemoPaymentOutcome = (typeof DemoPaymentOutcome)[keyof typeof DemoPaymentOutcome];

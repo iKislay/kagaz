@@ -1,8 +1,13 @@
 # Kagaz Shop Agent
 
-Windows desktop app skeleton for Kagaz print shops (Phase 0 — stage P0.6). The app runs on a shop's Windows machine and is the host for future pairing, job-list, and printing logic.
+Windows app for Kagaz print shops (stages P1.9–P1.10, P2.3–P2.11, P4.4, P5.4): pair the PC with a shop, register printers, review and
+accept paid orders (or let Auto mode do it), print each order as **one** spooler job (customer pages × copies + one
+pickup slip), and see today's pickups by daily pickup number (#1, #2 …, ADR-002). Same macOS-style design language as the web app
+(tokens and shared styles in `src/Kagaz.ShopAgent.App/App.xaml`).
 
-This is a skeleton only: it shows the shell, navigation placeholders, health polling, single-instance guard, DPAPI device-token store, and structured logging. No pairing, job list, or printing logic is implemented yet.
+Projects: `App` (WPF UI, view models, background services), `Core` (shop API client, local state, reconciliation),
+`Printing` (`IPrintEngine`, PDFium engine, spooler lookup), `PrintHost` (helper exe the app runs for each print so
+a driver/renderer crash can't take the app down), `Tests`.
 
 ## Prerequisites
 - Windows 10/11 x64
@@ -28,9 +33,43 @@ dotnet run --project apps/shop-agent/src/Kagaz.ShopAgent.App -c Release
 - Logs: `%LOCALAPPDATA%\Kagaz\logs\agent-<date>.log` (rolling daily, 14 files retained, plus Debug output). Never contains the device token.
 - Device token: `%LOCALAPPDATA%\Kagaz\device.token` (DPAPI-encrypted; never plaintext; never in `appsettings.json`)
 
+- Local print state: `%LOCALAPPDATA%\Kagaz\state.json` (per-attempt phase for crash reconciliation, chosen API URL, pause flag)
+- "Microsoft Print to PDF" output: `%LOCALAPPDATA%\Kagaz\print-to-pdf\KAGAZ-<ref>-A<attempt>.pdf` (no Save dialog)
+
+## Operators, pairing and mode
+- After pairing, an operator signs in (email/phone + password). The operator token lives in memory only and is sent as
+  `X-Operator-Token` on human actions; `401 OPERATOR_LOGIN_REQUIRED` returns to the sign-in. Printing of accepted
+  jobs continues while signed out.
+- `401 DEVICE_REVOKED` anywhere wipes the DPAPI token and shows "Device revoked, re-pair required". The device token
+  is rotated weekly (and from Settings).
+- Order approval (Manual | Auto, Pause auto-accept) is a shop setting on the **Settings** page (ADR-002); the sidebar
+  shows it read-only. It reflects the heartbeat / `shop.mode_changed` / `GET /shop/mode`; only an operator's change
+  sends `PATCH /shop/mode`.
+
+## How printing works (Appendix A.2–A.4)
+- Per-printer local queue in `state.json`, rebuilt from the server's QUEUED jobs. The worker leases the head of each
+  free printer's queue (`409 PRINTER_BUSY` / `NOT_NEXT_IN_QUEUE` → wait), downloads the packet, verifies SHA-256,
+  persists the local phase, then prints it through `Kagaz.ShopAgent.PrintHost.exe` (PDFium render on the STA main
+  thread → one `PrintDocument`, copies = 1, A4, explicit duplex/colour, `DocumentName = KAGAZ-<ref>-A<attempt>`).
+- Reports SUBMITTED, then `SpoolerMonitor` watches the spooler (`System.Printing`) and reports SPOOLER_COMPLETE
+  (the server then moves the order to READY_FOR_PICKUP by itself, ADR-002), FAILED (reason) or UNCERTAIN. There is no
+  Mark Ready and no pickup verification; Confirm printed (needs check) is the only manual way to Ready.
+- Heartbeat every 15 s: app version, OS, uptime, queue depth, `activePrintJobIds` (renews leases), printer health.
+- On start and every reconnect it reconciles (A.3): resume monitoring what is still in the spooler, FAILED
+  NOT_SUBMITTED for attempts that never reached the printer, UNCERTAIN for anything unprovable. Never prints twice.
+- Socket.IO `/shop` hints (`job.created`, `job.updated`, `shop.mode_changed`, `device.revoked`) wake the REST refresh;
+  10 s safety poll while connected, 5 s while not. Needs-check orders offer Confirm printed / Reprint (two
+  confirmations) / Mark failed.
+- Jobs rows and the detail pane show the pickup number ("#7", with the date when it is not today's); the Ready tab is
+  sorted by number, newest first. **Today's pickups** lists today's paid orders by number with Waiting / Printing /
+  Ready / Needs check and a quick number filter (type 7).
+
+## Installer
+`scripts/build-shop-agent-installer.ps1 -Version x.y.z` → `artifacts/shop-agent/releases/KagazShop-win-Setup.exe`
+(Velopack, per-user). See `docs/guides/SHOP_AGENT_INSTALL.md`.
+
 ## Notes
-- Single-instance guard via named Mutex `Kagaz.ShopAgent.SingleInstance`.
-- Window title shows "Kagaz Shop" plus the app version.
-- Left nav: Pairing, Jobs, Pickup, Printers, Settings (each shows title + "Coming in Phase 1").
-- Connection indicator polls `GET {ApiBaseUrl}/health` on startup and every 15 s; shows "Connected" (green) or "Disconnected: <short reason>" (red).
-- Configuration: `appsettings.json` — `ApiBaseUrl`, `PollIntervalSeconds`, `HeartbeatSeconds`, `PrintEngine`, `MaxRenderDpi`.
+- Single-instance guard via named Mutex `Kagaz.ShopAgent.SingleInstance`. Outbound HTTPS/HTTP only; no listening ports.
+- Configuration: `appsettings.json` — `ApiBaseUrl` (overridden by the address used when pairing), `PollIntervalSeconds`,
+  `SafetyPollSeconds`, `HeartbeatSeconds`, `TokenRotationDays`, `RealtimeEnabled`, `UpdateFeedUrl`, `MaxRenderDpi`,
+  `PrintToFileFolder` (testing only: print every job to PDF files).

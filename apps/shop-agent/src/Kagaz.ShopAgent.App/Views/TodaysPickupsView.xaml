@@ -1,0 +1,99 @@
+<UserControl x:Class="Kagaz.ShopAgent.App.Views.TodaysPickupsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
+             xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:TodaysPickupsViewModel}"
+             d:DesignHeight="700" d:DesignWidth="900">
+    <!-- ADR-002: a list, not a verification step. Customers say "number 7"; find it here or in the stack. -->
+    <Grid MaxWidth="760" HorizontalAlignment="Left">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Today's pickups" Style="{StaticResource TitleText}" />
+                <TextBlock Style="{StaticResource SubtitleText}" Margin="0,4,0,16" TextWrapping="Wrap">
+                    <Run Text="{Binding CountsText, Mode=OneWay}" />
+                    <Run Text="{Binding LastUpdated, Mode=OneWay}" />
+                </TextBlock>
+            </StackPanel>
+            <Button Grid.Column="1" Style="{StaticResource QuietButton}" Command="{Binding RefreshCommand}" ToolTip="Refresh now"
+                    VerticalAlignment="Top" Margin="0,6,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
+                    <TextBlock Text="Refresh" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- Quick number filter: type 7 → #7 is selected at the top. -->
+        <Grid Grid.Row="1" Margin="0,0,0,16" MaxWidth="360" HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox AutomationProperties.Name="Find pickup number" Style="{StaticResource TextField}"
+                     Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" FontSize="18" Padding="36,8,12,8" MaxLength="20" />
+            <TextBlock Text="&#xE721;" Style="{StaticResource IconText}" FontSize="14" Margin="12,0,0,0" IsHitTestVisible="False"
+                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Left" />
+            <TextBlock Text="Type a number, e.g. 7" Style="{StaticResource SecondaryText}" FontSize="15" Margin="37,0,0,0" IsHitTestVisible="False"
+                       VerticalAlignment="Center" HorizontalAlignment="Left"
+                       Visibility="{Binding HasFilter, Converter={StaticResource InverseBoolToVisibility}}" />
+            <Button Grid.Column="1" Content="Clear" Style="{StaticResource QuietButton}" Command="{Binding ClearFilterCommand}" Margin="10,0,0,0"
+                    Visibility="{Binding HasFilter, Converter={StaticResource BoolToVisibility}}" />
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="8">
+            <Grid>
+                <ListBox AutomationProperties.Name="Today's pickups" ItemsSource="{Binding Pickups}" SelectedItem="{Binding Selected}"
+                         Background="Transparent" BorderThickness="0" Padding="0"
+                         ItemContainerStyle="{StaticResource RowItem}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:JobItem}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="96" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding DisplayPickupNumber}" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold"
+                                           Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding PublicRef}" Style="{StaticResource HeadlineText}" FontSize="14" />
+                                    <TextBlock Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding DisplayPages, Mode=OneWay}" /><Run Text=" × " /><Run Text="{Binding DisplayCopies, Mode=OneWay}" />
+                                        <Run Text="·" />
+                                        <Run Text="{Binding DisplayMode, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding DisplaySides, Mode=OneWay}" />
+                                    </TextBlock>
+                                </StackPanel>
+                                <Border Grid.Column="2" Style="{StaticResource StatusPill}" VerticalAlignment="Center" Margin="10,0,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="7" Height="7" Fill="{Binding Status, Converter={StaticResource StatusBrush}}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding PickupStatus}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
+                            Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="&#xE8FD;" Style="{StaticResource IconText}" FontSize="28" Foreground="#40000000" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding EmptyText}" Style="{StaticResource SecondaryText}" Margin="0,10,0,0" TextWrapping="Wrap"
+                               TextAlignment="Center" MaxWidth="360" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

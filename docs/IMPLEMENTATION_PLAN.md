@@ -139,21 +139,21 @@ kagaz/
 
 **Simplifications allowed in this phase (removed later):** guest customer with tracking link (no OTP), polling instead of WebSocket, device token from seed/enrollment code without operator login, single printer per shop, no lease expiry handling, synchronous packet build.
 
-### P1.1 — Database schema v1 + seed `[ ]`
+### P1.1 — Database schema v1 + seed `[x]`
 
 - Prisma schema with **all** PRD §10 entities, enums, constraints and indexes (unique `public_ref`, `(provider, provider_event_id)`, `(order_id, attempt)`, `pickup_code.order_id`; `shop_id` indexes; `Order.version` for optimistic locking).
 - Initial migration.
 - Seed script: 3 demo shops in Mandya (e.g. "Kagaz Demo — PES College Gate", "Kagaz Demo — Mandya Bus Stand", "Kagaz Demo — VV Nagar"), `is_demo=true`, `OPEN`, `MANUAL` mode; pricing (e.g. mono ₹2/side = 200 paise, colour ₹10/side, min ₹5); one admin user; one owner + one operator per shop; one printer record for Shop 1; a one-time enrollment code for Shop 1 printed to console.
 - **Done when:** `pnpm --filter api prisma migrate dev && pnpm --filter api db:seed` produces 3 shops; re-running seed is idempotent.
 
-### P1.2 — Pricing module + quote `[ ]`
+### P1.2 — Pricing module + quote `[x]`
 
 - Pure function `calculateQuote(pricing, options, pageCount)` implementing PRD §8.2 in integer paise.
 - `PricingService.getEffectivePricing(shopId, at)`.
 - Unit tests: mono/colour, copies, page ranges, minimum charge, duplex rules, zero/negative/overflow guards, no floats.
 - **Done when:** tests cover every branch of the formula (T03 logic).
 
-### P1.3 — Storage + upload + PDF validation `[ ]`
+### P1.3 — Storage + upload + PDF validation `[x]`
 
 - `StorageService` interface (`createUploadUrl`, `createDownloadUrl`, `head`, `getObject`, `putObject`, `delete`) with S3 implementation (works with SeaweedFS locally and R2/S3).
 - `POST /api/orders/{id}/upload-url` → signed PUT (TTL 10 min, content-length limit, `application/pdf`), object key `orders/{orderId}/original/{uuid}.pdf` (no customer filename in key).
@@ -162,7 +162,7 @@ kagaz/
 - Tests against [test corpus](#appendix-c--test-pdf-corpus).
 - **Done when:** valid PDF → page count + checksum stored; each invalid sample returns its specific error (T01, T02); direct unsigned GET to the bucket returns 403.
 
-### P1.4 — Order state machine + order endpoints `[ ]`
+### P1.4 — Order state machine + order endpoints `[x]`
 
 - `OrderStateMachine.transition(orderId, to, actor, {reason, metadata, expectedVersion})`: validates against the transition table (PRD §9.1), conditional update on `version`, writes `OrderEvent`, all inside one Prisma transaction; emits domain event after commit.
 - `POST /api/orders` (shopId, options) → `DRAFT`, `public_ref` (`KGZ-` + 6 chars from the pickup alphabet), tracking token (random 32 bytes, stored hashed, returned once).
@@ -172,7 +172,7 @@ kagaz/
 - Unit tests: every allowed transition, every forbidden transition throws, concurrent transition (stale version) fails cleanly.
 - **Done when:** draft → upload → awaiting payment works via HTTP; forbidden transitions rejected.
 
-### P1.5 — Payment interface + DemoMockProvider `[ ]`
+### P1.5 — Payment interface + DemoMockProvider `[x]`
 
 - `PaymentProvider` interface exactly as PRD §8.7; `PAYMENT_PROVIDER` token resolved by config.
 - `DemoMockProvider.createPayment` → returns `{ providerOrderId: "DEMO-ORD-<ref>", mode: "DEMO_AUTO_APPROVE" }`; then `PaymentsService` records verification via `fetchPaymentStatus` (mock returns PAID, `providerPaymentId: "DEMO-PAY-<ref>"`) **inside the backend**.
@@ -180,7 +180,7 @@ kagaz/
 - Price snapshot written when payment is created.
 - **Done when:** paying twice yields one payment and one `PENDING_REVIEW` event (T04 core); request body `amount` is ignored.
 
-### P1.6 — Customer website flow `[ ]`
+### P1.6 — Customer website flow `[x]`
 
 - `/`: shop cards (name, address, status, rates, DEMO tag).
 - `/order/new?shop=`: upload (direct PUT with progress) → validation result → options form (copies, B/W/colour; duplex + page range may be shown if ready) → live server quote with breakdown.
@@ -189,7 +189,7 @@ kagaz/
 - Mobile-first layout (360 px).
 - **Done when:** a full order reaches `PENDING_REVIEW` from a phone-sized browser with no console errors.
 
-### P1.7 — Pickup code + slip + packet builder `[ ]`
+### P1.7 — Pickup code + slip + packet builder `[x]`
 
 - `PickupCodeService.generate()` — CSPRNG over `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, 8 chars; store `HMAC-SHA256(pepper, code)` and AES-256-GCM encrypted display value.
 - `SlipRenderer` (pdf-lib, embedded font + logo) per PRD §8.6.
@@ -197,7 +197,7 @@ kagaz/
 - Unit tests: page count of packet for simplex/duplex × odd/even × copies; slip is last page; slip text contains code & ref; no phone number.
 - **Done when:** a generated packet opened in a PDF viewer shows pages × copies, correct spacers and one slip at the end.
 
-### P1.8 — Shop/device API (slice) `[ ]`
+### P1.8 — Shop/device API (slice) `[x]`
 
 - `POST /api/devices/enroll` (enrollment code → device token; store SHA-256 hash; code single-use).
 - `DeviceAuthGuard` resolves `shopId` + `deviceId` from `Authorization: Bearer <deviceToken>`; every shop endpoint uses that `shopId` (never a path param).
@@ -211,7 +211,7 @@ kagaz/
 - e2e tests (supertest) for the full happy path and double-pickup rejection (T15).
 - **Done when:** the whole lifecycle can be driven by HTTP calls alone.
 
-### P1.9 — Windows app: pairing + job list + actions `[ ]`
+### P1.9 — Windows app: pairing + job list + actions `[x]`
 
 - Pairing screen: API URL + enrollment code → stores device token via DPAPI.
 - Jobs screen: polls `GET /api/shop/jobs` every 5 s; tabs Pending / Queue / Printing / Ready; toast + sound on new pending job.
@@ -219,7 +219,7 @@ kagaz/
 - Printer setup: list installed printers (`PrinterSettings.InstalledPrinters`), operator picks the shop printer and confirms colour/duplex; `PUT /api/shop/printers`.
 - **Done when:** a paid web order appears within 5 s and can be accepted/rejected from the app.
 
-### P1.10 — Windows app: print engine + ready + pickup `[ ]`
+### P1.10 — Windows app: print engine + ready + pickup `[x]`
 
 - `IPrintEngine.PrintAsync(pdfPath, PrintRequest{ printerName, colour, duplex, paper=A4, copies=1, documentName })`.
 - Implementation (see [Appendix A.4](#a4-windows-print-engine)): render PDF pages with PDFium and print through a single `PrintDocument` job with explicit `PrinterSettings` (duplex, colour, A4, copies=1) and `DocumentName = KAGAZ-<ref>-A<attempt>`. Keep a fallback engine (SumatraPDF CLI) behind config for the demo if PDFium rendering misbehaves on the chosen printer.
@@ -228,8 +228,10 @@ kagaz/
 - **Mark Ready** button with confirmation "I have checked the printed stack and the pickup slip".
 - **Verify Pickup** screen: 8-char input (auto-uppercase, strips spaces/dashes) → shows order summary → success / error states.
 - **Done when:** a real printer outputs customer pages followed by exactly one slip (T10 manual run), and the code on the slip verifies the order to `COLLECTED`.
+- **Status (2026-11-06):** everything verified end to end on the virtual _Microsoft Print to PDF_ printer — one 7-page job for 3 pages × 2 copies with the slip last, Mark Ready with confirmation, pickup success then `PICKUP_ALREADY_USED`, crash → reconciliation → NEEDS_OPERATOR_CHECK without reprint ([run notes](testing/p1-10-shop-app-virtual-printer.md)). Printing runs in a separate `Kagaz.ShopAgent.PrintHost.exe` so a driver/renderer crash only fails that attempt. **Open:** SumatraPDF fallback engine (only if PDFium misbehaves on a printer).
+- **Status (2026-11-07):** **T10 passed on a real printer** (Canon G2010, USB, vendor driver; working default for D1 = this laptop + Canon): one spooler job `KAGAZ-<ref>-A1` with 5 A4 pages for 2 pages × 2 copies, slip last, confirmed on paper; Mark Ready → code on the website → pickup COLLECTED, reuse and wrong code rejected ([run notes](testing/T10-real-printer-canon-g2010.md)). An HP Smart Tank 580-590 on the Microsoft IPP Class Driver could not be reached by Windows (CreateIC error 995); both attempts ended in NEEDS_OPERATOR_CHECK with no reprint.
 
-### P1.11 — End-to-end rehearsal + demo assets `[ ]`
+### P1.11 — End-to-end rehearsal + demo assets `[~]`
 
 - Deploy demo environment (can be a single VM / managed services: API + web + Postgres + R2) **or** run locally with a tunnel if time is short — document which.
 - `docs/demo/DEMO_RUNBOOK.md`: pre-flight checklist (printer paper/toner, agent paired, shops open, demo data reset), the 7-step script (PRD §18), recovery steps.
@@ -242,38 +244,47 @@ kagaz/
 
 **Goal:** replace slice shortcuts with real identity, durable queue/lease semantics, realtime, recovery, retention and basic admin.
 
-### P2.1 — Transactional hardening + audit `[ ]`
+> **Status 2026-11-10.** Phase 2–5 work was built by five parallel workstreams and merged on
+> `phase-1-vertical-slice` (139 e2e, 152 unit, 149 shop-app tests green). Open items per stage:
+> P1.11 rehearsals + video (runbook and `demo:reset` done) · P2.8/P2.10/P4.6 hardware drills
+> (T12/T13; logic unit-tested) · P2.9 live socket check against the shop app · P4.1 Prisma
+> shopId-assertion extension (helpers + T09 suite done) · P4.2 three paired devices · P4.8 audit
+> spot-check of 10 load-run orders · P5.3 cloud deploy (images + compose built locally, no accounts) ·
+> P5.4 fresh-machine install and vN→vN+1 update test. P4.5 is superseded by
+> [ADR-002](decisions/ADR-002-daily-pickup-number.md) (daily pickup number, auto-ready).
+
+### P2.1 — Transactional hardening + audit `[x]`
 
 - Audit module: `AuditService.record(actor, action, {shopId, orderId, metadata})`, called inside the same transaction as the change for all human actions (FR-OPS-01).
 - Idempotency interceptor for mutating shop/agent endpoints (`Idempotency-Key` → `IdempotencyRecord`; same key + same body → stored response; same key + different body → 409).
 - Outbox-style post-commit event emission (domain events collected during the transaction, published after commit).
 - **Done when:** replaying accept/ready/verify with the same key returns identical responses and no extra events.
 
-### P2.2 — Customer identity (OTP) `[ ]`
+### P2.2 — Customer identity (OTP) `[x]`
 
 - `OtpProvider` interface; `DemoOtpProvider` (demo/local only — OTP visible in the demo admin "OTP inbox" page and API logs; refuses to load in production); live provider deferred (D9).
 - `POST /api/auth/otp/request` (rate-limited per phone + IP), `POST /api/auth/otp/verify` → session cookie (httpOnly, Secure, SameSite=Lax, signed JWT, 7-day).
 - Orders linked to `customer_id`; tracking-link access still supported (read-only).
 - **Done when:** customer can sign in by OTP and see their orders; OTP brute force is rate-limited.
 
-### P2.3 — Staff accounts, roles and operator login `[ ]`
+### P2.3 — Staff accounts, roles and operator login `[x]`
 
 - Staff login (email/phone + password, Argon2id) for `ADMIN`, `SHOP_OWNER`, `SHOP_OPERATOR`; `RolesGuard` + `ShopScopeGuard`.
 - Windows app: operator login after pairing; requests carry device token + operator session; audit attributes actions to the operator.
 - **Done when:** an operator from Shop A cannot log into a Shop B device; actions show the operator's name in the audit log.
 
-### P2.4 — Device enrollment (proper) `[ ]`
+### P2.4 — Device enrollment (proper) `[x]`
 
 - Admin endpoint/UI to create enrollment codes (single-use, 30 min expiry, hashed); list and revoke devices; revoked token → 401 and the app returns to pairing screen.
 - Token rotation endpoint for the agent.
 - **Done when:** enroll → revoke → app shows "Device revoked, re-pair required".
 
-### P2.5 — Per-shop pricing management `[ ]`
+### P2.5 — Per-shop pricing management `[x]`
 
 - Pricing versions with `effective_from`; owner/admin can create new version; quote uses the latest effective row; existing orders keep snapshot.
 - **Done when:** changing price after a quote does not change the already-created order amount (T03 snapshot part).
 
-### P2.6 — Approval modes + guarded auto-accept `[ ]`
+### P2.6 — Approval modes + guarded auto-accept `[x]`
 
 - `AutoAcceptPolicy.evaluate(order, shop, printers, queueStats)` → `{ eligible, reasons[] }` implementing PRD §8.4.
 - On payment verified: if eligible → accept path (same code as manual accept, actor `SYSTEM`) → `QUEUED`; else → `PENDING_REVIEW` with reasons stored in the event.
@@ -281,7 +292,7 @@ kagaz/
 - Unit tests per precondition; integration test for offline printer and over-limit holds (T08).
 - **Done when:** T08 passes for eligible, offline, unsupported-colour and over-limit cases.
 
-### P2.7 — Durable per-printer queue + leases `[ ]`
+### P2.7 — Durable per-printer queue + leases `[x]`
 
 - Lease acquisition as a single conditional update ([Appendix A.2](#a2-printer-lease)): succeeds only if the printer has no active job or its lease expired, and this job is the oldest `READY` job for that printer.
 - Lease TTL 60 s, renewed by agent heartbeat every 15 s; job status reports also renew.
@@ -289,19 +300,19 @@ kagaz/
 - Agent: per-printer local queue persisted in `%LOCALAPPDATA%\Kagaz\state.json` (job id, attempt, local phase).
 - **Done when:** two agents racing for the same printer → only one wins; killing the agent mid-print → order lands in `NEEDS_OPERATOR_CHECK` after TTL (T13/T14 server side).
 
-### P2.8 — Agent reconnect reconciliation `[ ]`
+### P2.8 — Agent reconnect reconciliation `[~]`
 
 - On startup/reconnect, agent runs [Appendix A.3](#a3-agent-reconciliation-on-startup--reconnect): compares local state, server jobs and the Windows spooler; continues monitoring jobs still in the spooler; reports `UNCERTAIN` for anything it can't prove; **never** re-submits an attempt.
 - **Done when:** T13 manual drill (pull network cable mid-queue; restart PC mid-print) produces no duplicate output.
 
-### P2.9 — Realtime notifications `[ ]`
+### P2.9 — Realtime notifications `[~]`
 
 - Socket.IO gateway: `/customer` (auth by session or tracking token, room `order:{id}`), `/shop` (device token, room `shop:{shopId}`), `/admin`.
 - Events per PRD §12, emitted post-commit.
 - Web: replace polling with socket + 30 s safety poll; Windows app: SocketIOClient + 10 s safety poll; reconnect with exponential backoff.
 - **Done when:** pay → job appears in app in < 3 s; disabling the socket still delivers within the poll interval.
 
-### P2.10 — Spooler monitoring + printer health `[ ]`
+### P2.10 — Spooler monitoring + printer health `[~]`
 
 - Agent monitors its submitted job via `System.Printing` (`PrintQueue`, `PrintSystemJobInfo`): spooling, printing, error, offline, paper out, deleted, completed.
 - Maps to `POST /status` (`SPOOLER_COMPLETE`, `FAILED` with reason) and printer status in heartbeat (`READY`, `OFFLINE`, `PAPER_OUT`, `ERROR`).
@@ -309,21 +320,21 @@ kagaz/
 - Release printer lease when the spooler job leaves the queue (completed or deleted).
 - **Done when:** unplugging the printer / removing paper on the demo model shows the right status in the app and holds the order (T12, real hardware).
 
-### P2.11 — Needs-check resolution + safe reprint `[ ]`
+### P2.11 — Needs-check resolution + safe reprint `[x]`
 
 - `POST /api/shop/jobs/{orderId}/resolve` with `CONFIRM_PRINTED` (→ READY), `REPRINT` (requires `confirm: true`; marks old job `SUPERSEDED`; creates attempt+1 with the **same packet** and pickup code; order → `QUEUED`), `MARK_FAILED` (→ `REJECTED` → refund).
 - Windows app: Needs-check tab with clear warning copy ("Check the printer output tray before reprinting — reprinting may produce duplicate pages").
 - All actions audited.
 - **Done when:** T14 passes; reprint creates attempt 2 and an audit entry.
 
-### P2.12 — File retention + signed-URL expiry `[ ]`
+### P2.12 — File retention + signed-URL expiry `[x]`
 
 - Scheduled job (hourly): delete objects per PRD §14.3, set `FileAsset.deleted_at`; abandoned `DRAFT`/`AWAITING_PAYMENT` orders → `CANCELLED` after expiry.
 - Config: `RETENTION_AFTER_COLLECTED_HOURS=24`, `UNPAID_ORDER_EXPIRY_HOURS=24`.
 - Test with shortened durations.
 - **Done when:** T17 passes (object gone; old signed URL returns 403/404).
 
-### P2.13 — Basic admin screens `[ ]`
+### P2.13 — Basic admin screens `[x]`
 
 - `/admin` (role-protected): login, shop list (status, mode, device online, queue depth), order search + detail with event history, audit log viewer.
 - **Done when:** admin can find any order by ref and see its full history.
@@ -334,21 +345,21 @@ kagaz/
 
 **Goal:** a frozen, tested payment boundary with full webhook/refund semantics, so a live gateway is "just another adapter".
 
-### P3.1 — Freeze `PaymentProvider` + contract test suite `[ ]`
+### P3.1 — Freeze `PaymentProvider` + contract test suite `[x]`
 
 - Finalize types: `PaymentSession`, `VerifiedPaymentEvent` (`eventId`, `type`, `providerOrderId`, `providerPaymentId`, `amountPaise`, `status`, `occurredAt`), `PaymentStatus`, `RefundResult`.
 - Reusable contract test suite (`describePaymentProviderContract(factory)`) that any adapter must pass: amounts in paise, idempotent refunds, signature rejection, status mapping.
 - Lint rule / test that `orders/` imports nothing from provider implementations.
 - **Done when:** DemoMockProvider passes the contract suite.
 
-### P3.2 — Environment separation + production guard `[ ]`
+### P3.2 — Environment separation + production guard `[x]`
 
 - Config matrix (`local`, `demo`, `staging`, `production`): mock payments / demo OTP / demo controls allowed only in non-production; separate DB, bucket, domain, keys per env.
 - Boot-time assertions + a startup log line summarizing mode (`PAYMENT=DEMO (SIMULATED)`).
 - Test: production + demo provider → process exits non-zero.
 - **Done when:** guard tests pass; `/api/config` reflects mode; demo banner can't be disabled while mock is active.
 
-### P3.3 — Webhook pipeline `[ ]`
+### P3.3 — Webhook pipeline `[x]`
 
 - `POST /api/webhooks/{provider}` with raw-body capture (Nest `rawBody: true`), `provider.verifyWebhook(rawBody, headers)`.
 - Persist `WebhookEvent` (insert with unique `(provider, provider_event_id)`; conflict → 200 "duplicate" no-op).
@@ -357,30 +368,30 @@ kagaz/
 - Mock provider can emit signed webhooks (HMAC with a demo secret) so the real pipeline is exercised in demo.
 - **Done when:** T06 passes (same event twice → one transition, one print job); invalid signature → 400 + logged, no state change.
 
-### P3.4 — Refund workflow `[ ]`
+### P3.4 — Refund workflow `[x]`
 
 - `RefundService.request(orderId, reason)` — idempotency key `refund:<paymentId>:<n>`; `Refund` record; order `REJECTED → REFUND_PENDING`; provider `refund()`; on confirmation (sync for mock, webhook for live) → `REFUNDED`.
 - Demo: "Demo refund — no money moved" in customer UI and admin.
 - **Done when:** T07 reject path and T20 pass; order history, payment and refund records agree.
 
-### P3.5 — Payment outcome simulation (demo controls) `[ ]`
+### P3.5 — Payment outcome simulation (demo controls) `[x]`
 
 - Mock provider modes selectable per order from admin demo controls or a demo-only query flag: `SUCCESS`, `FAIL`, `PENDING` (resolves after N seconds), `DUPLICATE_WEBHOOK`, `OUT_OF_ORDER`.
 - Customer UI handles failed/pending payment states (retry pay; "waiting for confirmation").
 - **Done when:** T05 passes — failed/pending orders never reach the shop queue.
 
-### P3.6 — Cancellation and business rules `[ ]`
+### P3.6 — Cancellation and business rules `[x]`
 
 - Customer cancel before payment; admin reject after payment (→ refund); shop closed/paused handling: checkout blocked (`SHOP_UNAVAILABLE`), already-paid orders remain `PENDING_REVIEW` and are flagged in admin (T19).
 - Opening-hours evaluation in `Asia/Kolkata`.
 - **Done when:** T19 passes.
 
-### P3.7 — Reconciliation screen `[ ]`
+### P3.7 — Reconciliation screen `[x]`
 
 - `/admin/reconciliation`: per day/shop — paid amount, refunded amount, orders by final state; mismatch flags (paid without order progress > N hours, rejected without refund, refund without rejection, webhook received but unprocessed).
 - **Done when:** seeded inconsistent fixtures are flagged; clean data shows zero mismatches.
 
-### P3.8 — Merchant-of-record decision + data model readiness `[ ]` _(business + engineering)_
+### P3.8 — Merchant-of-record decision + data model readiness `[x]` _(business + engineering)_
 
 - Team/accountant/provider decide model (PRD §8.8). Record decision in `docs/decisions/ADR-001-merchant-of-record.md`.
 - Ensure `Shop.gatewayAccountId`, `settlementConfig`, `Payment` settlement refs exist and are editable by admin (not active).
@@ -398,51 +409,52 @@ kagaz/
 
 **Goal:** three independent shops running concurrently with proven isolation, complete admin, health visibility and 100–200 orders without loss or duplication.
 
-### P4.1 — Tenant isolation enforcement + tests `[ ]`
+### P4.1 — Tenant isolation enforcement + tests `[x]`
 
 - Central repository helpers require `shopId` for every shop-owned query (no unscoped `findUnique` by id in shop paths); Prisma query extension that asserts `shopId` presence for shop-owned models in shop/device contexts.
 - Cross-tenant e2e suite: Shop A device/operator tries to list, read, accept, reject, lease, ready, verify pickup, read preview/packet URLs of Shop B orders → all 404 (not 403, to avoid enumeration).
 - **Done when:** T09 suite passes and runs in CI.
+- _Status 2026-11-11:_ Prisma query extension in `apps/api/src/common/prisma/tenant-scope.ts` — every HTTP request gets a tenant scope, `DeviceAuthGuard` binds it to the device's shop, and any query on a shop-owned model (Order, Printer, PrintJob via order/printer, ShopDevice, ShopUser, ShopPricing, EnrollmentCode, PickupCounter, PrinterUptimeDaily, OperatorSession) that isn't pinned to that shop throws `TenantScopeViolation` instead of running. Shared code (state machine, refunds, packet prep, leases) adds `tenantWhere()`. Full e2e suite (147) passes with the guard on; unit tests cover the checker; e2e proves it bites inside transactions. Not covered: raw SQL and socket handlers (no request scope). CI workflow `.github/workflows/ci.yml` — first run green on GitHub 2026-11-11 (run 42979014524).
 
 ### P4.2 — Enroll three devices + printer mapping `[ ]`
 
 - Pair three Windows agents (one on the real demo PC/printer; two can be simulated agents — see P4.7) and map printers with confirmed capability profiles.
 - **Done when:** admin shows 3 shops, each with an online device and at least one printer.
 
-### P4.3 — Admin completion `[ ]`
+### P4.3 — Admin completion `[x]`
 
 - Full shop management: details, opening hours editor, status (OPEN/CLOSED/MAINTENANCE), approval mode, auto limits, pause; printer enable/disable/default; pricing versions; device list/revoke; enrollment codes.
 - All setting changes audited.
 - **Done when:** every shop setting in PRD FR-ADMIN-03…06 is editable without DB access.
 
-### P4.4 — Device + printer health `[ ]`
+### P4.4 — Device + printer health `[x]`
 
 - Heartbeat payload: app version, OS, uptime, printers `[ { printerId, status, lastError } ]`, local queue depth.
 - Admin health view: online (heartbeat ≤ 45 s), stale, offline; version drift warnings; printer status; queue depth per printer.
 - Realtime `device.status` / `printer.status` events.
 - **Done when:** stopping an agent turns its shop "offline" in admin within 60 s and blocks auto-accept for that shop.
 
-### P4.5 — Pickup hardening `[ ]`
+### P4.5 — Pickup hardening `[-] superseded by ADR-002`
 
 - Rate limiting: per device 5 failures / 10 min → 10 min lockout; per order failed-attempt counter; every failure audited with device and operator.
 - Code expiry (7 days after READY) surfaced in admin.
 - Customer retrieval of code via encrypted display value; cleared on `COLLECTED`.
 - **Done when:** T16 passes; T15 still passes.
 
-### P4.6 — Duplicate-prevention + recovery test pack `[ ]`
+### P4.6 — Duplicate-prevention + recovery test pack `[~]`
 
 - Automated tests: duplicate accept, duplicate lease, duplicate status reports, socket reconnect storms, webhook replays, reprint without confirm (rejected), lease expiry → uncertain.
 - Manual drills on real hardware: printer off mid-job, paper out, network drop, PC restart (record results in `docs/testing/RECOVERY_DRILLS.md`).
 - **Done when:** all automated cases pass; drills documented with outcomes.
 
-### P4.7 — Simulated agent + load seeding `[ ]`
+### P4.7 — Simulated agent + load seeding `[x]`
 
 - `scripts/sim-agent.ts`: headless agent using the real device API (enroll, heartbeat, lease, report statuses, randomized delays/failures) — stands in for shops without hardware.
 - `scripts/load-orders.ts`: creates 100–200 orders across 3 shops through the public API (upload sample PDFs, quote, pay with mock, mixed options), optionally with mock failure modes.
 - Post-run verifier: counts orders per state, asserts no lost orders, no duplicate `(order, attempt)`, no cross-tenant jobs, payments == transitions.
 - **Done when:** T18 passes with 200 orders; verifier report saved under `docs/testing/`.
 
-### P4.8 — Dashboards + audit verification `[ ]`
+### P4.8 — Dashboards + audit verification `[x]`
 
 - Admin overview: orders by shop/status/day, median time paid→ready, ready→collected, printer uptime.
 - Spot-check audit trail completeness for 10 random orders from the load run.
@@ -460,27 +472,27 @@ kagaz/
 - Load check (P4.7) re-run on the deployed demo env; recovery drills re-run.
 - **Done when:** all 20 pass or have an accepted, documented exception.
 
-### P5.2 — Security review `[ ]`
+### P5.2 — Security review `[x]`
 
 - Checklist: authN (sessions, device tokens, operator login), authZ & tenant isolation, signed URL TTLs & logging redaction, secrets handling, webhook verification, rate limits, CORS/CSRF/cookies, headers (Helmet, HSTS), dependency audit (`pnpm audit`, `dotnet list package --vulnerable`), file retention, demo/live separation, admin demo endpoints disabled in production.
 - Fix findings; record in `docs/security/SECURITY_REVIEW_RC1.md`.
 - **Done when:** no open high/critical findings.
 
-### P5.3 — Deployment + environments `[ ]`
+### P5.3 — Deployment + environments `[~]`
 
 - Dockerfiles (API, web); deploy demo and staging (production config prepared, not activated for payments).
 - Managed PostgreSQL with automated backups; R2/S3 buckets per env (private, lifecycle rule as a retention safety net); HTTPS domains; secrets in the platform's secret manager.
 - Migrations run as a release step; health checks + uptime monitor; Sentry for API/web/agent.
 - **Done when:** clean deploy from `main` to demo with one command/pipeline; backup restore tested once.
 
-### P5.4 — Windows installer + updates `[ ]`
+### P5.4 — Windows installer + updates `[~]`
 
 - Installer + auto-update (e.g. Velopack or MSIX); per-user install, start-with-Windows option, single instance.
 - Version reported in heartbeat; minimum-supported-version check from API (`426 Upgrade Required` style response → app prompts update).
 - Code signing when a certificate is available (document unsigned SmartScreen behaviour otherwise).
 - **Done when:** fresh Windows machine → install → pair → print works; update from vN to vN+1 works.
 
-### P5.5 — Documentation `[ ]`
+### P5.5 — Documentation `[~]`
 
 - `docs/guides/CUSTOMER_GUIDE.md`, `OPERATOR_GUIDE.md` (with screenshots), `ADMIN_GUIDE.md`.
 - `docs/runbooks/SUPPORT_RUNBOOK.md` (stuck jobs, needs-check, refunds, device re-pair, printer issues), `BACKUP_RESTORE.md`, `INCIDENT_CHECKLIST.md`.
@@ -630,32 +642,32 @@ verify(shopId, input):
 
 ## Appendix B — Environment variables
 
-| Variable                                    | Example                                         | Notes                                   |
-| ------------------------------------------- | ----------------------------------------------- | --------------------------------------- |
-| `APP_ENV`                                   | `local` \| `demo` \| `staging` \| `production`  | Drives guards                           |
-| `PORT`                                      | `4000`                                          | API                                     |
-| `DATABASE_URL`                              | `postgresql://kagaz:kagaz@localhost:5432/kagaz` |                                         |
-| `PUBLIC_WEB_URL`                            | `http://localhost:3000`                         | CORS + links                            |
-| `S3_ENDPOINT`                               | `http://localhost:9000`                         | SeaweedFS locally; R2 endpoint in cloud |
-| `S3_REGION`                                 | `auto`                                          |                                         |
-| `S3_BUCKET`                                 | `kagaz-local`                                   | Private                                 |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | —                                               | Secret                                  |
-| `UPLOAD_URL_TTL_SECONDS`                    | `600`                                           |                                         |
-| `DOWNLOAD_URL_TTL_SECONDS`                  | `300`                                           |                                         |
-| `MAX_UPLOAD_BYTES`                          | `26214400`                                      | 25 MB                                   |
-| `MAX_PAGES` / `MAX_COPIES` / `MAX_SIDES`    | `300` / `20` / `1000`                           |                                         |
-| `PAYMENT_PROVIDER`                          | `demo` \| `razorpay` \| `cashfree`              | `demo` forbidden in production          |
-| `DEMO_WEBHOOK_SECRET`                       | —                                               | Mock webhook signing                    |
-| `OTP_PROVIDER`                              | `demo`                                          | `demo` forbidden in production          |
-| `SESSION_JWT_SECRET`                        | —                                               | Secret                                  |
-| `PICKUP_CODE_PEPPER`                        | —                                               | Secret, 32+ bytes                       |
-| `PICKUP_CODE_ENC_KEY`                       | —                                               | Secret, 32 bytes base64                 |
-| `PRINTER_LEASE_TTL_SECONDS`                 | `60`                                            |                                         |
-| `DEVICE_ONLINE_THRESHOLD_SECONDS`           | `45`                                            |                                         |
-| `RETENTION_AFTER_COLLECTED_HOURS`           | `24`                                            |                                         |
-| `UNPAID_ORDER_EXPIRY_HOURS`                 | `24`                                            |                                         |
-| `SENTRY_DSN`                                | —                                               | Optional                                |
-| `NEXT_PUBLIC_API_URL`                       | `http://localhost:4000/api`                     | Web                                     |
+| Variable                                    | Example                                         | Notes                                                    |
+| ------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| `APP_ENV`                                   | `local` \| `demo` \| `staging` \| `production`  | Drives guards                                            |
+| `API_PORT`                                  | `4000`                                          | API (not `PORT`, which dev tools set for the web server) |
+| `DATABASE_URL`                              | `postgresql://kagaz:kagaz@localhost:5432/kagaz` |                                                          |
+| `PUBLIC_WEB_URL`                            | `http://localhost:3000`                         | CORS + links                                             |
+| `S3_ENDPOINT`                               | `http://localhost:9000`                         | SeaweedFS locally; R2 endpoint in cloud                  |
+| `S3_REGION`                                 | `auto`                                          |                                                          |
+| `S3_BUCKET`                                 | `kagaz-local`                                   | Private                                                  |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | —                                               | Secret                                                   |
+| `UPLOAD_URL_TTL_SECONDS`                    | `600`                                           |                                                          |
+| `DOWNLOAD_URL_TTL_SECONDS`                  | `300`                                           |                                                          |
+| `MAX_UPLOAD_BYTES`                          | `26214400`                                      | 25 MB                                                    |
+| `MAX_PAGES` / `MAX_COPIES` / `MAX_SIDES`    | `300` / `20` / `1000`                           |                                                          |
+| `PAYMENT_PROVIDER`                          | `demo` \| `razorpay` \| `cashfree`              | `demo` forbidden in production                           |
+| `DEMO_WEBHOOK_SECRET`                       | —                                               | Mock webhook signing                                     |
+| `OTP_PROVIDER`                              | `demo`                                          | `demo` forbidden in production                           |
+| `SESSION_JWT_SECRET`                        | —                                               | Secret                                                   |
+| `PICKUP_CODE_PEPPER`                        | —                                               | Secret, 32+ bytes                                        |
+| `PICKUP_CODE_ENC_KEY`                       | —                                               | Secret, 32 bytes base64                                  |
+| `PRINTER_LEASE_TTL_SECONDS`                 | `60`                                            |                                                          |
+| `DEVICE_ONLINE_THRESHOLD_SECONDS`           | `45`                                            |                                                          |
+| `RETENTION_AFTER_COLLECTED_HOURS`           | `24`                                            |                                                          |
+| `UNPAID_ORDER_EXPIRY_HOURS`                 | `24`                                            |                                                          |
+| `SENTRY_DSN`                                | —                                               | Optional                                                 |
+| `NEXT_PUBLIC_API_URL`                       | `http://localhost:4000/api`                     | Web                                                      |
 
 Windows agent `appsettings.json`: `ApiBaseUrl`, `PollIntervalSeconds` (10), `HeartbeatSeconds` (15), `PrintEngine` (`Pdfium` | `Sumatra`), `MaxRenderDpi` (300). Device token is **not** in this file — it's in the DPAPI store.
 

@@ -1,5 +1,7 @@
-// Kagaz database schema.
-// Phase 0: connection only. The full entity set (docs/PRD.md §10) lands in stage P1.1.
+// Kagaz database schema — docs/PRD.md §10.
+// Conventions: tables/columns snake_case (@@map/@map), API camelCase, money = Int paise,
+// timestamps UTC. Uniqueness constraints are part of correctness (see CLAUDE.md invariants).
+// Partial unique index "one active print job per order" is added by hand in the init migration.
 
 generator client {
   provider            = "prisma-client"
@@ -10,4 +12,570 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+// Values mirror packages/shared/src/enums.ts.
+
+enum UserKind {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum ShopStatus {
+  OPEN
+  CLOSED
+  MAINTENANCE
+}
+
+enum ApprovalMode {
+  MANUAL
+  AUTO
+}
+
+enum ShopUserRole {
+  OWNER
+  OPERATOR
+}
+
+enum DeviceStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum PrinterStatus {
+  UNKNOWN
+  READY
+  OFFLINE
+  PAPER_OUT
+  ERROR
+}
+
+enum DuplexRule {
+  SAME_AS_SIMPLEX
+  DISCOUNTED_SIDE_RATE
+}
+
+enum OrderStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  PENDING_REVIEW
+  QUEUED
+  PRINTING
+  NEEDS_OPERATOR_CHECK
+  READY_FOR_PICKUP
+  COLLECTED
+  REJECTED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum ActorType {
+  CUSTOMER
+  STAFF
+  DEVICE
+  ADMIN
+  SYSTEM
+}
+
+enum FileKind {
+  ORIGINAL
+  PACKET
+}
+
+enum FileStatus {
+  PENDING_UPLOAD
+  VALID
+  INVALID
+  DELETED
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  PAID
+  FAILED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum PrintJobStatus {
+  PREPARING
+  READY
+  LEASED
+  SUBMITTED
+  SPOOLER_COMPLETE
+  FAILED
+  UNCERTAIN
+  CANCELLED
+  SUPERSEDED
+}
+
+// ───────────────────────────── Identity & tenancy ─────────────────────────────
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  phone        String?  @unique // E.164
+  email        String?  @unique
+  passwordHash String?  @map("password_hash") // staff/admin only (P2.3)
+  name         String?
+  kind         UserKind @default(CUSTOMER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  shopMemberships ShopUser[]
+  orders          Order[]
+
+  @@map("users")
+}
+
+model Shop {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  slug             String       @unique
+  name             String
+  address          String
+  contactPhone     String?      @map("contact_phone")
+  status           ShopStatus   @default(CLOSED)
+  approvalMode     ApprovalMode @default(MANUAL) @map("approval_mode")
+  autoPaused       Boolean      @default(false) @map("auto_paused")
+  /// { maxPages, maxCopies, maxSides, maxQueueDepth } — PRD §8.4
+  autoLimits       Json         @map("auto_limits")
+  /// { mon: [["09:00","20:00"]], ... } in Asia/Kolkata — evaluated from P3.6
+  openingHours     Json         @map("opening_hours")
+  isDemo           Boolean      @default(false) @map("is_demo")
+  /// Live-payment settlement fields — present, not active (PRD §8.8 / D6)
+  gatewayAccountId String?      @map("gateway_account_id")
+  settlementConfig Json?        @map("settlement_config")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  members         ShopUser[]
+  devices         ShopDevice[]
+  enrollmentCodes EnrollmentCode[]
+  printers        Printer[]
+  pricing         ShopPricing[]
+  orders          Order[]
+  pickupCounters  PickupCounter[]
+
+  @@map("shops")
+}
+
+model ShopUser {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  shopId      String       @map("shop_id") @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  role        ShopUserRole
+  permissions Json?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  shop Shop @relation(fields: [shopId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([shopId, userId])
+  @@index([userId])
+  @@map("shop_users")
+}
+
+model ShopDevice {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  shopId          String       @map("shop_id") @db.Uuid
+  name            String
+  /// SHA-256 of the device bearer token; the token itself is never stored.
+  tokenHash       String       @unique @map("token_hash")
+  appVersion      String?      @map("app_version")
+  lastHeartbeatAt DateTime?    @map("last_heartbeat_at")
+  status          DeviceStatus @default(ACTIVE)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  revokedAt       DateTime?    @map("revoked_at")
+  /// Heartbeat health (P4.4).
+  os              String?
+  uptimeSeconds   Int?         @map("uptime_seconds")
+  queueDepth      Int?         @map("queue_depth")
+  /// Pickup brute-force window (P4.5): failures since pickupWindowAt; lockout end.
+  pickupFailures  Int          @default(0) @map("pickup_failures")
+  pickupWindowAt  DateTime?    @map("pickup_window_at")
+  pickupLockUntil DateTime?    @map("pickup_lock_until")
+
+  shop     Shop      @relation(fields: [shopId], references: [id])
+  printers Printer[]
+
+  @@index([shopId])
+  @@map("shop_devices")
+}
+
+model EnrollmentCode {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  shopId         String    @map("shop_id") @db.Uuid
+  codeHash       String    @unique @map("code_hash")
+  expiresAt      DateTime  @map("expires_at")
+  usedAt         DateTime? @map("used_at")
+  usedByDeviceId String?   @map("used_by_device_id") @db.Uuid
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  shop Shop @relation(fields: [shopId], references: [id])
+
+  @@index([shopId])
+  @@map("enrollment_codes")
+}
+
+model Printer {
+  id                    String        @id @default(uuid(7)) @db.Uuid
+  shopId                String        @map("shop_id") @db.Uuid
+  deviceId              String?       @map("device_id") @db.Uuid
+  /// Exact Windows printer name on the shop PC.
+  printerName           String        @map("printer_name")
+  displayName           String        @map("display_name")
+  colourCapable         Boolean       @default(false) @map("colour_capable")
+  duplexCapable         Boolean       @default(false) @map("duplex_capable")
+  paperSizes            String[]      @default(["A4"]) @map("paper_sizes")
+  /// Operator confirmed the capability profile; auto mode requires this (PRD §8.4).
+  capabilitiesConfirmed Boolean       @default(false) @map("capabilities_confirmed")
+  enabled               Boolean       @default(true)
+  isDefault             Boolean       @default(false) @map("is_default")
+  status                PrinterStatus @default(UNKNOWN)
+  lastStatusAt          DateTime?     @map("last_status_at")
+  lastError             String?       @map("last_error")
+  /// Printer lease (Appendix A.2): at most one active Kagaz job per physical printer.
+  activeJobId           String?       @unique @map("active_job_id") @db.Uuid
+  leaseUntil            DateTime?     @map("lease_until")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  shop      Shop        @relation(fields: [shopId], references: [id])
+  device    ShopDevice? @relation(fields: [deviceId], references: [id])
+  printJobs PrintJob[]
+  orders    Order[]
+
+  @@unique([shopId, printerName])
+  @@index([deviceId])
+  @@map("printers")
+}
+
+model ShopPricing {
+  id                    String     @id @default(uuid(7)) @db.Uuid
+  shopId                String     @map("shop_id") @db.Uuid
+  /// Paise per printed side (PRD §8.2, D4).
+  monoRatePaise         Int        @map("mono_rate_paise")
+  colourRatePaise       Int        @map("colour_rate_paise")
+  monoDuplexRatePaise   Int?       @map("mono_duplex_rate_paise")
+  colourDuplexRatePaise Int?       @map("colour_duplex_rate_paise")
+  duplexRule            DuplexRule @default(SAME_AS_SIMPLEX) @map("duplex_rule")
+  minimumChargePaise    Int        @default(0) @map("minimum_charge_paise")
+  effectiveFrom         DateTime   @default(now()) @map("effective_from")
+  createdAt             DateTime   @default(now()) @map("created_at")
+
+  shop Shop @relation(fields: [shopId], references: [id])
+
+  @@index([shopId, effectiveFrom])
+  @@map("shop_pricing")
+}
+
+// ───────────────────────────── Orders ─────────────────────────────
+
+model Order {
+  id                String      @id @default(uuid(7)) @db.Uuid
+  /// Customer/operator-facing reference, e.g. KGZ-7H3K2Q.
+  publicRef         String      @unique @map("public_ref")
+  customerId        String?     @map("customer_id") @db.Uuid
+  /// Guest phone (E.164) until OTP sign-in lands (P2.2). Never printed on the slip.
+  customerPhone     String?     @map("customer_phone")
+  shopId            String      @map("shop_id") @db.Uuid
+  printerId         String?     @map("printer_id") @db.Uuid
+  /// PrintOptions from @kagaz/shared.
+  options           Json
+  /// Latest server quote (changes until payment).
+  quote             Json?
+  /// Immutable once payment is created (PRD FR-PRICE-04).
+  priceSnapshot     Json?       @map("price_snapshot")
+  amountPaise       Int?        @map("amount_paise")
+  status            OrderStatus @default(DRAFT)
+  /// Optimistic-lock counter; every transition increments it.
+  version           Int         @default(0)
+  /// SHA-256 of the tracking token (token itself returned once to the customer).
+  trackingTokenHash String      @unique @map("tracking_token_hash")
+  rejectionCode     String?     @map("rejection_code")
+  rejectionNote     String?     @map("rejection_note")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+  paidAt            DateTime?   @map("paid_at")
+  queuedAt          DateTime?   @map("queued_at")
+  readyAt           DateTime?   @map("ready_at")
+  collectedAt       DateTime?   @map("collected_at")
+  expiresAt         DateTime?   @map("expires_at")
+  /// ADR-002 daily pickup code (#1, #2 … per shop per Asia/Kolkata day), set once when
+  /// payment is verified and never changed (reprints keep it).
+  pickupNumber      Int?        @map("pickup_number")
+  /// Business date (Asia/Kolkata) the pickup number belongs to.
+  pickupDate        DateTime?   @map("pickup_date") @db.Date
+
+  customer   User?        @relation(fields: [customerId], references: [id])
+  shop       Shop         @relation(fields: [shopId], references: [id])
+  printer    Printer?     @relation(fields: [printerId], references: [id])
+  events     OrderEvent[]
+  files      FileAsset[]
+  payments   Payment[]
+  printJobs  PrintJob[]
+  pickupCode PickupCode?
+
+  @@unique([shopId, pickupDate, pickupNumber])
+  @@index([shopId, status])
+  @@index([customerId])
+  @@map("orders")
+}
+
+model OrderEvent {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  orderId    String       @map("order_id") @db.Uuid
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus  @map("to_status")
+  actorType  ActorType    @map("actor_type")
+  actorId    String?      @map("actor_id")
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, createdAt])
+  @@map("order_events")
+}
+
+model FileAsset {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  orderId   String     @map("order_id") @db.Uuid
+  kind      FileKind
+  status    FileStatus @default(PENDING_UPLOAD)
+  /// Private bucket key; never contains the customer's filename.
+  objectKey String     @unique @map("object_key")
+  mime      String     @default("application/pdf")
+  bytes     Int?
+  pageCount Int?       @map("page_count")
+  sha256    String?
+  /// Validation error code when status = INVALID.
+  error     String?
+  expiresAt DateTime?  @map("expires_at")
+  deletedAt DateTime?  @map("deleted_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  order     Order      @relation(fields: [orderId], references: [id])
+  printJobs PrintJob[]
+
+  @@index([orderId, kind])
+  @@map("file_assets")
+}
+
+// ───────────────────────────── Payments ─────────────────────────────
+
+model Payment {
+  id                String        @id @default(uuid(7)) @db.Uuid
+  orderId           String        @map("order_id") @db.Uuid
+  provider          String
+  providerOrderId   String?       @map("provider_order_id")
+  providerPaymentId String?       @map("provider_payment_id")
+  amountPaise       Int           @map("amount_paise")
+  currency          String        @default("INR")
+  status            PaymentStatus @default(CREATED)
+  isSimulated       Boolean       @default(false) @map("is_simulated")
+  verifiedAt        DateTime?     @map("verified_at")
+  /// Settlement / transfer reference from the provider — present, not active (PRD §8.8, D6).
+  settlementRef     String?       @map("settlement_ref")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  order   Order    @relation(fields: [orderId], references: [id])
+  refunds Refund[]
+
+  @@unique([provider, providerOrderId])
+  @@unique([provider, providerPaymentId])
+  @@index([orderId])
+  @@map("payments")
+}
+
+model Refund {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  paymentId        String       @map("payment_id") @db.Uuid
+  amountPaise      Int          @map("amount_paise")
+  status           RefundStatus @default(PENDING)
+  providerRefundId String?      @map("provider_refund_id")
+  idempotencyKey   String       @unique @map("idempotency_key")
+  reason           String?
+  isSimulated      Boolean      @default(false) @map("is_simulated")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  completedAt      DateTime?    @map("completed_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@map("refunds")
+}
+
+model WebhookEvent {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  provider        String
+  providerEventId String    @map("provider_event_id")
+  receivedAt      DateTime  @default(now()) @map("received_at")
+  signatureValid  Boolean   @map("signature_valid")
+  processedAt     DateTime? @map("processed_at")
+  rawPayloadHash  String    @map("raw_payload_hash")
+  error           String?
+
+  @@unique([provider, providerEventId])
+  @@map("webhook_events")
+}
+
+// ───────────────────────────── Printing & pickup ─────────────────────────────
+
+model PrintJob {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  orderId          String         @map("order_id") @db.Uuid
+  printerId        String         @map("printer_id") @db.Uuid
+  packetFileId     String?        @map("packet_file_id") @db.Uuid
+  /// Reprints create attempt + 1; an attempt is never resubmitted (CLAUDE.md invariant 8).
+  attempt          Int
+  status           PrintJobStatus @default(PREPARING)
+  spoolerJobId     Int?           @map("spooler_job_id")
+  leaseUntil       DateTime?      @map("lease_until")
+  leasedByDeviceId String?        @map("leased_by_device_id") @db.Uuid
+  /// SHA-256 of the packet; the agent verifies it before printing.
+  checksum         String?
+  submittedAt      DateTime?      @map("submitted_at")
+  completedAt      DateTime?      @map("completed_at")
+  error            String?
+  createdById      String?        @map("created_by_id")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  order      Order      @relation(fields: [orderId], references: [id])
+  printer    Printer    @relation(fields: [printerId], references: [id])
+  packetFile FileAsset? @relation(fields: [packetFileId], references: [id])
+
+  @@unique([orderId, attempt])
+  @@index([printerId, status, createdAt])
+  @@index([status, leaseUntil])
+  @@map("print_jobs")
+}
+
+/// ADR-002: last pickup number handed out per shop per business date (Asia/Kolkata).
+/// Bumped with INSERT … ON CONFLICT DO UPDATE in the payment-verified transaction.
+model PickupCounter {
+  shopId       String   @map("shop_id") @db.Uuid
+  businessDate DateTime @map("business_date") @db.Date
+  lastNumber   Int      @map("last_number")
+
+  shop Shop @relation(fields: [shopId], references: [id])
+
+  @@id([shopId, businessDate])
+  @@map("pickup_counters")
+}
+
+/// Retired by ADR-002 (random 8-char codes): kept for history, no longer written.
+model PickupCode {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  orderId               String    @unique @map("order_id") @db.Uuid
+  /// HMAC-SHA256(PICKUP_CODE_PEPPER, code). Plaintext is never stored.
+  codeHmac              String    @map("code_hmac")
+  /// AES-256-GCM(PICKUP_CODE_ENC_KEY, code) so the customer can see it again; cleared on collection.
+  encryptedDisplayValue String?   @map("encrypted_display_value")
+  expiresAt             DateTime? @map("expires_at")
+  consumedAt            DateTime? @map("consumed_at")
+  consumedByDeviceId    String?   @map("consumed_by_device_id") @db.Uuid
+  failedAttempts        Int       @default(0) @map("failed_attempts")
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([codeHmac])
+  @@map("pickup_codes")
+}
+
+// ───────────────────────────── Customer identity (P2.2) ─────────────────────────────
+
+/// One sign-in code sent to a phone. The code itself is never stored (HMAC only).
+model OtpChallenge {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  phone      String
+  codeHmac   String    @map("code_hmac")
+  ip         String?
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([phone, createdAt])
+  @@index([ip, createdAt])
+  @@map("otp_challenges")
+}
+
+// ───────────────────────────── Audit & operations ─────────────────────────────
+
+model AuditLog {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  actorType ActorType @map("actor_type")
+  actorId   String?   @map("actor_id")
+  shopId    String?   @map("shop_id") @db.Uuid
+  orderId   String?   @map("order_id") @db.Uuid
+  action    String
+  metadata  Json?
+  ip        String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([shopId, createdAt])
+  @@index([orderId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model IdempotencyRecord {
+  scope          String
+  key            String
+  requestHash    String   @map("request_hash")
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@id([scope, key])
+  @@map("idempotency_records")
+}
+
+// ───────────────────────────── Identity / admin (Phase 2–4) ─────────────────────────────
+// Kept relation-free on purpose (plain uuid columns + indexes) so these models stay additive.
+
+/// Operator session on a paired device (contract §4). The JWT carries this row's id (jti);
+/// logout or device revocation sets revoked_at, which kills the token immediately.
+model OperatorSession {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  deviceId  String    @map("device_id") @db.Uuid
+  shopId    String    @map("shop_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  @@index([deviceId])
+  @@index([userId])
+  @@map("operator_sessions")
+}
+
+/// Approximate printer uptime (P4.8): sampled once a minute by the admin health sampler.
+/// up = device online AND printer status READY; ratio = up_samples / observed_samples.
+model PrinterUptimeDaily {
+  printerId       String   @map("printer_id") @db.Uuid
+  shopId          String   @map("shop_id") @db.Uuid
+  /// Calendar day in Asia/Kolkata.
+  day             DateTime @db.Date
+  observedSamples Int      @default(0) @map("observed_samples")
+  upSamples       Int      @default(0) @map("up_samples")
+
+  @@id([printerId, day])
+  @@index([shopId, day])
+  @@map("printer_uptime_daily")
 }
