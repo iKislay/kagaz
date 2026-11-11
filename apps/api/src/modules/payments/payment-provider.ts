@@ -109,6 +109,22 @@ export class WebhookSignatureError extends Error {
   override name = 'WebhookSignatureError';
 }
 
+/**
+ * The provider cannot start a payment right now (retryable). `RECEIVER_OFFLINE`: the shop's
+ * payment-detection side is down (ADR-003: the shop's phone has not reported recently), so a
+ * payment could not be confirmed and must not be started. `UNAVAILABLE`: provider unreachable/erroring.
+ */
+export class PaymentProviderUnavailableError extends Error {
+  override name = 'PaymentProviderUnavailableError';
+  constructor(
+    message: string,
+    readonly reason: 'RECEIVER_OFFLINE' | 'UNAVAILABLE',
+    readonly retryAfterSeconds: number | null = null,
+  ) {
+    super(message);
+  }
+}
+
 /** Thrown for invalid inputs (non-integer/negative paise, unknown payment, over-refund). */
 export class PaymentProviderInputError extends Error {
   override name = 'PaymentProviderInputError';

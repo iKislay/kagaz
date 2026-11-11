@@ -76,6 +76,18 @@ type Json = Record<string, unknown>;
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
 
+/**
+ * YouPI stores some times as SQLite `datetime('now')` strings — UTC without a zone
+ * ("2026-11-11 12:54:22"). `new Date()` would read those as LOCAL time (5.5 h off in India),
+ * so normalise every YouPI time to an ISO-8601 UTC string. Unparseable → null.
+ */
+export function parseYoupiTime(v: unknown): string | null {
+  if (typeof v !== 'string' || v === '') return null;
+  const sqlite = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/.exec(v);
+  const d = new Date(sqlite ? `${sqlite[1]}T${sqlite[2]}Z` : v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 /** Integer paise from a number or a digit string; null otherwise. */
 export function parsePaise(v: unknown): number | null {
   if (typeof v === 'number') return Number.isSafeInteger(v) ? v : null;
@@ -154,7 +166,7 @@ export class YoupiClient {
       status: str(body.internalStatus) ?? str(body.status) ?? 'UNKNOWN',
       settlementState: str(body.settlementState),
       method: str(body.method) ?? 'UPI',
-      completedAt: str(body.completedAt),
+      completedAt: parseYoupiTime(body.completedAt),
     };
   }
 
@@ -253,8 +265,8 @@ export class YoupiClient {
       id: str(d.id) ?? '',
       name: str(d.deviceName) ?? 'Android phone',
       isActive: Boolean(d.isActive),
-      lastHeartbeatAt: str(d.lastHeartbeatAt),
-      lastObservationAt: str(d.lastObservationAt),
+      lastHeartbeatAt: parseYoupiTime(d.lastHeartbeatAt),
+      lastObservationAt: parseYoupiTime(d.lastObservationAt),
     }));
   }
 

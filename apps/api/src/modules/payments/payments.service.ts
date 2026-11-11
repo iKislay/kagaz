@@ -18,6 +18,7 @@ import { ShopsService } from '../shops/shops.service.js';
 import {
   PAYMENT_PROVIDER,
   type PaymentProvider,
+  PaymentProviderUnavailableError,
   type ProviderPaymentState,
 } from './payment-provider.js';
 import { ShopPaymentAccountsService } from './shop-payment-accounts.service.js';
@@ -154,15 +155,34 @@ export class PaymentsService {
           include: { _count: { select: { payments: true } } },
         });
         const attempt = order._count.payments;
-        const session = await this.provider.createPayment({
-          orderId,
-          shopId: order.shopId,
-          returnUrl: `${this.config.PUBLIC_WEB_URL.replace(/\/+$/, '')}/order/${orderId}`,
-          publicRef: order.publicRef,
-          receipt: attempt <= 1 ? order.publicRef : `${order.publicRef}-${attempt}`,
-          amountPaise: payment.amountPaise,
-          currency: 'INR',
-        });
+        const session = await this.provider
+          .createPayment({
+            orderId,
+            shopId: order.shopId,
+            returnUrl: `${this.config.PUBLIC_WEB_URL.replace(/\/+$/, '')}/order/${orderId}`,
+            publicRef: order.publicRef,
+            receipt: attempt <= 1 ? order.publicRef : `${order.publicRef}-${attempt}`,
+            amountPaise: payment.amountPaise,
+            currency: 'INR',
+          })
+          .catch((err: unknown) => {
+            // Retryable: the payment row stays CREATED; the next Pay click tries again.
+            if (!(err instanceof PaymentProviderUnavailableError)) throw err;
+            this.logger.warn({ orderId, reason: err.reason }, 'payment provider unavailable');
+            throw err.reason === 'RECEIVER_OFFLINE'
+              ? new AppError(
+                  'SHOP_PAYMENTS_OFFLINE',
+                  "The shop can't confirm UPI payments right now (its payment phone is offline). Please try again in a minute.",
+                  HttpStatus.SERVICE_UNAVAILABLE,
+                  { retryAfterSeconds: err.retryAfterSeconds },
+                )
+              : new AppError(
+                  'PAYMENT_PROVIDER_UNAVAILABLE',
+                  'Payments are temporarily unavailable. Please try again in a minute.',
+                  HttpStatus.SERVICE_UNAVAILABLE,
+                  { retryAfterSeconds: err.retryAfterSeconds },
+                );
+          });
         checkoutUrl =
           session.checkout.kind === 'UPI_CHECKOUT' ? session.checkout.checkoutUrl : null;
         await this.prisma.payment.updateMany({

@@ -8,10 +8,16 @@ import {
   type RefundInput,
   type RefundResult,
   type VerifiedPaymentEvent,
+  PaymentProviderUnavailableError,
   WebhookSignatureError,
   assertProviderPaise,
 } from '../../payment-provider.js';
-import { type YoupiClient, type YoupiMerchantCredentials, parsePaise } from './youpi-client.js';
+import {
+  type YoupiClient,
+  YoupiError,
+  type YoupiMerchantCredentials,
+  parsePaise,
+} from './youpi-client.js';
 
 /** Per-shop YouPI credentials, decrypted on demand (implemented by ShopPaymentAccountsService). */
 export interface YoupiAccountResolver {
@@ -80,14 +86,31 @@ export class YoupiProvider implements PaymentProvider {
   async createPayment(input: CreatePaymentInput): Promise<PaymentSession> {
     assertProviderPaise(input.amountPaise, 'amountPaise');
     const account = await this.accounts.forShop(input.shopId);
-    const created = await this.client.createPayment(account, {
-      // The receipt is unique per attempt; YouPI dedupes active sessions per orderId.
-      orderId: input.receipt,
-      amountPaise: input.amountPaise,
-      returnUrl: input.returnUrl,
-      idempotencyKey: `kagaz:${input.receipt}`,
-      metadata: { kagazOrderId: input.orderId, publicRef: input.publicRef },
-    });
+    let created;
+    try {
+      created = await this.client.createPayment(account, {
+        // The receipt is unique per attempt; YouPI dedupes active sessions per orderId.
+        orderId: input.receipt,
+        amountPaise: input.amountPaise,
+        returnUrl: input.returnUrl,
+        idempotencyKey: `kagaz:${input.receipt}`,
+        metadata: { kagazOrderId: input.orderId, publicRef: input.publicRef },
+      });
+    } catch (err) {
+      // YouPI refuses new UPI sessions while the shop's phone has no fresh heartbeat: nobody
+      // could detect the payment, so the customer must not be sent to pay.
+      if (err instanceof YoupiError && err.code === 'OBSERVERS_UNHEALTHY') {
+        throw new PaymentProviderUnavailableError(
+          'shop payment phone offline',
+          'RECEIVER_OFFLINE',
+          60,
+        );
+      }
+      if (err instanceof YoupiError && (err.status === null || err.status >= 500)) {
+        throw new PaymentProviderUnavailableError(err.message, 'UNAVAILABLE', 30);
+      }
+      throw err;
+    }
     return {
       providerOrderId: created.paymentId,
       checkout: { kind: 'UPI_CHECKOUT', checkoutUrl: created.checkoutUrl },

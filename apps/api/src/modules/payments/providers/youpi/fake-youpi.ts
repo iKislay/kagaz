@@ -41,6 +41,8 @@ export class FakeYoupi {
   readonly calls: { method: string; path: string; headers: Record<string, string> }[] = [];
   /** When set, every request fails like a network error. */
   down = false;
+  /** False = no paired phone reported recently: YouPI refuses new UPI sessions (503). */
+  observersHealthy = true;
 
   readonly fetch: FetchLike = async (input, init) => {
     if (this.down) throw new TypeError('fetch failed');
@@ -151,6 +153,16 @@ export class FakeYoupi {
       if (!merchant) return [400, { error: 'Merchant not found or not configured.' }];
       if (headers['x-merchant-key'] !== merchant.apiKey) {
         return [401, { error: 'Invalid merchant key', code: 'INVALID_MERCHANT_KEY' }];
+      }
+      if (!this.observersHealthy) {
+        return [
+          503,
+          {
+            error: 'UPI observers are offline.',
+            code: 'OBSERVERS_UNHEALTHY',
+            retryAfterSeconds: 60,
+          },
+        ];
       }
       const [r, p] = String(body.amount ?? '').split('.');
       const amountPaise = Number(r) * 100 + Number((p ?? '0').padEnd(2, '0'));

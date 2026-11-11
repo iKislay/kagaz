@@ -211,6 +211,23 @@ describe('P6.3 UPI checkout + signed webhooks', () => {
     expect(res.body.error.code).toBe('SHOP_PAYMENTS_NOT_SET_UP');
   });
 
+  it('phone offline: checkout is refused with a clear, retryable error and can be retried', async () => {
+    const s = await pairedShop(h);
+    await setUpShop(s);
+    const created = await payableOrder(h, s.shop.id);
+    fake.observersHealthy = false;
+    try {
+      const res = await pay(h, created).expect(503);
+      expect(res.body.error.code).toBe('SHOP_PAYMENTS_OFFLINE');
+      expect(res.body.error.details.retryAfterSeconds).toBe(60);
+    } finally {
+      fake.observersHealthy = true;
+    }
+    const retry = (await pay(h, created).expect(200)).body as PayResponse;
+    expect(retry.mode).toBe('UPI_CHECKOUT');
+    expect(await h.prisma.payment.count({ where: { orderId: created.order.id } })).toBe(1);
+  });
+
   it('returns the hosted UPI checkout for the shop and marks paid on a verified alert', async () => {
     const s = await pairedShop(h);
     await setUpShop(s);

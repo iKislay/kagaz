@@ -1,9 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { describePaymentProviderContract } from '../../payment-provider.contract.js';
-import { WebhookSignatureError } from '../../payment-provider.js';
+import { PaymentProviderUnavailableError, WebhookSignatureError } from '../../payment-provider.js';
 import { FakeYoupi } from './fake-youpi.js';
-import { YoupiClient, YoupiError, paiseToRupeeString, parsePaise } from './youpi-client.js';
+import {
+  YoupiClient,
+  YoupiError,
+  paiseToRupeeString,
+  parsePaise,
+  parseYoupiTime,
+} from './youpi-client.js';
 import { type YoupiAccount, YoupiProvider, mapYoupiStatus } from './youpi.provider.js';
 
 function setup() {
@@ -186,6 +192,17 @@ describe('YoupiProvider specifics', () => {
     });
   });
 
+  it('refuses to start a checkout while the shop phone is offline (YouPI OBSERVERS_UNHEALTHY)', async () => {
+    const s = setup();
+    s.fake.observersHealthy = false;
+    const err = await create(s).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(PaymentProviderUnavailableError);
+    expect(err).toMatchObject({ reason: 'RECEIVER_OFFLINE', retryAfterSeconds: 60 });
+    s.fake.observersHealthy = true;
+    s.fake.down = true;
+    await expect(create(s)).rejects.toMatchObject({ reason: 'UNAVAILABLE' });
+  });
+
   it('refuses to start a checkout for a shop without payment setup', async () => {
     const s = setup();
     await expect(create(s, 2400, randomUUID())).rejects.toThrow('PAYMENT_SETUP_REQUIRED');
@@ -209,6 +226,14 @@ describe('YoupiClient', () => {
     expect(parsePaise(4800)).toBe(4800);
     expect(parsePaise('48.00')).toBeNull();
     expect(parsePaise(48.5)).toBeNull();
+  });
+
+  it('reads YouPI SQLite times as UTC, not local time', () => {
+    expect(parseYoupiTime('2026-11-11 12:54:22')).toBe('2026-11-11T12:54:22.000Z');
+    expect(parseYoupiTime('2026-11-11T12:54:22.192Z')).toBe('2026-11-11T12:54:22.192Z');
+    expect(parseYoupiTime('2026-11-11T18:24:22+05:30')).toBe('2026-11-11T12:54:22.000Z');
+    expect(parseYoupiTime('soon')).toBeNull();
+    expect(parseYoupiTime(null)).toBeNull();
   });
 
   it('maps network failures and HTTP errors to YoupiError', async () => {
