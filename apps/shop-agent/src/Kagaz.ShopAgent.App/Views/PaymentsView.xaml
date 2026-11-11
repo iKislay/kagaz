@@ -1,0 +1,367 @@
+<UserControl x:Class="Kagaz.ShopAgent.App.Views.PaymentsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
+             xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:PaymentsViewModel}"
+             d:DesignHeight="900" d:DesignWidth="900">
+    <!-- ADR-003: direct-to-shop UPI. Status line, payment checks, refunds to send, then the two setup steps. -->
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="760" HorizontalAlignment="Left">
+                <TextBlock Text="Payments" Style="{StaticResource TitleText}" />
+                <TextBlock Text="Customers pay straight into your UPI account. Kagaz checks each payment and sends the job to your printer."
+                           Style="{StaticResource SubtitleText}" />
+
+                <!-- One status line + dot (readiness) -->
+                <Border Style="{StaticResource Card}" Padding="16,12" Margin="0,0,0,16">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="10" Height="10" Margin="0,0,10,0" VerticalAlignment="Center"
+                                     Fill="{Binding StatusTone, Converter={StaticResource StatusToneBrush}}" />
+                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource HeadlineText}" FontSize="14"
+                                       VerticalAlignment="Center" AutomationProperties.Name="Payment status" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding SetupError}" Style="{StaticResource ErrorText}" FontSize="12" Margin="20,6,0,0"
+                                   Visibility="{Binding SetupError, Converter={StaticResource NullToVisibility}}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ─── Payment checks: customers who say they paid ─── -->
+                <StackPanel Visibility="{Binding HasReports, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                    <TextBlock Style="{StaticResource HeadlineText}" FontSize="17">
+                        <Run Text="Customers who say they paid" />
+                        <Run Text="{Binding OpenReportCount, Mode=OneWay, StringFormat=· {0}}" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,12"
+                               Text="The automatic check did not see these payments. Open your UPI app or bank app, find the reference number, and approve only if the money is there." />
+                    <TextBlock Text="{Binding ReportsError}" Style="{StaticResource ErrorText}" FontSize="12" Margin="0,0,0,8"
+                               Visibility="{Binding ReportsError, Converter={StaticResource NullToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding Reports}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:PaymentReportItem}">
+                                <Border Style="{StaticResource Card}" Padding="20" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding PublicRef}" Style="{StaticResource HeadlineText}" />
+                                                <TextBlock Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0">
+                                                    <Run Text="{Binding DisplayTime, Mode=OneWay, StringFormat=Reported {0}}" />
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding DisplayPhone}" Style="{StaticResource SecondaryText}" FontSize="12"
+                                                           Visibility="{Binding DisplayPhone, Converter={StaticResource NullToVisibility}}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding DisplayAmount}" FontFamily="{StaticResource DisplayFont}"
+                                                       FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextBrush}" VerticalAlignment="Top" />
+                                        </Grid>
+
+                                        <!-- Full UTR: large, monospaced, copyable -->
+                                        <Border Background="{StaticResource BgBrush}" CornerRadius="8" Padding="14,10" Margin="0,14,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="UPI reference (UTR)" Style="{StaticResource FieldLabel}" Margin="0,0,0,2" />
+                                                    <TextBlock Text="{Binding DisplayUtr}" FontFamily="{StaticResource MonoFont}" FontSize="24" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TextBrush}" AutomationProperties.Name="UPI reference number" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Style="{StaticResource QuietButton}" VerticalAlignment="Center" ToolTip="Copy the reference number"
+                                                        Command="{Binding DataContext.CopyUtrCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="&#xE8C8;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
+                                                        <TextBlock Text="Copy" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+
+                                        <WrapPanel Margin="0,14,0,0">
+                                            <Button Content="{Binding ApproveLabel}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0"
+                                                    Command="{Binding DataContext.OpenApproveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                            <Button Content="Decline…" Style="{StaticResource DestructiveButton}"
+                                                    Command="{Binding DataContext.OpenDeclineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- ─── Refunds to send (provider cannot move money) ─── -->
+                <StackPanel Visibility="{Binding HasRefunds, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                    <TextBlock Style="{StaticResource HeadlineText}" FontSize="17">
+                        <Run Text="Refunds to send" />
+                        <Run Text="{Binding RefundCount, Mode=OneWay, StringFormat=· {0}}" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,12"
+                               Text="These orders were cancelled after the customer paid. Send the money back from your UPI app to the account that paid, then tap “I sent the money”." />
+                    <ItemsControl ItemsSource="{Binding Refunds}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:RefundItem}">
+                                <Border Style="{StaticResource Card}" Padding="20" Margin="0,0,0,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding PublicRef}" Style="{StaticResource HeadlineText}" />
+                                            <TextBlock Style="{StaticResource BodyText}" Margin="0,4,0,0"
+                                                       Visibility="{Binding DisplayPaymentReference, Converter={StaticResource NullToVisibility}}">
+                                                <Run Text="Paid with UPI reference" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                <Run Text="{Binding DisplayPaymentReference, Mode=OneWay}" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding DisplayPhone}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0"
+                                                       Visibility="{Binding DisplayPhone, Converter={StaticResource NullToVisibility}}" />
+                                            <TextBlock Text="{Binding Reason}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0"
+                                                       Visibility="{Binding Reason, Converter={StaticResource NullToVisibility}}" />
+                                            <TextBlock Text="{Binding DisplayTime}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                            <TextBlock Text="{Binding DisplayAmount}" FontFamily="{StaticResource DisplayFont}" FontSize="26" FontWeight="Bold"
+                                                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Right" />
+                                            <Button Content="I sent the money…" Style="{StaticResource PrimaryButton}" Margin="0,10,0,0"
+                                                    Command="{Binding DataContext.OpenRefundCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- ─── Step 1: UPI ID + name customers see ─── -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16"
+                        Visibility="{Binding IsSetupVisible, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="24" Height="24" CornerRadius="12" Background="{StaticResource AccentBrush}" Margin="0,0,10,0">
+                                <TextBlock Text="1" Foreground="White" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Your UPI ID" Style="{StaticResource HeadlineText}" VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" FontSize="14" Foreground="{StaticResource GreenBrush}" Margin="10,0,0,0"
+                                       ToolTip="Saved" Visibility="{Binding Step1Done, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                        <TextBlock Text="The UPI ID your customers pay to — the one on your shop's QR sticker or in PhonePe / GPay / Paytm for Business."
+                                   Style="{StaticResource SecondaryText}" Margin="34,4,0,14" />
+
+                        <StackPanel Margin="34,0,0,0" MaxWidth="420" HorizontalAlignment="Left">
+                            <TextBlock Text="UPI ID" Style="{StaticResource FieldLabel}" />
+                            <TextBox Text="{Binding UpiId, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" MaxLength="320"
+                                     AutomationProperties.Name="UPI ID" ToolTip="For example sriganesh@okicici" />
+                            <TextBlock Text="{Binding UpiIdError}" Style="{StaticResource ErrorText}" FontSize="12" Margin="0,6,0,0"
+                                       Visibility="{Binding UpiIdError, Converter={StaticResource NullToVisibility}}" />
+
+                            <TextBlock Text="Name customers see" Style="{StaticResource FieldLabel}" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding PayeeName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" MaxLength="60"
+                                     AutomationProperties.Name="Name customers see" />
+                            <TextBlock Text="{Binding PayeeNameError}" Style="{StaticResource ErrorText}" FontSize="12" Margin="0,6,0,0"
+                                       Visibility="{Binding PayeeNameError, Converter={StaticResource NullToVisibility}}" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                <Button Content="Save" Style="{StaticResource PrimaryButton}" Command="{Binding SaveSetupCommand}" MinWidth="90" IsDefault="True" />
+                                <TextBlock Text="Saving…" Style="{StaticResource SecondaryText}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           Visibility="{Binding IsSaving, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding Step1Message}" Style="{StaticResource ErrorText}" FontSize="12" Margin="0,8,0,0"
+                                       Visibility="{Binding Step1Message, Converter={StaticResource NullToVisibility}}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ─── Step 2: connect the phone that gets UPI alerts ─── -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16"
+                        Visibility="{Binding IsSetupVisible, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="24" Height="24" CornerRadius="12" Background="{StaticResource AccentBrush}" Margin="0,0,10,0">
+                                <TextBlock Text="2" Foreground="White" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Connect your phone" Style="{StaticResource HeadlineText}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource SecondaryText}" Margin="34,4,0,16"
+                                   Text="Use the phone that already gets your UPI payment messages (PhonePe, GPay, Paytm or bank SMS). Keep it switched on, charged and on the internet." />
+
+                        <Grid Margin="34,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- QR A: install the app -->
+                            <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                <TextBlock Text="1. Install the app" Style="{StaticResource HeadlineText}" FontSize="14" HorizontalAlignment="Center" />
+                                <TextBlock Text="Scan with the phone camera" Style="{StaticResource SecondaryText}" FontSize="12" HorizontalAlignment="Center" Margin="0,2,0,10" />
+                                <Border Width="196" Height="196" CornerRadius="12" Background="White" BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1" Padding="8">
+                                    <Grid>
+                                        <Image Source="{Binding AppDownloadQr}" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                               AutomationProperties.Name="QR code to install the payments app" />
+                                        <TextBlock Text="Already installed" Style="{StaticResource SecondaryText}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Visibility="{Binding AppDownloadQr, Converter={StaticResource NotNullToCollapsed}}" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- QR B: pairing code (fetched on request, short-lived) -->
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                <TextBlock Text="2. Scan in the app" Style="{StaticResource HeadlineText}" FontSize="14" HorizontalAlignment="Center" />
+                                <TextBlock Text="Open the app and tap Scan" Style="{StaticResource SecondaryText}" FontSize="12" HorizontalAlignment="Center" Margin="0,2,0,10" />
+                                <Border Width="196" Height="196" CornerRadius="12" Background="White" BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1" Padding="8">
+                                    <Grid>
+                                        <Image Source="{Binding PairingQr}" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                               AutomationProperties.Name="Pairing QR code" />
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8"
+                                                    Visibility="{Binding PairingQr, Converter={StaticResource NotNullToCollapsed}}">
+                                            <TextBlock Text="&#xED14;" Style="{StaticResource IconText}" FontSize="28" Foreground="#40000000" HorizontalAlignment="Center" />
+                                            <TextBlock Text="{Binding Step2Hint}" Style="{StaticResource SecondaryText}" FontSize="12" TextAlignment="Center" Margin="0,8,0,0"
+                                                       Visibility="{Binding PairingExpired, Converter={StaticResource InverseBoolToVisibility}}" />
+                                            <TextBlock Text="Code expired" Style="{StaticResource SecondaryText}" FontSize="12" TextAlignment="Center" Margin="0,8,0,0"
+                                                       Visibility="{Binding PairingExpired, Converter={StaticResource BoolToVisibility}}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <TextBlock Text="{Binding PairingCountdown}" Style="{StaticResource SecondaryText}" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0"
+                                           Visibility="{Binding PairingCountdown, Converter={StaticResource NullToVisibility}}" />
+                                <Button Style="{StaticResource QuietButton}" Command="{Binding ShowPairingCommand}" HorizontalAlignment="Center" Margin="0,10,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0"
+                                                   Visibility="{Binding IsPairingShown, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="{Binding PairingButtonText}" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Text="{Binding PairingError}" Style="{StaticResource ErrorText}" FontSize="12" Margin="0,8,0,0" MaxWidth="240" TextAlignment="Center"
+                                           Visibility="{Binding PairingError, Converter={StaticResource NullToVisibility}}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Style="{StaticResource Hairline}" Margin="34,20,0,14" />
+
+                        <!-- Paired phones -->
+                        <StackPanel Margin="34,0,0,0">
+                            <TextBlock Text="Connected phones" Style="{StaticResource FieldLabel}" />
+                            <TextBlock Text="No phone connected yet." Style="{StaticResource SecondaryText}"
+                                       Visibility="{Binding HasPhones, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <ItemsControl ItemsSource="{Binding Phones}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:PhoneItem}">
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Ellipse Width="8" Height="8" Margin="0,6,10,0" VerticalAlignment="Top"
+                                                     Fill="{Binding Tone, Converter={StaticResource StatusToneBrush}}" />
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding LastSeenText}" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                                <TextBlock Text="{Binding LastPaymentText}" Style="{StaticResource SecondaryText}" FontSize="12"
+                                                           Visibility="{Binding LastPaymentText, Converter={StaticResource NullToVisibility}}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Approve sheet -->
+        <Border Background="{StaticResource ScrimBrush}" Margin="-36,-28"
+                Visibility="{Binding IsApproveOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}">
+                <StackPanel>
+                    <TextBlock Text="&#xE8C7;" Style="{StaticResource IconText}" FontSize="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Left" />
+                    <TextBlock Style="{StaticResource TitleText}" FontSize="20" Margin="0,10,0,0" TextWrapping="Wrap">
+                        <Run Text="Did you receive" /> <Run Text="{Binding ApproveTarget.DisplayAmount, Mode=OneWay}" /><Run Text="?" />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource BodyText}" Margin="0,8,0,0">
+                        <Run Text="Check your UPI app for" />
+                        <Run Text="{Binding ApproveTarget.DisplayAmount, Mode=OneWay}" FontWeight="SemiBold" />
+                        <Run Text="with reference" />
+                        <Run Text="{Binding ApproveTarget.DisplayUtr, Mode=OneWay}" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" /><Run Text="." />
+                        <Run Text="Approve only if you see it." FontWeight="SemiBold" />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,8,0,0"
+                               Text="Approving marks the order as paid, gives it a pickup number and sends it to your printer. It is recorded under your name." />
+                    <TextBlock Text="{Binding SheetError}" Style="{StaticResource ErrorText}" Margin="0,10,0,0"
+                               Visibility="{Binding SheetError, Converter={StaticResource NullToVisibility}}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                        <Button Content="Cancel" Style="{StaticResource QuietButton}" Command="{Binding CancelSheetCommand}" Margin="0,0,10,0" IsCancel="True" />
+                        <Button Content="{Binding ApproveTarget.ApproveLabel}" Style="{StaticResource PrimaryButton}" Command="{Binding ConfirmApproveCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Decline sheet -->
+        <Border Background="{StaticResource ScrimBrush}" Margin="-36,-28"
+                Visibility="{Binding IsDeclineOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}">
+                <StackPanel>
+                    <TextBlock Text="Decline this payment?" Style="{StaticResource TitleText}" FontSize="20" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,16">
+                        <Run Text="{Binding DeclineTarget.PublicRef, Mode=OneWay}" FontWeight="SemiBold" />
+                        <Run Text="stays unpaid and will not print. The customer sees the reason and can contact you." />
+                    </TextBlock>
+                    <TextBlock Text="Reason" Style="{StaticResource FieldLabel}" />
+                    <Border BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1" CornerRadius="8" Padding="4">
+                        <ListBox AutomationProperties.Name="Decline reason" ItemsSource="{Binding DeclineReasons}" SelectedItem="{Binding SelectedDeclineReason}"
+                                 DisplayMemberPath="Label" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource RowItem}" />
+                    </Border>
+                    <TextBlock Text="Note (optional)" Style="{StaticResource FieldLabel}" Margin="0,14,0,6" />
+                    <TextBox Text="{Binding DeclineNote, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}"
+                             MaxLength="200" TextWrapping="Wrap" AcceptsReturn="True" Height="56" AutomationProperties.Name="Note" />
+                    <TextBlock Text="{Binding SheetError}" Style="{StaticResource ErrorText}" Margin="0,10,0,0"
+                               Visibility="{Binding SheetError, Converter={StaticResource NullToVisibility}}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                        <Button Content="Cancel" Style="{StaticResource QuietButton}" Command="{Binding CancelSheetCommand}" Margin="0,0,10,0" IsCancel="True" />
+                        <Button Content="Decline" Style="{StaticResource PrimaryButton}" Background="{StaticResource RedBrush}" Command="{Binding SubmitDeclineCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Refund sent sheet -->
+        <Border Background="{StaticResource ScrimBrush}" Margin="-36,-28"
+                Visibility="{Binding IsRefundOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource TitleText}" FontSize="20" TextWrapping="Wrap">
+                        <Run Text="Did you send back" /> <Run Text="{Binding RefundTarget.DisplayAmount, Mode=OneWay}" /><Run Text="?" />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,16">
+                        <Run Text="Confirm only after the money has left your UPI account for" />
+                        <Run Text="{Binding RefundTarget.PublicRef, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="." />
+                    </TextBlock>
+                    <TextBlock Text="UPI reference of your refund (optional)" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding RefundUtr, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" MaxLength="20"
+                             FontFamily="{StaticResource MonoFont}" AutomationProperties.Name="Refund UPI reference" />
+                    <TextBlock Text="{Binding RefundUtrError}" Style="{StaticResource ErrorText}" FontSize="12" Margin="0,6,0,0"
+                               Visibility="{Binding RefundUtrError, Converter={StaticResource NullToVisibility}}" />
+                    <TextBlock Text="{Binding SheetError}" Style="{StaticResource ErrorText}" Margin="0,10,0,0"
+                               Visibility="{Binding SheetError, Converter={StaticResource NullToVisibility}}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                        <Button Content="Cancel" Style="{StaticResource QuietButton}" Command="{Binding CancelSheetCommand}" Margin="0,0,10,0" IsCancel="True" />
+                        <Button Content="I sent the money" Style="{StaticResource PrimaryButton}" Command="{Binding SubmitRefundCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</UserControl>

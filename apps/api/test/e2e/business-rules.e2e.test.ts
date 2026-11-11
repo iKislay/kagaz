@@ -35,7 +35,12 @@ describe('refund workflow (P3.4)', () => {
 
     const order = (await view(h, created)).body as PublicOrder;
     expect(order.status).toBe('REFUNDED');
-    expect(order.refund).toEqual({ status: 'SUCCEEDED', amountPaise: 600, isSimulated: true });
+    expect(order.refund).toEqual({
+      status: 'SUCCEEDED',
+      amountPaise: 600,
+      isSimulated: true,
+      manual: false,
+    });
     expect(order.rejection).toEqual({ code: 'OUT_OF_SUPPLIES', note: 'No toner' });
     expect(await statuses(created.order.id)).toEqual([
       'DRAFT',

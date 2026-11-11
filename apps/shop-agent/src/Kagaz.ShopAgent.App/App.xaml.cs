@@ -57,6 +57,8 @@ public sealed partial class App : Application
             // worker and heartbeat are hosted services.
             var lifetime = _host.Services.GetRequiredService<IHostApplicationLifetime>();
             _ = _host.Services.GetRequiredService<JobsViewModel>().RunAsync(lifetime.ApplicationStopping);
+            // ADR-003: payment reports + refunds (sidebar badge) and, while open, the payment setup.
+            _ = _host.Services.GetRequiredService<PaymentsViewModel>().RunAsync(lifetime.ApplicationStopping);
         }
         catch (Exception ex)
         {

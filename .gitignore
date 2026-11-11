@@ -38,6 +38,10 @@ next-env.d.ts
 
 # Demo compose secrets (infra/demo.env.example is the template)
 infra/demo.env
+# Pilot secrets + real shop/staff details (templates: *.example)
+infra/pilot.env
+infra/pilot-shops.json
+release/
 # Shop agent installer output (scripts/build-shop-agent-installer.ps1)
 artifacts/
 .tools/

@@ -42,6 +42,7 @@ describe('demo payment (T04)', () => {
       status: 'PAID',
       isSimulated: true,
       reference: `DEMO-PAY-${created.order.publicRef}`,
+      checkoutUrl: null,
     });
 
     const payments = await h.prisma.payment.findMany({ where: { orderId: created.order.id } });

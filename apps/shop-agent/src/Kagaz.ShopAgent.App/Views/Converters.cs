@@ -65,6 +65,21 @@ public sealed class StatusBrushConverter : IValueConverter
         => Binding.DoNothing;
 }
 
+/// <summary><see cref="ViewModels.StatusTone"/> → status dot colour (payments readiness, phones).</summary>
+public sealed class StatusToneBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
+    {
+        ViewModels.StatusTone.Green => StatusBrushes.Green,
+        ViewModels.StatusTone.Orange => StatusBrushes.Orange,
+        ViewModels.StatusTone.Red => StatusBrushes.Red,
+        _ => StatusBrushes.Secondary,
+    };
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
 /// <summary>Connection state → sidebar status dot.</summary>
 public sealed class ConnectionBrushConverter : IValueConverter
 {

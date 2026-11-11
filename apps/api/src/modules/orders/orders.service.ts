@@ -55,7 +55,7 @@ export class OrdersService {
       include: ORDER_VIEW_INCLUDE,
     });
     if (!order) throw notFound();
-    return toPublicOrder(order);
+    return toPublicOrder(order, { reportAfterSeconds: this.config.PAYMENT_CLAIM_AFTER_SECONDS });
   }
 
   /** Session check used by the customer guard: is this the signed-in customer's order? */
@@ -271,10 +271,20 @@ export class OrdersService {
       await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        include: { payments: { select: { status: true } } },
+        include: {
+          payments: { select: { status: true } },
+          paymentReports: { where: { status: 'OPEN' }, select: { status: true } },
+        },
       });
       if (!order) throw notFound();
       if (order.status === OrderStatus.CANCELLED) return; // idempotent
+      if (order.paymentReports.length > 0) {
+        throw new AppError(
+          'PAYMENT_REPORT_OPEN',
+          'The shop is checking the payment you reported; the order cannot be cancelled now.',
+          HttpStatus.CONFLICT,
+        );
+      }
       if (order.payments.some((p) => (PAYMENT_IN_FLIGHT as readonly string[]).includes(p.status))) {
         throw new AppError(
           'PAYMENT_IN_PROGRESS',

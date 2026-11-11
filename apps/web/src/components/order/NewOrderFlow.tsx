@@ -31,6 +31,7 @@ import {
   updateOptions,
   uploadToSignedUrl,
 } from '@/lib/api';
+import { openCheckout } from '@/lib/customer-api';
 import { saveTrackingToken } from '@/lib/tracking';
 
 type Phase = 'idle' | 'uploading' | 'validating' | 'ready' | 'paying';
@@ -142,6 +143,16 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
     // not when the order object itself updates.
   }, [options]);
 
+  // Coming back from the UPI page with the browser's Back button restores this page from the
+  // back/forward cache still "paying": let the customer press Pay again (it reuses the checkout).
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setPhase((p) => (p === 'paying' ? 'ready' : p));
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
+
   // ─── Pay ───
   const pay = async () => {
     if (!order || !token) return;
@@ -149,6 +160,10 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
     setError(null);
     try {
       const res = await payOrder(order.id, token);
+      // ADR-003: pay the shop on the hosted UPI page; it returns the browser to /order/:id
+      // (the tracking token is already saved on this device). Without a usable checkout URL the
+      // tracking page offers "Open payment page" / "Check again" instead.
+      if (res.mode === 'UPI_CHECKOUT' && openCheckout(res.checkoutUrl)) return;
       router.push(`/order/${res.order.id}#t=${encodeURIComponent(token)}`);
     } catch (err) {
       setError(messageOf(err));
@@ -278,12 +293,17 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
               <Spinner /> Processing…
             </>
           ) : quote ? (
-            `Pay ${formatPaise(quote.totalPaise)}${isDemo ? ' (demo)' : ''}`
+            `Pay ${formatPaise(quote.totalPaise)}${isDemo ? ' (demo)' : ' with UPI'}`
           ) : (
             'Pay'
           )}
         </button>
       </div>
+      {!isDemo && quote && (
+        <p className="mt-2 text-[12px] text-text-secondary sm:text-right">
+          You pay {shop.name} directly from your UPI app.
+        </p>
+      )}
     </section>
   );
 }

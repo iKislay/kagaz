@@ -9,3 +9,4 @@ export * from './api.js';
 export * from './shop-api.js';
 export * from './admin-api.js';
 export * from './realtime.js';
+export * from './upi-payments.js';

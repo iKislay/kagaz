@@ -74,6 +74,7 @@ public static class HostFactory
         builder.Services.AddSingleton<JobsViewModel>();
         builder.Services.AddSingleton<TodaysPickupsViewModel>();
         builder.Services.AddSingleton<SettingsViewModel>();
+        builder.Services.AddSingleton<PaymentsViewModel>();
         builder.Services.AddSingleton<ShopModeViewModel>();
         builder.Services.AddSingleton<UpdateViewModel>();
         builder.Services.AddSingleton<ShellViewModel>();

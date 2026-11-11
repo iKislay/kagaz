@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { PaymentStatus, ShopStatus } from './enums.js';
 import { OrderStatusSchema, PrintOptionsSchema, QuoteSchema } from './schemas.js';
+import { PublicPaymentReportSchema } from './upi-payments.js';
 
 const enumValues = <T extends Record<string, string>>(obj: T) =>
   Object.values(obj) as [T[keyof T], ...T[keyof T][]];
@@ -90,8 +91,16 @@ export const PublicOrderSchema = z.object({
       status: z.enum(enumValues(PaymentStatus)),
       isSimulated: z.boolean(),
       reference: z.string().nullable(),
+      /** ADR-003: hosted UPI checkout to (re)open while the payment is open; null otherwise. */
+      checkoutUrl: z.string().nullable().default(null),
     })
     .nullable(),
+  /** ADR-003 fallback: the customer's latest "I paid" report, if any. */
+  paymentReport: PublicPaymentReportSchema.nullable().default(null),
+  /** True when the customer may report a payment now (automatic check had its chance). */
+  canReportPayment: z.boolean().default(false),
+  /** ISO time from which reporting becomes possible (null when not applicable). */
+  reportPaymentAfter: z.string().nullable().default(null),
   /** ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified. */
   pickupNumber: z.int().nullable(),
   /** Business date (YYYY-MM-DD, Asia/Kolkata) the pickup number belongs to. */
@@ -103,6 +112,8 @@ export const PublicOrderSchema = z.object({
       status: z.enum(['PENDING', 'SUCCEEDED', 'FAILED']),
       amountPaise: z.int(),
       isSimulated: z.boolean(),
+      /** ADR-003: the shop sends the money back from their UPI app (no gateway refund). */
+      manual: z.boolean().default(false),
     })
     .nullable()
     .default(null),
@@ -123,8 +134,13 @@ export type CreateOrderResponse = z.infer<typeof CreateOrderResponseSchema>;
 
 export const PayResponseSchema = z.object({
   order: PublicOrderSchema,
-  /** DEMO: payment already verified server-side. LIVE (later): checkout data for the provider. */
-  mode: z.enum(['DEMO_AUTO_APPROVED', 'PROVIDER_CHECKOUT']),
+  /**
+   * DEMO_AUTO_APPROVED: verified server-side already. UPI_CHECKOUT (ADR-003): send the browser to
+   * `checkoutUrl` (shop's UPI QR / app links); it returns to the order page. PROVIDER_CHECKOUT:
+   * reserved for a card/UPI gateway SDK.
+   */
+  mode: z.enum(['DEMO_AUTO_APPROVED', 'UPI_CHECKOUT', 'PROVIDER_CHECKOUT']),
+  checkoutUrl: z.string().nullable().default(null),
 });
 export type PayResponse = z.infer<typeof PayResponseSchema>;
 

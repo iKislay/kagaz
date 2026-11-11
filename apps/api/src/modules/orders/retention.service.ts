@@ -81,6 +81,8 @@ export class RetentionService {
         OR: [{ expiresAt: { lt: now } }, { expiresAt: null, createdAt: { lt: createdBefore } }],
         // Never cancel something the gateway already confirmed (payments decide that path).
         payments: { none: { status: 'PAID' } },
+        // ADR-003: the shop is still checking a customer's payment report.
+        paymentReports: { none: { status: 'OPEN' } },
       },
       select: { id: true },
       take: BATCH,

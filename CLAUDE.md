@@ -37,6 +37,12 @@ API modules live in `apps/api/src/modules/`: `identity`, `shops`, `pricing`, `or
 pnpm install
 cp .env.example .env                                  # PowerShell: Copy-Item .env.example .env
 pnpm infra:up                                         # Postgres :5432, SeaweedFS S3 API :9000, private bucket
+pnpm youpi:up                                         # YouPI (ADR-003) :6100 API, :7000 checkout; needs YouPI-PG checkout (YOUPI_SRC)
+node scripts/pilot-env.mjs --domain <domain> [--tunnel-token <t>]   # pilot: writes infra/pilot.env (secrets generated)
+docker compose -f infra/docker-compose.pilot.yml --env-file infra/pilot.env up -d --build      # pilot stack + Cloudflare Tunnel
+docker compose -f infra/docker-compose.pilot.yml --env-file infra/pilot.env exec api node dist/cli/pilot-bootstrap.js /config/pilot-shops.json
+pnpm --filter @kagaz/api pilot:smoke -- --api https://api.<domain>/api --shop <slug> --login <owner> --password <pw> --code <pairing code>
+powershell -ExecutionPolicy Bypass -File scripts\build-pilot-release.ps1 -Domain <domain> -Version 0.3.0   # release/pilot-<v>/: Setup.exe + phone APK
 pnpm dev                                              # builds shared, then api :4000 (watch) + web :3000
 pnpm test                                             # shared + api unit tests (vitest)
 pnpm lint && pnpm typecheck && pnpm format:check
@@ -81,7 +87,7 @@ Environment: copy `.env.example` → `.env`. Never commit `.env*` files other th
 These come straight from the PRD. Breaking any of them is a bug, regardless of what a task description says — flag the conflict instead.
 
 1. **Server decides money.** Prices are computed server-side from shop pricing; the client never sends an amount. All money is **integer paise** — no floats anywhere in pricing/payments. Store an immutable `price_snapshot` on the order at payment creation.
-2. **Payment is verified by the backend only.** A browser redirect is never proof. Paid transition only after verified webhook (signature over the exact **raw body**) and/or server-to-server status fetch.
+2. **Payment is verified by the backend only.** A browser redirect is never proof. Paid transition only after verified webhook (signature over the exact **raw body**) and/or server-to-server status fetch — or, as the ADR-003 fallback, an explicit audited operator approval of a customer's payment report.
 3. **Payments go through `PaymentProvider`.** `orders/` and other modules must never import provider implementations or contain Razorpay/Cashfree-specific code.
 4. **Mock is never production.** The API must fail to start if `APP_ENV=production` with `PAYMENT_PROVIDER=demo` or `OTP_PROVIDER=demo`. In demo, every page shows **"DEMO PAYMENT — NO MONEY CHARGED"**; refunds show "Demo refund — no money moved".
 5. **All order status changes go through `OrderStateMachine.transition()`** — transition table check, optimistic `version` check, `OrderEvent` row, audit row for human actions, all in one DB transaction; realtime events emitted **after commit**. No direct `status` updates elsewhere.
@@ -171,4 +177,4 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 - 2026-11-11: `phase-1-vertical-slice` merged to `main` (PR #3); CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit, API e2e and shop-agent tests. P4.1, P4.8, P5.2 done.
 - Remaining: hardware drills and rehearsal (P1.11, P2.8–P2.10, P4.6, P5.1), P4.2 three devices, deployment (P5.3), installer test (P5.4), docs (P5.5), investor assets (P5.7).
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
-- Payments: **DEMO only**; live gateway gated by **D6** (merchant of record).
+- Payments: **ADR-003** — default provider `youpi` (customers pay the shop's own UPI ID; YouPI detects the credit; customer "I paid" report + shop approve as fallback; manual refunds). Phase 6 on `feat/youpi-upi-payments`; P6.8 real-phone ₹1 test pending. `demo` stays for local/tests. Gateways (Razorpay/Cashfree) still gated by D6.

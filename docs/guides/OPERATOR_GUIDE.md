@@ -41,6 +41,44 @@ Optional: **Settings → Start with Windows** so the app opens when you log in t
 - The session ends when you click **Sign out** or close the app. Sign out when you leave the
   counter.
 
+## 2a. Set up payments (do this once — two steps)
+
+Customers pay **your own UPI ID**, exactly like they do today. The money goes straight to your
+account; Kagaz only notices that it arrived and then prints the job
+([ADR-003](../decisions/ADR-003-youpi-direct-upi.md)).
+
+Open **Payments** in the sidebar (signed in as operator):
+
+1. **Your UPI ID** — type the UPI ID you already use (e.g. `ganeshxerox@okicici`) and the name
+   customers should see, then **Save**.
+2. **Connect your phone** — use the phone that gets your UPI payment messages (the one your
+   payment soundbox / PhonePe / GPay for Business app is on):
+   - scan **"1. Install the app"** with the phone camera and install the phone app (**YouPI SMS Gateway**);
+   - click **Show pairing code** and scan **"2. Scan in the app"** from inside that app;
+   - allow it to read notifications and SMS, and turn **off battery saver** for it.
+
+The status line turns **green — "Payments are confirmed automatically"** once the phone reports
+in. If it turns orange (_"Your payments phone is offline"_), check the phone's internet and battery.
+
+### When a customer says "I paid but it's not confirmed"
+
+This is rare (the phone was offline or the message came late). The **Payments** item shows a
+badge and a bar appears at the top of the app.
+
+1. Open **Payments → Customers who say they paid**.
+2. Open your UPI app and look for a payment of **that amount** with **that UPI reference number**
+   (the 12 digits shown large; **Copy** helps you search).
+3. If you see it: **Approve — I received ₹X**. The order goes to the queue and prints like any
+   other. If you don't: **Decline** and choose why — the customer sees the reason.
+
+Only approve what you can see in your own account.
+
+### Refunds
+
+If you reject an order that was already paid, Kagaz cannot send the money back for you. It appears
+under **Payments → Refunds to send**: send the amount back from your UPI app, then click
+**I sent the money** (add the refund's UPI reference if you have it).
+
 ## 3. Set up the printer (do this once, and after changing printers)
 
 Open **Printers**. The list shows printers installed in Windows on this PC.

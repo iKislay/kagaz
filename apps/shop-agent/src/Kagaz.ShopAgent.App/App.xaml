@@ -54,6 +54,7 @@
         <views:NullToVisibilityConverter x:Key="NotNullToCollapsed" Invert="True" />
         <views:StatusBrushConverter x:Key="StatusBrush" />
         <views:ConnectionBrushConverter x:Key="ConnectionBrush" />
+        <views:StatusToneBrushConverter x:Key="StatusToneBrush" />
 
         <!-- ─── Text ─── -->
         <Style x:Key="TitleText" TargetType="TextBlock">
