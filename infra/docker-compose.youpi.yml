@@ -1,0 +1,60 @@
+# YouPI payment gateway next to Kagaz (ADR-003). Customers pay the shop's own UPI ID; YouPI
+# detects the credit (Android observer on the shop's phone) and posts a signed webhook to Kagaz.
+#
+#   pnpm youpi:up      # build + start (needs the YouPI-PG checkout, see YOUPI_SRC)
+#   pnpm youpi:down
+#
+# Kagaz does not vendor YouPI code (licence: see ADR-003). Point YOUPI_SRC at a checkout of
+# https://github.com/youpi-pg/YouPI-PG (default: a sibling folder next to this repo).
+# Values come from the root .env (loaded with --env-file .env by the pnpm scripts).
+#
+# Ports:  6100 payment API (Kagaz server-to-server + phone app pairing/alerts)
+#         7000 customer checkout page (QR / UPI app buttons)
+#         127.0.0.1:6001 YouPI's own merchant admin (operators only; Kagaz never needs it)
+services:
+  youpi:
+    build:
+      context: ${YOUPI_SRC:-../../YouPI-PG}
+      dockerfile: Dockerfile
+      target: runner
+    image: kagaz-youpi:local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      YOUPI_MODE: localhost
+      YOUPI_ALLOW_LOCALHOST_MODE: 'true'
+      YOUPI_BIND_HOST: 0.0.0.0
+      USE_SQLITE_FALLBACK: 'true'
+      SQLITE_DB_PATH: /app/data/youpi_pg.sqlite
+      PAYMENT_API_PORT: 6100
+      CHECKOUT_PORTAL_PORT: 7000
+      MERCHANT_ADMIN_PORT: 6001
+      BASE_PAYMENT_API_URL: ${YOUPI_PUBLIC_URL:-http://localhost:6100}
+      BASE_CHECKOUT_URL: ${YOUPI_CHECKOUT_URL:-http://localhost:7000}
+      BASE_ADMIN_URL: http://localhost:6001
+      # Kagaz provisions shops with this token (YOUPI_ADMIN_TOKEN in the Kagaz .env).
+      ADMIN_API_TOKEN: ${YOUPI_ADMIN_TOKEN:?set YOUPI_ADMIN_TOKEN in .env}
+      # Phone pairing secret (YouPI-wide). Generate a random value per environment.
+      ANDROID_ENROLLMENT_SECRET: ${YOUPI_ANDROID_ENROLLMENT_SECRET:?set YOUPI_ANDROID_ENROLLMENT_SECRET in .env}
+      # The checkout page may only send customers back to the Kagaz website.
+      YOUPI_ALLOWED_RETURN_ORIGINS: ${PUBLIC_WEB_URL:?set PUBLIC_WEB_URL in .env}
+      # Local only: lets YouPI post webhooks to a Kagaz API on the LAN / host.docker.internal.
+      # Leave unset in any internet-facing deployment (Kagaz must have a public HTTPS URL).
+      YOUPI_ALLOW_PRIVATE_WEBHOOKS: ${YOUPI_ALLOW_PRIVATE_WEBHOOKS:-true}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '6100:6100'
+      - '7000:7000'
+      - '127.0.0.1:6001:6001'
+    volumes:
+      - youpi-data:/app/data
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:6100/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  youpi-data:

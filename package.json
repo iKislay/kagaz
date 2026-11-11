@@ -16,6 +16,8 @@
     "format:check": "prettier --check .",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "youpi:up": "docker compose --env-file .env -f infra/docker-compose.youpi.yml up -d --build",
+    "youpi:down": "docker compose --env-file .env -f infra/docker-compose.youpi.yml down",
     "sim:agent": "pnpm --filter @kagaz/scripts sim-agent",
     "load:orders": "pnpm --filter @kagaz/scripts load-orders",
     "verify:run": "pnpm --filter @kagaz/scripts verify-run",
