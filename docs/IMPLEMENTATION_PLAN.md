@@ -453,7 +453,7 @@ kagaz/
 - Post-run verifier: counts orders per state, asserts no lost orders, no duplicate `(order, attempt)`, no cross-tenant jobs, payments == transitions.
 - **Done when:** T18 passes with 200 orders; verifier report saved under `docs/testing/`.
 
-### P4.8 — Dashboards + audit verification `[~]`
+### P4.8 — Dashboards + audit verification `[x]`
 
 - Admin overview: orders by shop/status/day, median time paid→ready, ready→collected, printer uptime.
 - Spot-check audit trail completeness for 10 random orders from the load run.
