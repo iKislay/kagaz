@@ -13,6 +13,12 @@ import { adminApi } from '../_lib/api';
  * (sent with credentials: 'include'). This page is what every unauthenticated
  * /admin/* visit is redirected to.
  */
+/** Where to go after sign-in: `?next=` if it's one of our staff areas, else /admin. */
+function nextPath(): string {
+  const next = new URLSearchParams(window.location.search).get('next') ?? '';
+  return /^\/(admin|sudoadmin)(\/[\w\-/]*)?$/.test(next) ? next : '/admin';
+}
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const [login, setLogin] = useState('');
@@ -26,7 +32,7 @@ export default function AdminLoginPage() {
     void adminApi
       .me()
       .then(() => {
-        if (!cancelled) router.replace('/admin');
+        if (!cancelled) router.replace(nextPath());
       })
       .catch(() => undefined);
     return () => {
@@ -41,7 +47,7 @@ export default function AdminLoginPage() {
     try {
       await adminApi.login(login.trim(), password);
       setPassword('');
-      router.replace('/admin');
+      router.replace(nextPath());
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Sign-in failed');
     } finally {

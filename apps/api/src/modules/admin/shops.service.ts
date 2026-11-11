@@ -19,7 +19,8 @@ export class ShopsService {
     const thresholdMs = (this.config.DEVICE_ONLINE_THRESHOLD_SECONDS ?? 45) * 1000;
 
     const shops = await this.prisma.shop.findMany({
-      where: onlyShopIds ? { id: { in: onlyShopIds } } : {},
+      // Archived shops live only in /sudoadmin.
+      where: { archivedAt: null, ...(onlyShopIds ? { id: { in: onlyShopIds } } : {}) },
       orderBy: { name: 'asc' },
       include: {
         pricing: {

@@ -119,6 +119,25 @@ enum PrintJobStatus {
   SUPERSEDED
 }
 
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionPaymentMethod {
+  CASH
+  UPI
+  BANK_TRANSFER
+  OTHER
+}
+
 // ───────────────────────────── Identity & tenancy ─────────────────────────────
 
 model User {
@@ -154,6 +173,11 @@ model Shop {
   /// Live-payment settlement fields — present, not active (PRD §8.8 / D6)
   gatewayAccountId String?      @map("gateway_account_id")
   settlementConfig Json?        @map("settlement_config")
+  /// Platform-owner controls (/sudoadmin): a suspended shop takes no new orders and is hidden
+  /// from customers; an archived shop is also gone from staff sign-in and its devices are revoked.
+  suspendedAt      DateTime?    @map("suspended_at")
+  suspendedReason  String?      @map("suspended_reason")
+  archivedAt       DateTime?    @map("archived_at")
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
@@ -164,6 +188,7 @@ model Shop {
   pricing         ShopPricing[]
   orders          Order[]
   pickupCounters  PickupCounter[]
+  subscriptions   ShopSubscription[]
 
   @@map("shops")
 }
@@ -578,4 +603,82 @@ model PrinterUptimeDaily {
   @@id([printerId, day])
   @@index([shopId, day])
   @@map("printer_uptime_daily")
+}
+
+// ───────────────────────────── Platform billing (/sudoadmin) ─────────────────────────────
+// What Kagaz charges shops for using the platform. Separate from customer order payments:
+// nothing here goes through PaymentProvider; payments are recorded by a platform admin.
+
+/// A plan in the catalogue. Changing a plan's price never changes existing subscriptions
+/// (each subscription keeps its own price_paise).
+model SubscriptionPlan {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  code             String          @unique
+  name             String
+  description      String?
+  pricePaise       Int             @map("price_paise")
+  interval         BillingInterval
+  trialDays        Int             @default(0) @map("trial_days")
+  /// Informational limits shown to the team; null = unlimited. Not enforced yet.
+  maxPrinters      Int?            @map("max_printers")
+  maxMonthlyOrders Int?            @map("max_monthly_orders")
+  /// Inactive plans stay on existing subscriptions but can't be picked for new ones.
+  active           Boolean         @default(true)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  subscriptions ShopSubscription[]
+
+  @@map("subscription_plans")
+}
+
+/// A shop's subscription. At most one open (TRIALING / ACTIVE / PAST_DUE) per shop, enforced
+/// by a partial unique index added by hand in the migration.
+model ShopSubscription {
+  id                 String             @id @default(uuid(7)) @db.Uuid
+  shopId             String             @map("shop_id") @db.Uuid
+  planId             String             @map("plan_id") @db.Uuid
+  status             SubscriptionStatus
+  /// Price agreed for this shop (may differ from the plan's list price).
+  pricePaise         Int                @map("price_paise")
+  interval           BillingInterval
+  currentPeriodStart DateTime           @map("current_period_start")
+  currentPeriodEnd   DateTime           @map("current_period_end")
+  trialEndsAt        DateTime?          @map("trial_ends_at")
+  cancelAtPeriodEnd  Boolean            @default(false) @map("cancel_at_period_end")
+  cancelledAt        DateTime?          @map("cancelled_at")
+  notes              String?
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  shop     Shop                  @relation(fields: [shopId], references: [id])
+  plan     SubscriptionPlan      @relation(fields: [planId], references: [id])
+  payments SubscriptionPayment[]
+
+  @@index([shopId, createdAt])
+  @@index([status, currentPeriodEnd])
+  @@map("shop_subscriptions")
+}
+
+/// A subscription payment recorded by a platform admin (cash, UPI, bank transfer…).
+model SubscriptionPayment {
+  id             String                    @id @default(uuid(7)) @db.Uuid
+  subscriptionId String                    @map("subscription_id") @db.Uuid
+  shopId         String                    @map("shop_id") @db.Uuid
+  amountPaise    Int                       @map("amount_paise")
+  method         SubscriptionPaymentMethod
+  reference      String?
+  note           String?
+  /// Billing period this payment covers.
+  periodStart    DateTime                  @map("period_start")
+  periodEnd      DateTime                  @map("period_end")
+  paidAt         DateTime                  @map("paid_at")
+  recordedById   String                    @map("recorded_by_id") @db.Uuid
+  createdAt      DateTime                  @default(now()) @map("created_at")
+
+  subscription ShopSubscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId, paidAt])
+  @@index([shopId, paidAt])
+  @@map("subscription_payments")
 }

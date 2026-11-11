@@ -71,7 +71,11 @@ export async function resolveStaff(
       id: true,
       email: true,
       kind: true,
-      shopMemberships: { select: { shopId: true, role: true } },
+      // Archived shops (offboarded in /sudoadmin) no longer grant web access.
+      shopMemberships: {
+        where: { shop: { archivedAt: null } },
+        select: { shopId: true, role: true },
+      },
     },
   });
   if (!user) return null;
