@@ -6,6 +6,7 @@ import { type AppConfig } from '../../common/config/config.schema.js';
 import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { tenantWhere } from '../../common/prisma/tenant-scope.js';
 import { type Tx } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
 import { AutoAcceptPolicy, type AutoAcceptResult } from './auto-accept.policy.js';
@@ -34,7 +35,7 @@ export class ApprovalService {
   /** Evaluate PRD §8.4 for an order (inside a transaction or not). */
   async evaluate(orderId: string, db: Tx | PrismaService = this.prisma): Promise<AutoAcceptResult> {
     const order = await db.order.findUniqueOrThrow({
-      where: { id: orderId },
+      where: { id: orderId, ...tenantWhere() },
       include: {
         shop: true,
         files: { where: { kind: 'ORIGINAL', status: 'VALID' }, take: 1 },
@@ -87,7 +88,7 @@ export class ApprovalService {
       const result = await this.evaluate(orderId);
       if (!result.eligible || !result.printerId) return false;
       const order = await this.prisma.order.findUniqueOrThrow({
-        where: { id: orderId },
+        where: { id: orderId, ...tenantWhere() },
         select: { shopId: true },
       });
       await this.acceptance.accept({

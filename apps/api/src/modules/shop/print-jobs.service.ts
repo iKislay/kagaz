@@ -68,7 +68,7 @@ export class PrintJobsService {
 
       // Explain failures precisely; the conditional update below is what guarantees safety.
       const head = await tx.printJob.findFirst({
-        where: { printerId: job.printerId, status: 'READY' },
+        where: { printerId: job.printerId, status: 'READY', order: { shopId: device.shopId } },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         select: { id: true },
       });
@@ -95,7 +95,7 @@ export class PrintJobsService {
       });
       if (!won) throw printerBusy();
       const leased = await tx.printJob.updateMany({
-        where: { id: job.id, status: 'READY' },
+        where: { id: job.id, status: 'READY', order: { shopId: device.shopId } },
         data: { status: 'LEASED', leaseUntil, leasedByDeviceId: device.deviceId },
       });
       if (leased.count !== 1) throw printerBusy();
@@ -181,11 +181,18 @@ export class PrintJobsService {
       }
       // Conditional on the current status: concurrent duplicate reports apply once.
       const applied = await tx.printJob.updateMany({
-        where: { id: job.id, status: { in: from }, leasedByDeviceId: device.deviceId },
+        where: {
+          id: job.id,
+          status: { in: from },
+          leasedByDeviceId: device.deviceId,
+          order: { shopId: device.shopId },
+        },
         data,
       });
       if (applied.count !== 1) {
-        const current = await tx.printJob.findUniqueOrThrow({ where: { id: job.id } });
+        const current = await tx.printJob.findUniqueOrThrow({
+          where: { id: job.id, order: { shopId: device.shopId } },
+        });
         if (current.status === report.status) return job.orderId;
         throw invalidJobTransition(current.status, report.status);
       }
@@ -193,7 +200,7 @@ export class PrintJobsService {
 
       if (report.status === 'SUBMITTED') {
         await tx.printer.updateMany({
-          where: { id: job.printerId, activeJobId: job.id },
+          where: { id: job.printerId, activeJobId: job.id, shopId: device.shopId },
           data: { leaseUntil },
         });
         return job.orderId;

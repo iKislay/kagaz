@@ -84,11 +84,11 @@ export class DevicesService {
     const at = now.toISOString();
     const result = await this.prisma.$transaction(async (tx) => {
       const before = await tx.shopDevice.findUniqueOrThrow({
-        where: { id: device.deviceId },
+        where: { id: device.deviceId, shopId: device.shopId },
         select: { lastHeartbeatAt: true },
       });
       const updated = await tx.shopDevice.update({
-        where: { id: device.deviceId },
+        where: { id: device.deviceId, shopId: device.shopId },
         data: {
           lastHeartbeatAt: now,
           ...(req.appVersion ? { appVersion: req.appVersion } : {}),
@@ -119,7 +119,7 @@ export class DevicesService {
         if (!printer) continue;
         const lastError = p.lastError ?? null;
         await tx.printer.update({
-          where: { id: printer.id },
+          where: { id: printer.id, shopId: device.shopId },
           data: { status: p.status, lastStatusAt: now, lastError },
         });
         if (printer.status !== p.status || printer.lastError !== lastError) {
@@ -152,7 +152,7 @@ export class DevicesService {
     const token = generateToken();
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.shopDevice.updateMany({
-        where: { id: device.deviceId, status: 'ACTIVE' },
+        where: { id: device.deviceId, shopId: device.shopId, status: 'ACTIVE' },
         data: { tokenHash: sha256Hex(token) },
       });
       if (updated.count !== 1) {

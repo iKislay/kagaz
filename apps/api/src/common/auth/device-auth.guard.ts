@@ -10,6 +10,7 @@ import { type Actor } from '../actor.js';
 import { sha256Hex } from '../crypto/tokens.js';
 import { AppError } from '../http/api-exception.filter.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { bindTenantShop } from '../prisma/tenant-scope.js';
 
 /** Operator signed in on the device (contract §4); set by OperatorAuthGuard. */
 export interface OperatorContext {
@@ -60,6 +61,8 @@ export class DeviceAuthGuard implements CanActivate {
     }
 
     req.device = { deviceId: device.id, shopId: device.shopId, name: device.name };
+    // From here on every shop-owned query in this request must be scoped to this shop (P4.1).
+    bindTenantShop(device.shopId);
     return true;
   }
 }

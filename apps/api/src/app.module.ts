@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { type IncomingMessage, type ServerResponse } from 'node:http';
-import { Module } from '@nestjs/common';
+import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
@@ -9,6 +9,7 @@ import { EventsModule } from './common/events/events.module.js';
 import { loadConfig } from './common/config/config.schema.js';
 import { ApiExceptionFilter } from './common/http/api-exception.filter.js';
 import { PrismaModule } from './common/prisma/prisma.module.js';
+import { runInTenantScope } from './common/prisma/tenant-scope.js';
 import { HealthController } from './health/health.controller.js';
 import { FilesModule } from './modules/files/files.module.js';
 import { OrdersModule } from './modules/orders/orders.module.js';
@@ -87,4 +88,11 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /** Every request gets its own tenant scope; DeviceAuthGuard binds it to the device's shop (P4.1). */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply((_req: unknown, _res: unknown, next: () => void) => runInTenantScope(next))
+      .forRoutes('*');
+  }
+}

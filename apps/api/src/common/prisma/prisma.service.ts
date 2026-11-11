@@ -4,6 +4,7 @@ import { PrismaClient } from '../../generated/prisma/client.js';
 import { APP_CONFIG } from '../config/config.module.js';
 import { type AppConfig } from '../config/config.schema.js';
 import { DomainEventBus } from '../events/domain-events.js';
+import { assertTenantScoped, currentTenantShop } from './tenant-scope.js';
 
 /**
  * Prisma client for the whole API. Connects lazily on first query so the API can boot
@@ -16,6 +17,21 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
     @Optional() readonly domainEvents?: DomainEventBus,
   ) {
     super({ adapter: new PrismaPg({ connectionString: config.DATABASE_URL }) });
+    // Tenant guard (P4.1): in a request bound to a shop device, every query on a shop-owned model
+    // must be pinned to that shop (see tenant-scope.ts). The extended client forwards everything
+    // else (ping, domainEvents, the patched $transaction) to this instance, so Nest injects it as
+    // the PrismaService.
+    return this.$extends({
+      query: {
+        $allModels: {
+          $allOperations({ model, operation, args, query }) {
+            const shopId = currentTenantShop();
+            if (shopId) assertTenantScoped(model, operation, args, shopId);
+            return query(args);
+          },
+        },
+      },
+    }) as unknown as PrismaService;
   }
 
   async ping(): Promise<void> {

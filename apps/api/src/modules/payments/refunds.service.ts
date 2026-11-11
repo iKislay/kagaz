@@ -5,6 +5,7 @@ import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.js';
+import { tenantWhere } from '../../common/prisma/tenant-scope.js';
 
 export interface RefundSummary {
   id: string;
@@ -49,7 +50,7 @@ export class RefundsService {
   async request(orderId: string, reason: string): Promise<RefundRequestResult> {
     const opened = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
-      const order = await tx.order.findUnique({ where: { id: orderId } });
+      const order = await tx.order.findUnique({ where: { id: orderId, ...tenantWhere() } });
       if (!order) throw new AppError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND);
       const refundable: OrderStatus[] = [
         OrderStatus.REJECTED,
@@ -111,7 +112,7 @@ export class RefundsService {
         data: { status: 'REFUND_PENDING' },
       });
     }
-    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId, ...tenantWhere() } });
     if (order.status === OrderStatus.REJECTED) {
       await this.stateMachine.transition(tx, {
         orderId,
@@ -189,7 +190,9 @@ export class RefundsService {
       include: { payment: true },
     });
     await tx.payment.update({ where: { id: refund.paymentId }, data: { status: 'REFUNDED' } });
-    const order = await tx.order.findUniqueOrThrow({ where: { id: refund.payment.orderId } });
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: refund.payment.orderId, ...tenantWhere() },
+    });
     if (order.status === OrderStatus.REFUND_PENDING) {
       await this.stateMachine.transition(tx, {
         orderId: order.id,
@@ -205,7 +208,7 @@ export class RefundsService {
 
   private async summary(orderId: string): Promise<RefundRequestResult> {
     const order = await this.prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
+      where: { id: orderId, ...tenantWhere() },
       include: {
         payments: {
           include: { refunds: { orderBy: { createdAt: 'desc' }, take: 1 } },

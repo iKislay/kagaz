@@ -8,6 +8,7 @@ import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.j
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type PrintJobStatus } from '../../generated/prisma/client.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
+import { tenantJobWhere, tenantWhere } from '../../common/prisma/tenant-scope.js';
 
 /** Job statuses that hold (or held) a printer lease. */
 export const LEASE_HOLDING: PrintJobStatus[] = ['LEASED', 'SUBMITTED'];
@@ -17,7 +18,7 @@ export const LEASE_EXPIRED_REASON = 'Lease expired before completion';
 /** Free the printer if this job still holds its lease. */
 export async function releaseLease(tx: Tx, printerId: string, jobId: string): Promise<void> {
   await tx.printer.updateMany({
-    where: { id: printerId, activeJobId: jobId },
+    where: { id: printerId, activeJobId: jobId, ...tenantWhere() },
     data: { activeJobId: null, leaseUntil: null },
   });
 }
@@ -95,10 +96,13 @@ export class PrintLeaseService {
     const ids = jobs.map((j) => j.id);
     if (ids.length === 0) return [];
     await tx.printJob.updateMany({
-      where: { id: { in: ids }, status: { in: LEASE_HOLDING } },
+      where: { id: { in: ids }, status: { in: LEASE_HOLDING }, order: { shopId: holder.shopId } },
       data: { leaseUntil },
     });
-    await tx.printer.updateMany({ where: { activeJobId: { in: ids } }, data: { leaseUntil } });
+    await tx.printer.updateMany({
+      where: { activeJobId: { in: ids }, shopId: holder.shopId },
+      data: { leaseUntil },
+    });
     return ids;
   }
 
@@ -118,6 +122,7 @@ export class PrintLeaseService {
       where: {
         id: printJobId,
         status: { in: LEASE_HOLDING },
+        ...tenantJobWhere(),
         ...(expiredBefore ? { leaseUntil: { lt: expiredBefore } } : {}),
       },
       data: { status: 'UNCERTAIN', error: reason, leaseUntil: null },
@@ -125,7 +130,7 @@ export class PrintLeaseService {
     if (updated.count !== 1) return false;
 
     const job = await tx.printJob.findUniqueOrThrow({
-      where: { id: printJobId },
+      where: { id: printJobId, ...tenantJobWhere() },
       include: { order: { select: { status: true, shopId: true } } },
     });
     await releaseLease(tx, job.printerId, job.id);

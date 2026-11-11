@@ -8,6 +8,7 @@ import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { StorageService } from '../files/storage.service.js';
 import { pickupDateString } from '../pickup/pickup-number.service.js';
 import { buildPrintPacket } from './packet-builder.js';
+import { tenantWhere } from '../../common/prisma/tenant-scope.js';
 
 export interface PreparedPacket {
   objectKey: string;
@@ -32,7 +33,7 @@ export class PrintPreparationService {
 
   async prepare(orderId: string, options: PrintOptions): Promise<PreparedPacket> {
     const order = await this.prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
+      where: { id: orderId, ...tenantWhere() },
       include: {
         shop: { select: { name: true, isDemo: true } },
         files: { where: { kind: 'ORIGINAL', status: 'VALID' }, take: 1 },

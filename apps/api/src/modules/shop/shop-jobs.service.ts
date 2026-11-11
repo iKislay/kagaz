@@ -19,6 +19,7 @@ import { OrderAcceptanceService } from '../approval/order-acceptance.service.js'
 import { PrintLeaseService, releaseLease } from '../printing/print-leases.service.js';
 import { SHOP_JOB_INCLUDE, toShopJob } from './shop-job-view.js';
 import { findShopOrder } from './shop-scope.js';
+import { tenantJobWhere } from '../../common/prisma/tenant-scope.js';
 
 /** What the shop sees by default: everything from payment to pickup. */
 const ACTIVE_STATUSES: OrderStatus[] = [
@@ -105,7 +106,11 @@ export class ShopJobsService {
         data: { rejectionCode: req.reasonCode, rejectionNote: req.note ?? null },
       });
       await tx.printJob.updateMany({
-        where: { orderId: order.id, status: { in: ['PREPARING', 'READY'] } },
+        where: {
+          orderId: order.id,
+          status: { in: ['PREPARING', 'READY'] },
+          order: { shopId: device.shopId },
+        },
         data: { status: 'CANCELLED' },
       });
       return this.requestRefund(tx, order.id, deviceActor(device));
@@ -142,7 +147,7 @@ export class ShopJobsService {
 
     const refundId = await this.prisma.$transaction(async (tx) => {
       const latest = await tx.printJob.findFirst({
-        where: { orderId: order.id },
+        where: { orderId: order.id, order: { shopId: device.shopId } },
         orderBy: { attempt: 'desc' },
         include: { packetFile: true },
       });
@@ -180,10 +185,14 @@ export class ShopJobsService {
           data: { queuedAt: new Date() },
         });
         const old = await tx.printJob.findMany({
-          where: { orderId: order.id, status: { in: SUPERSEDABLE } },
+          where: {
+            orderId: order.id,
+            status: { in: SUPERSEDABLE },
+            order: { shopId: device.shopId },
+          },
         });
         await tx.printJob.updateMany({
-          where: { id: { in: old.map((j) => j.id) } },
+          where: { id: { in: old.map((j) => j.id) }, order: { shopId: device.shopId } },
           data: { status: 'SUPERSEDED', leaseUntil: null },
         });
         for (const j of old) {
@@ -233,7 +242,7 @@ export class ShopJobsService {
   /** The operator has decided this attempt's outcome: free the printer, stop the lease clock. */
   private async closeLease(tx: Tx, job: { id: string; printerId: string }): Promise<void> {
     await tx.printJob.updateMany({
-      where: { id: job.id, leaseUntil: { not: null } },
+      where: { id: job.id, leaseUntil: { not: null }, ...tenantJobWhere() },
       data: { leaseUntil: null },
     });
     await releaseLease(tx, job.printerId, job.id);

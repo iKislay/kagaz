@@ -3,6 +3,7 @@ import { type OrderStatus, canTransition } from '@kagaz/shared';
 import { type Actor, isHumanActor } from '../../common/actor.js';
 import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
+import { tenantWhere } from '../../common/prisma/tenant-scope.js';
 import { type Order, type Prisma } from '../../generated/prisma/client.js';
 import { AuditService } from '../audit/audit.service.js';
 
@@ -39,7 +40,7 @@ export class OrderStateMachine {
   ) {}
 
   async transition(tx: Tx, params: TransitionParams): Promise<Order> {
-    const order = await tx.order.findUnique({ where: { id: params.orderId } });
+    const order = await tx.order.findUnique({ where: { id: params.orderId, ...tenantWhere() } });
     if (!order) {
       throw new AppError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND);
     }
@@ -59,7 +60,7 @@ export class OrderStateMachine {
     }
 
     const updated = await tx.order.updateMany({
-      where: { id: order.id, status: order.status, version: order.version },
+      where: { id: order.id, shopId: order.shopId, status: order.status, version: order.version },
       data: { ...params.data, status: params.to, version: { increment: 1 } },
     });
     if (updated.count !== 1) {
@@ -100,7 +101,9 @@ export class OrderStateMachine {
       );
     }
 
-    const updatedOrder = await tx.order.findUniqueOrThrow({ where: { id: order.id } });
+    const updatedOrder = await tx.order.findUniqueOrThrow({
+      where: { id: order.id, shopId: order.shopId },
+    });
     this.events.publish(tx, DomainEvent.ORDER_STATUS_CHANGED, {
       orderId: order.id,
       shopId: order.shopId,
@@ -139,7 +142,12 @@ export class OrderStateMachine {
     data: Omit<Prisma.OrderUpdateManyMutationInput, 'status' | 'version'>,
   ): Promise<Order> {
     const updated = await tx.order.updateMany({
-      where: { id: order.id, version: order.version, status: { in: [...inStatuses] } },
+      where: {
+        id: order.id,
+        version: order.version,
+        status: { in: [...inStatuses] },
+        ...tenantWhere(),
+      },
       data: { ...data, version: { increment: 1 } },
     });
     if (updated.count !== 1) {
@@ -149,6 +157,6 @@ export class OrderStateMachine {
         HttpStatus.CONFLICT,
       );
     }
-    return tx.order.findUniqueOrThrow({ where: { id: order.id } });
+    return tx.order.findUniqueOrThrow({ where: { id: order.id, ...tenantWhere() } });
   }
 }

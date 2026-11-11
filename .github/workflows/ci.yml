@@ -1,0 +1,53 @@
+# CI: lint/typecheck/unit tests, API e2e against real Postgres + SeaweedFS (incl. the T09
+# tenant-isolation suite and the P4.1 tenant guard), and the shop-agent tests on Windows.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: TypeScript (lint, unit, e2e)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version from packageManager in package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+
+      - name: Start Postgres + SeaweedFS and create the private bucket
+        run: |
+          docker compose -f infra/docker-compose.yml up -d --wait postgres seaweedfs
+          docker compose -f infra/docker-compose.yml run --rm storage-init
+
+      - run: pnpm format:check
+      - run: pnpm --filter @kagaz/shared build
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: API e2e (T01–T09, T17, T18 server side, P4.1 tenant guard)
+        run: pnpm --filter @kagaz/api test:e2e
+      - run: pnpm build
+
+  shop-agent:
+    name: Shop agent (.NET)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # Test project directly: running the .sln can crash MSBuild (see CLAUDE.md).
+      - run: dotnet test apps/shop-agent/tests/Kagaz.ShopAgent.Tests/Kagaz.ShopAgent.Tests.csproj

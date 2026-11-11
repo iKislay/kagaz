@@ -105,7 +105,7 @@ export class OperatorSessionService {
     const op = token ? await this.verify(device, token).catch(() => null) : null;
     if (!op) return;
     await this.prisma.operatorSession.updateMany({
-      where: { id: op.sessionId, revokedAt: null },
+      where: { id: op.sessionId, shopId: device.shopId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
     await this.audit(device, op.userId, 'operator.logout', { sessionId: op.sessionId });
@@ -134,7 +134,9 @@ export class OperatorSessionService {
       throw operatorLoginRequired();
     }
 
-    const session = await this.prisma.operatorSession.findUnique({ where: { id: jti } });
+    const session = await this.prisma.operatorSession.findUnique({
+      where: { id: jti, shopId: device.shopId },
+    });
     if (
       !session ||
       session.revokedAt ||

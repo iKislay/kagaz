@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type ShopJob } from '@kagaz/shared';
+import {
+  TenantScopeViolation,
+  bindTenantShop,
+  runInTenantScope,
+} from '../../src/common/prisma/tenant-scope.js';
 import { type Harness, createHarness } from './harness.js';
 import {
   acceptedOrder,
@@ -135,5 +140,39 @@ describe('T09: three-shop separation', () => {
       { 'Idempotency-Key': 'cross-tenant-1' },
     );
     expect(replay.status).toBe(404);
+  });
+});
+
+describe('P4.1: database-level tenant guard', () => {
+  it('in a device-bound scope, unscoped or cross-shop queries throw before reaching the DB', async () => {
+    const a = await pairedShop(h);
+    const b = await pairedShop(h);
+    const bOrder = await paidOrder(h, b.shop.id);
+
+    await runInTenantScope(async () => {
+      bindTenantShop(a.shop.id);
+      // Scoped to the bound shop: allowed.
+      await expect(h.prisma.order.findMany({ where: { shopId: a.shop.id } })).resolves.toEqual([]);
+      // Unscoped, or naming another shop: refused, also inside interactive transactions.
+      await expect(h.prisma.order.findUnique({ where: { id: bOrder.order.id } })).rejects.toThrow(
+        TenantScopeViolation,
+      );
+      await expect(
+        h.prisma.order.findFirst({ where: { id: bOrder.order.id, shopId: b.shop.id } }),
+      ).rejects.toThrow(/another shop/);
+      await expect(
+        h.prisma.$transaction((tx) => tx.printJob.findMany({ where: { status: 'READY' } })),
+      ).rejects.toThrow(TenantScopeViolation);
+      await expect(
+        h.prisma.printer.updateMany({ where: { shopId: b.shop.id }, data: { enabled: false } }),
+      ).rejects.toThrow(TenantScopeViolation);
+    });
+    // B's printer was never touched.
+    const bPrinters = await h.prisma.printer.findMany({ where: { shopId: b.shop.id } });
+    expect(bPrinters.every((p) => p.enabled)).toBe(true);
+    // Outside a device-bound request (customer, admin, jobs) the guard is inert.
+    await expect(
+      h.prisma.order.findUnique({ where: { id: bOrder.order.id } }),
+    ).resolves.toBeTruthy();
   });
 });

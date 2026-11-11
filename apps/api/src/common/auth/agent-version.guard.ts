@@ -61,7 +61,7 @@ export class AgentVersionGuard implements CanActivate {
     let version = typeof header === 'string' && header.length <= 40 ? header : null;
     if (!version && req.device) {
       const device = await this.prisma.shopDevice.findUnique({
-        where: { id: req.device.deviceId },
+        where: { id: req.device.deviceId, shopId: req.device.shopId },
         select: { appVersion: true },
       });
       version = device?.appVersion ?? null;
