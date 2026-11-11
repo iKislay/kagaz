@@ -34,7 +34,7 @@ public static class ReconnectBackoff
 /// <summary>
 /// Realtime hints for the shop app (P2.9, contract §5): connects to <c>/shop</c> with the device token
 /// and turns events into wake-ups. <b>Hints only</b> (invariant 13): <c>job.created</c>/<c>job.updated</c>
-/// wake the REST refresh, <c>device.revoked</c> triggers an immediate heartbeat (the REST
+/// wake the REST refresh, <c>payment_report.changed</c> wakes the payment-report refresh, <c>device.revoked</c> triggers an immediate heartbeat (the REST
 /// <c>401 DEVICE_REVOKED</c> is what wipes the token), <c>shop.mode_changed</c> updates the mode control
 /// (the next heartbeat confirms it). Everything keeps working through the REST safety polls if the
 /// socket never connects. Reconnects with <see cref="ReconnectBackoff"/>; the library's own
@@ -94,6 +94,7 @@ public sealed class RealtimeClient
                 failures = 0;
                 SetConnected(true);
                 _signals.Jobs.Pulse(); // catch up on anything missed while disconnected (REST is the truth)
+                _signals.PaymentReports.Pulse();
                 await Task.WhenAny(dropped.Task, Task.Delay(Timeout.Infinite, session.Token));
                 SetConnected(false);
             }
@@ -130,6 +131,9 @@ public sealed class RealtimeClient
             case "job.created":
             case "job.updated":
                 _signals.Jobs.Pulse();
+                break;
+            case "payment_report.changed":
+                _signals.PaymentReports.Pulse(); // ADR-003: refetch GET /shop/payment-reports
                 break;
             case "device.revoked":
                 _signals.Heartbeat.Pulse();

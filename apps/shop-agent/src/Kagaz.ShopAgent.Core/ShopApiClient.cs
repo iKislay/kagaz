@@ -214,6 +214,74 @@ public sealed class ShopApiClient
         return await ReadAsync<ShopJob>(response, ct);
     }
 
+    // ─── Direct-to-shop UPI payments (ADR-003) ───
+
+    /// <summary><c>GET /shop/payments/setup</c> (device token): readiness, UPI ID, paired phones.</summary>
+    public async Task<ShopPaymentSetup> GetPaymentSetupAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/payments/setup", null, ct);
+        return await ReadAsync<ShopPaymentSetup>(response, ct);
+    }
+
+    /// <summary><c>PUT /shop/payments/setup</c> (operator) — step 1: UPI ID + the name customers see.</summary>
+    public async Task<ShopPaymentSetup> UpdatePaymentSetupAsync(UpdateShopPaymentSetupRequest request, string? idempotencyKey = null,
+        CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Put, "/shop/payments/setup", request, ct, auth: Auth.Operator,
+            idempotencyKey: idempotencyKey);
+        return await ReadAsync<ShopPaymentSetup>(response, ct);
+    }
+
+    /// <summary><c>POST /shop/payments/pairing</c> (operator) — step 2: a short-lived QR text for the phone app.</summary>
+    public async Task<ShopPhonePairing> CreatePhonePairingAsync(string? idempotencyKey = null, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, "/shop/payments/pairing", null, ct, auth: Auth.Operator,
+            idempotencyKey: idempotencyKey);
+        return await ReadAsync<ShopPhonePairing>(response, ct);
+    }
+
+    /// <summary><c>GET /shop/payment-reports?status=OPEN|ALL</c> (device token).</summary>
+    public async Task<List<ShopPaymentReport>> ListPaymentReportsAsync(string status = PaymentReportStatus.Open, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, $"/shop/payment-reports?status={Uri.EscapeDataString(status)}", null, ct);
+        var wrapper = await ReadAsync<ShopPaymentReportList>(response, ct);
+        return wrapper.Reports ?? new();
+    }
+
+    /// <summary><c>POST /shop/payment-reports/:id/approve</c> (operator): marks the order paid.</summary>
+    public async Task<ShopPaymentReport> ApprovePaymentReportAsync(string reportId, string? idempotencyKey = null, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, $"/shop/payment-reports/{Uri.EscapeDataString(reportId)}/approve",
+            null, ct, auth: Auth.Operator, idempotencyKey: idempotencyKey);
+        return await ReadAsync<ShopPaymentReport>(response, ct);
+    }
+
+    /// <summary><c>POST /shop/payment-reports/:id/decline</c> (operator).</summary>
+    public async Task<ShopPaymentReport> DeclinePaymentReportAsync(string reportId, DeclinePaymentReportRequest request,
+        string? idempotencyKey = null, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, $"/shop/payment-reports/{Uri.EscapeDataString(reportId)}/decline",
+            request, ct, auth: Auth.Operator, idempotencyKey: idempotencyKey);
+        return await ReadAsync<ShopPaymentReport>(response, ct);
+    }
+
+    /// <summary><c>GET /shop/refunds</c> (device token): refunds the shop must send from its own UPI app.</summary>
+    public async Task<List<ShopManualRefund>> ListManualRefundsAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/refunds", null, ct);
+        var wrapper = await ReadAsync<ShopManualRefundList>(response, ct);
+        return wrapper.Refunds ?? new();
+    }
+
+    /// <summary><c>POST /shop/refunds/:id/confirm</c> (operator, 204): "I sent the money back".</summary>
+    public async Task ConfirmManualRefundAsync(string refundId, ConfirmManualRefundRequest request, string? idempotencyKey = null,
+        CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, $"/shop/refunds/{Uri.EscapeDataString(refundId)}/confirm",
+            request, ct, auth: Auth.Operator, idempotencyKey: idempotencyKey);
+        await EnsureSuccess(response);
+    }
+
     // ─── Helpers ───
 
     private enum Auth

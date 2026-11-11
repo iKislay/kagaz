@@ -41,6 +41,9 @@ public sealed class AgentSignals
     /// <summary>Send a heartbeat now (e.g. socket <c>device.revoked</c> hint — the REST answer decides).</summary>
     public WakeSignal Heartbeat { get; } = new();
 
+    /// <summary>Payment reports changed (socket <c>payment_report.changed</c>, ADR-003) — refetch them.</summary>
+    public WakeSignal PaymentReports { get; } = new();
+
     private int _connectionEpoch;
 
     /// <summary>Bumped every time the server becomes reachable again; the worker reconciles on change (A.3).</summary>

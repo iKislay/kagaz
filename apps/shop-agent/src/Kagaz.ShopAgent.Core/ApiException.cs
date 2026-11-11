@@ -41,4 +41,11 @@ public static class ApiErrorCodes
     public const string InvalidTransition = "INVALID_TRANSITION";
     public const string ReprintConfirmRequired = "REPRINT_CONFIRM_REQUIRED";
     public const string RateLimited = "RATE_LIMITED";
+    public const string ValidationFailed = "VALIDATION_FAILED";
+    /// <summary>502: the payment service (YouPI) could not be reached — retry (ADR-003).</summary>
+    public const string PaymentProviderUnavailable = "PAYMENT_PROVIDER_UNAVAILABLE";
+    /// <summary>409 pairing: save the UPI ID (step 1) first.</summary>
+    public const string PaymentSetupRequired = "PAYMENT_SETUP_REQUIRED";
+    /// <summary>409 approve/decline: the report was already decided or superseded.</summary>
+    public const string PaymentReportNotOpen = "PAYMENT_REPORT_NOT_OPEN";
 }
