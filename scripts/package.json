@@ -9,6 +9,7 @@
     "load-orders": "tsx load-orders.ts",
     "verify-run": "tsx verify-run.ts",
     "demo-reset": "tsx demo-reset.ts",
+    "publish-shop-agent-release": "tsx publish-shop-agent-release.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

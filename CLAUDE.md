@@ -18,7 +18,8 @@ Current target: an **investor-ready working prototype** — 3 shop tenants, 100�
 
 ```
 apps/api/          NestJS modular monolith + Prisma (apps/api/prisma)
-apps/web/          Next.js + Tailwind — customer routes and /admin routes
+apps/web/          Next.js + Tailwind — customer routes and /admin routes (print.kaggaz.app)
+apps/landing/      Next.js static export — marketing site + shop-app download page (kaggaz.app)
 apps/shop-agent/   .NET WPF Windows app (Kagaz.ShopAgent.sln: App, Core, Printing, Tests)
 packages/shared/   TS enums, zod schemas, DTO types, money + page-range helpers
 infra/             docker-compose (Postgres + SeaweedFS S3), deploy configs
@@ -54,6 +55,9 @@ docker build -f apps/api/Dockerfile -t kagaz-api .     # --target migrate for th
 docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=... -t kagaz-web .
 docker compose -f infra/docker-compose.demo.yml --env-file infra/demo.env up -d --build
 pwsh scripts/build-shop-agent-installer.ps1           # Velopack Setup.exe + update feed (needs internet once)
+pnpm release:shop-agent [-- --dry-run]                # upload the release folder to Cloudflare R2 (docs/runbooks/LANDING_SITE.md)
+pnpm dev:landing                                      # kaggaz.app landing site on :3001
+pnpm build:landing                                    # static export → apps/landing/out
 dotnet build apps/shop-agent/Kagaz.ShopAgent.sln
 dotnet test  apps/shop-agent/tests/Kagaz.ShopAgent.Tests/Kagaz.ShopAgent.Tests.csproj   # .sln run can crash MSBuild
 ```

@@ -11,7 +11,8 @@
      the full/delta .nupkg packages and releases.win.json (the update feed).
 
   Publish the whole releases folder at the URL (or share) configured as UpdateFeedUrl in the app's
-  appsettings.json; installed apps update from there. Packing a newer -Version into the same
+  appsettings.json (-UpdateFeedUrl, default SHOP_APP_RELEASES_URL from .env); installed apps
+  update from there. `pnpm release:shop-agent` uploads the folder to Cloudflare R2. Packing a newer -Version into the same
   releases folder produces the delta update.
 
   Unsigned builds trigger SmartScreen ("Windows protected your PC") — see
@@ -26,7 +27,12 @@ param(
     [string]$OutputDir = "artifacts/shop-agent",
     [string]$Channel = "win",
     # Optional signtool parameters, e.g. '/a /fd sha256 /tr http://timestamp.digicert.com /td sha256'
-    [string]$SignParams = ""
+    [string]$SignParams = "",
+    # Public URL of the release folder (e.g. the Cloudflare R2 bucket). Written into the published
+    # appsettings.json as UpdateFeedUrl. Defaults to SHOP_APP_RELEASES_URL from the env / root .env.
+    [string]$UpdateFeedUrl = "",
+    # API URL the installed app talks to (written as ApiBaseUrl). Defaults to SHOP_APP_API_URL.
+    [string]$ApiBaseUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,6 +56,34 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
 foreach ($required in @($MainExe, "Kagaz.ShopAgent.PrintHost.exe", "appsettings.json")) {
     if (-not (Test-Path (Join-Path $publishDir $required))) { throw "Publish output is missing $required" }
 }
+
+# Fill UpdateFeedUrl / ApiBaseUrl from the root .env when not passed explicitly.
+$envFile = Join-Path $root ".env"
+function Get-DotEnv([string]$name) {
+    $fromProcess = [Environment]::GetEnvironmentVariable($name)
+    if ($fromProcess) { return $fromProcess }
+    if (Test-Path $envFile) {
+        $line = Get-Content $envFile | Where-Object { $_ -match "^\s*$name\s*=" } | Select-Object -Last 1
+        if ($line) { return ($line -replace "^\s*$name\s*=\s*", "").Trim().Trim('"').Trim("'") }
+    }
+    return ""
+}
+if (-not $UpdateFeedUrl) { $UpdateFeedUrl = Get-DotEnv "SHOP_APP_RELEASES_URL" }
+if (-not $ApiBaseUrl) { $ApiBaseUrl = Get-DotEnv "SHOP_APP_API_URL" }
+
+$settingsPath = Join-Path $publishDir "appsettings.json"
+$settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+if ($UpdateFeedUrl) {
+    $settings.UpdateFeedUrl = $UpdateFeedUrl.TrimEnd("/")
+    Write-Host "==> UpdateFeedUrl = $($settings.UpdateFeedUrl)"
+} else {
+    Write-Warning "UpdateFeedUrl is empty: installed apps won't self-update. Pass -UpdateFeedUrl or set SHOP_APP_RELEASES_URL."
+}
+if ($ApiBaseUrl) {
+    $settings.ApiBaseUrl = $ApiBaseUrl.TrimEnd("/")
+    Write-Host "==> ApiBaseUrl    = $($settings.ApiBaseUrl)"
+}
+$settings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding utf8
 
 if (-not (Test-Path $vpk)) {
     Write-Host "==> Installing vpk $VpkVersion into .tools/"
@@ -78,3 +112,4 @@ if ($LASTEXITCODE -ne 0) { throw "vpk pack failed ($LASTEXITCODE)" }
 Write-Host ""
 Write-Host "Done. Installer: $(Join-Path $releasesDir "$PackId-$Channel-Setup.exe")"
 Write-Host "Update feed:    $releasesDir (serve it at UpdateFeedUrl)"
+Write-Host "Upload to R2:   pnpm release:shop-agent"

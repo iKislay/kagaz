@@ -8,3 +8,5 @@ apps/api/src/generated
 docs/architecture.png
 .claude
 apps/web/next-env.d.ts
+apps/landing/out
+apps/landing/next-env.d.ts

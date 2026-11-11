@@ -19,7 +19,10 @@
     "sim:agent": "pnpm --filter @kagaz/scripts sim-agent",
     "load:orders": "pnpm --filter @kagaz/scripts load-orders",
     "verify:run": "pnpm --filter @kagaz/scripts verify-run",
-    "demo:reset": "pnpm --filter @kagaz/scripts demo-reset"
+    "demo:reset": "pnpm --filter @kagaz/scripts demo-reset",
+    "dev:landing": "pnpm --filter @kagaz/landing dev",
+    "build:landing": "pnpm --filter @kagaz/landing build",
+    "release:shop-agent": "pnpm --filter @kagaz/scripts publish-shop-agent-release"
   },
   "devDependencies": {
     "@eslint/js": "^10",

@@ -8,6 +8,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
+      'apps/landing/out/**',
       '**/coverage/**',
       '**/next-env.d.ts',
       'apps/shop-agent/**',

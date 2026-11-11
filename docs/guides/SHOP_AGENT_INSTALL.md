@@ -66,9 +66,11 @@ scripts\build-shop-agent-installer.ps1 -Version 0.2.1 -SignParams "/a /fd sha256
 
 ## Updates
 
-1. Serve the `releases` folder at a stable location — any static https host or a file share — and set
-   `"UpdateFeedUrl"` in `appsettings.json` **before** building (it is baked into the published app), e.g.
-   `"https://downloads.example.com/kagaz-shop"` or `"\\\\server\\kagaz-shop"`.
+1. Serve the `releases` folder at a stable location — any static https host or a file share. The feed URL is
+   baked into the published app: set `SHOP_APP_RELEASES_URL` in the root `.env` (or pass `-UpdateFeedUrl`)
+   **before** building, e.g. `https://downloads.kaggaz.app/kagaz-shop` or `\\server\kagaz-shop`.
+   The default host is Cloudflare R2: `pnpm release:shop-agent` uploads the folder — see
+   [LANDING_SITE.md](../runbooks/LANDING_SITE.md).
 2. To release vN+1: build with a higher `-Version` **into the same `releases` folder** (keep the older packages there
    so the delta is produced), then upload the folder again.
 3. In the app: **Settings → Updates → Check for updates / Install update**. Installing downloads the package, closes
