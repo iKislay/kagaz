@@ -10,6 +10,7 @@ import {
   PayResponseSchema,
   type PublicOrder,
   PublicOrderSchema,
+  type ReportPaymentRequest,
 } from '@kagaz/shared';
 import { apiFetch } from './api';
 
@@ -44,7 +45,43 @@ export const retryPayment = (id: string, token: string | null): Promise<PayRespo
 export const cancelOrder = (id: string, token: string | null): Promise<PublicOrder> =>
   apiFetch(`/orders/${id}/cancel`, PublicOrderSchema, { method: 'POST', token });
 
-/** "+91 98765 43210" / "9876543210" → "+919876543210" (server validates again). */
+// ─── Direct-to-shop UPI (ADR-003) ───
+
+/**
+ * "I paid but it isn't confirmed": send the 12-digit UPI reference (UTR) to the shop, who checks
+ * their account and approves or declines. Returns the updated order.
+ */
+export const reportPayment = (
+  id: string,
+  utr: string,
+  token: string | null,
+): Promise<PublicOrder> =>
+  apiFetch(`/orders/${id}/payment-report`, PublicOrderSchema, {
+    method: 'POST',
+    body: { utr } satisfies ReportPaymentRequest,
+    token,
+  });
+
+/** Only ever navigate to an http(s) checkout URL from the API (never `javascript:` and the like). */
+export function safeCheckoutUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Send the browser to the hosted UPI checkout; YouPI returns it to /order/:id. */
+export function openCheckout(url: string | null | undefined): boolean {
+  const safe = safeCheckoutUrl(url);
+  if (!safe) return false;
+  window.location.assign(safe);
+  return true;
+}
+
+/** "+91 98765 43210" /"9876543210" → "+919876543210" (server validates again). */
 export function normalizeIndianPhone(input: string): string {
   const digits = input.replace(/\D/g, '');
   const local = digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;

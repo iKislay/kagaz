@@ -29,6 +29,8 @@ export class ApiRequestError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Optional machine-readable extras from the error envelope (e.g. `{ after }`). */
+    readonly details?: unknown,
   ) {
     super(message);
   }
@@ -75,7 +77,12 @@ export async function apiFetch<T>(
   if (!res.ok) {
     const parsed = ApiErrorSchema.safeParse(json);
     throw parsed.success
-      ? new ApiRequestError(res.status, parsed.data.error.code, parsed.data.error.message)
+      ? new ApiRequestError(
+          res.status,
+          parsed.data.error.code,
+          parsed.data.error.message,
+          parsed.data.error.details,
+        )
       : new ApiRequestError(res.status, 'HTTP_ERROR', `Something went wrong (${res.status})`);
   }
   return schema.parse(json);
