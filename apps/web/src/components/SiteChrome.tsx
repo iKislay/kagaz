@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { DemoBanner } from '@/components/DemoBanner';
 import { AccountLink } from '@/components/customer/AccountLink';
+import { getPublicConfig } from '@/lib/api';
 
 /** Shared header/footer and type styles for every customer-facing page. */
 export const display = 'font-display font-semibold tracking-[-0.03em]';
@@ -26,7 +27,12 @@ function Logo() {
   );
 }
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  // OTP_PROVIDER=none: no customer sign-in, so no "Sign in" link (tracking links still work).
+  const signInOn = await getPublicConfig().then(
+    (c) => c.otpMode !== 'OFF',
+    () => false,
+  );
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-cream/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
@@ -46,7 +52,7 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="flex items-center gap-1.5">
-          <AccountLink />
+          {signInOn && <AccountLink />}
           <Link href="/shops" className={`${btnPrimary} h-9 px-4 text-[13px]`}>
             Print a file
           </Link>
@@ -66,9 +72,6 @@ export function SiteFooter() {
             <div className="flex items-center gap-2">
               <Logo />
               <span className="text-[16px] font-semibold tracking-tight">Kagaz</span>
-              <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[10px] text-ink-soft">
-                pilot
-              </span>
             </div>
             <p className="mt-4 max-w-[34ch] text-[14px] leading-relaxed text-ink-soft">
               Upload from your phone, collect from a print shop in Mandya, Karnataka.
@@ -101,7 +104,7 @@ export function SiteFooter() {
         </div>
         <div className="mt-12 flex flex-wrap justify-between gap-2 text-[12px] text-ink-soft">
           <span>© 2026 Kagaz. Mandya, Karnataka.</span>
-          <span>Payments are in demo mode. No money is charged.</span>
+          <span>Pay at the shop counter when you collect your prints.</span>
         </div>
       </div>
       {/* Pulled up under the links; the faded empty sky sits behind them. */}

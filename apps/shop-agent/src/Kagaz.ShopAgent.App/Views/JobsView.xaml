@@ -89,6 +89,8 @@
                                     </StackPanel>
                                     <StackPanel Grid.Column="3" Margin="10,0,0,0">
                                         <TextBlock Text="{Binding DisplayAmount}" Style="{StaticResource HeadlineText}" FontSize="14" HorizontalAlignment="Right" />
+                                        <TextBlock Text="to collect" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource OrangeBrush}" HorizontalAlignment="Right"
+                                                   Visibility="{Binding PayAtCounter, Converter={StaticResource BoolToVisibility}}" />
                                         <TextBlock Text="{Binding DisplayPaidAt}" Style="{StaticResource SecondaryText}" FontSize="11" HorizontalAlignment="Right" />
                                     </StackPanel>
                                 </Grid>
@@ -126,7 +128,9 @@
                                                    Visibility="{Binding DisplayPickupDate, Converter={StaticResource NullToVisibility}}" />
                                     </StackPanel>
                                 </StackPanel>
-                                <TextBlock Text="{Binding DisplayPaidAt, StringFormat=Paid {0}}" Style="{StaticResource SecondaryText}" Margin="0,2,0,0" />
+                                <TextBlock Text="{Binding DisplayOrderedLine}" Style="{StaticResource SecondaryText}" Margin="0,2,0,0" />
+                                <TextBlock Text="{Binding DisplayCollect}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource OrangeBrush}" Margin="0,6,0,0"
+                                           Visibility="{Binding PayAtCounter, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
                             <Border Grid.Column="1" Style="{StaticResource StatusPill}" VerticalAlignment="Top">
                                 <StackPanel Orientation="Horizontal">
@@ -161,7 +165,7 @@
                             <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource BodyText}">
                                 <Run Text="{Binding DisplayMode, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding DisplaySides, Mode=OneWay}" /><Run Text=" · A4" />
                             </TextBlock>
-                            <TextBlock Grid.Row="3" Text="Charged" Style="{StaticResource SecondaryText}" Margin="0,0,0,8" />
+                            <TextBlock Grid.Row="3" Text="Amount" Style="{StaticResource SecondaryText}" Margin="0,0,0,8" />
                             <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource BodyText}">
                                 <Run Text="{Binding DisplayAmount, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding DisplayPrintedSides, Mode=OneWay}" />
                             </TextBlock>

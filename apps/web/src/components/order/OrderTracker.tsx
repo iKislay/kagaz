@@ -12,7 +12,7 @@ import {
 import { PaymentStatePanel } from '@/components/order/PaymentStatePanel';
 import { Group, Notice, Pill, Row, Spinner, cx } from '@/components/ui';
 import { useOrderUpdates } from '@/lib/realtime';
-import { REJECT_REASONS, STATUS_COPY, TIMELINE_STEPS } from '@/lib/status';
+import { REJECT_REASONS, TIMELINE_STEPS, statusCopy } from '@/lib/status';
 import { trackingUrl } from '@/lib/tracking';
 
 /** Live order status (FR-CUST-10/11) until the order reaches a final state. */
@@ -42,7 +42,8 @@ export function OrderTracker({ orderId }: { orderId: string }) {
     );
   }
 
-  const copy = STATUS_COPY[order.status];
+  const copy = statusCopy(order);
+  const atCounter = order.payment?.atCounter ?? false;
   const quote = order.quote;
 
   return (
@@ -53,6 +54,7 @@ export function OrderTracker({ orderId }: { orderId: string }) {
           pickupDate={order.pickupDate}
           ready={order.status === OrderStatus.READY_FOR_PICKUP}
           shop={order.shop}
+          amountDue={atCounter && order.status !== OrderStatus.COLLECTED ? order.amountPaise : null}
         />
       )}
 
@@ -79,11 +81,13 @@ export function OrderTracker({ orderId }: { orderId: string }) {
           {/* Refund amount and status are shown by PaymentStatePanel when known. */}
           {!order.refund && (
             <div className="mt-1 text-[13px] opacity-80">
-              {order.payment?.isSimulated
-                ? DEMO_REFUND_NOTICE
-                : order.status === OrderStatus.REFUNDED
-                  ? 'Your payment was refunded.'
-                  : 'Your refund is being processed.'}
+              {atCounter
+                ? 'Nothing to pay.'
+                : order.payment?.isSimulated
+                  ? DEMO_REFUND_NOTICE
+                  : order.status === OrderStatus.REFUNDED
+                    ? 'Your payment was refunded.'
+                    : 'Your refund is being processed.'}
             </div>
           )}
         </Notice>
@@ -105,7 +109,13 @@ export function OrderTracker({ orderId }: { orderId: string }) {
         </Row>
         {order.amountPaise !== null && (
           <Row
-            label={order.status === OrderStatus.AWAITING_PAYMENT ? 'Total' : 'Paid'}
+            label={
+              order.status === OrderStatus.AWAITING_PAYMENT
+                ? 'Total'
+                : atCounter
+                  ? 'Pay at counter'
+                  : 'Paid'
+            }
             hint={order.payment?.isSimulated ? 'Demo payment — no money was charged' : undefined}
           >
             <span className="text-[15px] font-semibold tabular-nums">
@@ -139,11 +149,14 @@ function PickupCodeCard({
   pickupDate,
   ready,
   shop,
+  amountDue,
 }: {
   pickupNumber: number;
   pickupDate: string;
   ready: boolean;
   shop: PublicOrder['shop'];
+  /** Pay-at-counter: the amount the customer pays the shop at pickup. */
+  amountDue: number | null;
 }) {
   const date = formatPickupDate(pickupDate);
   return (
@@ -181,12 +194,19 @@ function PickupCodeCard({
           </>
         )}
       </p>
+      {amountDue !== null && (
+        <div className="mx-auto mt-4 inline-flex items-baseline gap-2 rounded-full bg-orange/12 px-4 py-1.5">
+          <span className="text-[13px] font-medium text-text-secondary">Pay at the counter</span>
+          <span className="text-[20px] font-bold tabular-nums">{formatPaise(amountDue)}</span>
+        </div>
+      )}
       {ready && <p className="mt-1 text-[13px] text-text-secondary">{shop.address}</p>}
     </div>
   );
 }
 
 function Timeline({ order }: { order: PublicOrder }) {
+  const atCounter = order.payment?.atCounter ?? false;
   const reached = new Set(order.timeline.map((e) => e.status));
   const at = (status: OrderStatus) => order.timeline.findLast((e) => e.status === status)?.at;
   const offPath =
@@ -230,7 +250,9 @@ function Timeline({ order }: { order: PublicOrder }) {
               </span>
               <div className="min-w-0">
                 <div className={cx('text-[15px]', !done && !current && 'text-text-secondary')}>
-                  {step.label}
+                  {atCounter && step.status === OrderStatus.PENDING_REVIEW
+                    ? 'Order placed'
+                    : step.label}
                 </div>
                 {time && (
                   <div className="text-[12px] text-text-secondary">

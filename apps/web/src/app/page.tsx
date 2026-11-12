@@ -142,8 +142,8 @@ const FAQ = [
     'Shops install the Kagaz Windows app on their PC, pair it with a code and set their rates. Setup takes minutes.',
   ],
   [
-    'Is this live?',
-    'Kagaz is in a pilot in Mandya. Payments are in demo mode right now, so no money is charged.',
+    'How do I pay?',
+    'Pay at the shop counter when you collect: tell them your pickup code and pay by cash or UPI. Online payment is coming soon.',
   ],
 ] as const;
 

@@ -1,4 +1,5 @@
 import {
+  COUNTER_PAYMENT_PROVIDER,
   OrderStatus,
   type PrintOptions,
   PrintOptionsSchema,
@@ -70,6 +71,7 @@ export function toPublicOrder(order: OrderWithView): PublicOrder {
       ? {
           status: payment.status,
           isSimulated: payment.isSimulated,
+          atCounter: payment.provider === COUNTER_PAYMENT_PROVIDER,
           reference: payment.providerPaymentId,
         }
       : null,

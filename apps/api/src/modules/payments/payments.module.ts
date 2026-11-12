@@ -8,6 +8,7 @@ import { PricingModule } from '../pricing/pricing.module.js';
 import { ShopsModule } from '../shops/shops.module.js';
 import { AdminOrderActionsService } from './admin-order-actions.service.js';
 import { AdminPaymentsController, DemoPaymentsController } from './admin-payments.controller.js';
+import { CounterPaymentProvider } from './counter.provider.js';
 import { DemoControlsService } from './demo-controls.service.js';
 import { DemoMockProvider } from './demo-mock.provider.js';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.js';
@@ -43,6 +44,8 @@ import { WebhooksService } from './webhooks.service.js';
               webhookDelayMs: config.DEMO_WEBHOOK_DELAY_MS,
               pendingResolveMs: config.DEMO_PENDING_RESOLVE_SECONDS * 1000,
             });
+          case 'counter':
+            return new CounterPaymentProvider();
           default:
             // Live gateways are gated on the merchant-of-record decision (P3.8/P3.9, D6).
             throw new Error(`Payment provider "${config.PAYMENT_PROVIDER}" is not implemented yet`);

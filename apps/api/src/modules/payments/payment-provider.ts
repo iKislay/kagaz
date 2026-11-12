@@ -42,6 +42,8 @@ export interface CreatePaymentInput {
 export type CheckoutInstruction =
   /** Demo only: nothing for the customer to do; the simulated gateway settles server-side. */
   | { kind: 'DEMO_AUTO_APPROVE' }
+  /** Pay at counter (ADR-003): confirmed now, the shop collects at pickup. */
+  | { kind: 'PAY_AT_COUNTER' }
   /** Live (P3.9): data the browser needs to open the provider's checkout. */
   | { kind: 'PROVIDER_CHECKOUT'; data: Record<string, unknown> };
 

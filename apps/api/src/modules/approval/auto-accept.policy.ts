@@ -20,6 +20,8 @@ export const AutoAcceptReason = {
   UNSUPPORTED_PAPER: 'UNSUPPORTED_PAPER',
   PRINTER_OFFLINE: 'PRINTER_OFFLINE',
   QUEUE_FULL: 'QUEUE_FULL',
+  /** ADR-003: the shop confirms pay-at-counter orders itself. */
+  PAY_AT_COUNTER: 'PAY_AT_COUNTER',
 } as const;
 export type AutoAcceptReason = (typeof AutoAcceptReason)[keyof typeof AutoAcceptReason];
 
@@ -52,6 +54,8 @@ export interface AutoAcceptOrder {
   /** Printed sides from the price snapshot/quote. */
   printedSides: number | null;
   fileValid: boolean;
+  /** Paid "at the counter" (ADR-003): never auto-accepted. */
+  payAtCounter?: boolean;
 }
 
 export interface AutoAcceptPrinter {
@@ -115,6 +119,7 @@ export const AutoAcceptPolicy = {
     // 2. Mode
     if (shop.approvalMode !== 'AUTO') reasons.push(AutoAcceptReason.MANUAL_MODE);
     else if (shop.autoPaused) reasons.push(AutoAcceptReason.AUTO_PAUSED);
+    if (order.payAtCounter) reasons.push(AutoAcceptReason.PAY_AT_COUNTER);
 
     // 5. File and size limits
     if (!order.fileValid || order.pageCount === null) {

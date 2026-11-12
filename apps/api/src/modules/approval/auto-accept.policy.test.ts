@@ -71,6 +71,9 @@ describe('AutoAcceptPolicy.evaluate (PRD §8.4)', () => {
         AutoAcceptReason.MANUAL_MODE,
       ]);
     });
+    it('pay-at-counter orders always wait for the shop (ADR-003)', () => {
+      expect(evaluate({ payAtCounter: true }).reasons).toEqual([AutoAcceptReason.PAY_AT_COUNTER]);
+    });
     it('auto paused behaves as manual', () => {
       expect(evaluate({}, { autoPaused: true }).reasons).toEqual([AutoAcceptReason.AUTO_PAUSED]);
     });

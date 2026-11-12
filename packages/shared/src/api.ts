@@ -93,6 +93,8 @@ export const PublicOrderSchema = z.object({
     .object({
       status: z.enum(enumValues(PaymentStatus)),
       isSimulated: z.boolean(),
+      /** Pay-at-counter order (ADR-003): the amount is collected by the shop at pickup. */
+      atCounter: z.boolean().default(false),
       reference: z.string().nullable(),
     })
     .nullable(),
@@ -127,8 +129,11 @@ export type CreateOrderResponse = z.infer<typeof CreateOrderResponseSchema>;
 
 export const PayResponseSchema = z.object({
   order: PublicOrderSchema,
-  /** DEMO: payment already verified server-side. LIVE (later): checkout data for the provider. */
-  mode: z.enum(['DEMO_AUTO_APPROVED', 'PROVIDER_CHECKOUT']),
+  /**
+   * DEMO: payment already verified server-side. PAY_AT_COUNTER: order confirmed, the customer
+   * pays the shop at pickup. LIVE (later): checkout data for the provider.
+   */
+  mode: z.enum(['DEMO_AUTO_APPROVED', 'PAY_AT_COUNTER', 'PROVIDER_CHECKOUT']),
 });
 export type PayResponse = z.infer<typeof PayResponseSchema>;
 

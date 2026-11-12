@@ -50,6 +50,37 @@ export const STATUS_COPY: Record<OrderStatus, { label: string; detail: string; t
   },
 };
 
+/** Pay-at-counter orders (ADR-003): nothing was paid online, so no "paid"/"refund" wording. */
+const COUNTER_COPY: Partial<typeof STATUS_COPY> = {
+  PENDING_REVIEW: {
+    label: 'Waiting for the shop',
+    detail: 'Order placed. The shop will check your file and accept it shortly.',
+    tone: 'accent',
+  },
+  READY_FOR_PICKUP: {
+    label: 'Ready for pickup',
+    detail: 'Your prints are waiting. Tell the shop your pickup code and pay at the counter.',
+    tone: 'green',
+  },
+  REFUND_PENDING: {
+    label: 'Rejected',
+    detail: 'The shop couldn’t print this order. Nothing to pay.',
+    tone: 'red',
+  },
+  REFUNDED: {
+    label: 'Rejected',
+    detail: 'The shop couldn’t print this order. Nothing to pay.',
+    tone: 'red',
+  },
+};
+
+export function statusCopy(order: {
+  status: OrderStatus;
+  payment: { atCounter?: boolean } | null;
+}) {
+  return (order.payment?.atCounter && COUNTER_COPY[order.status]) || STATUS_COPY[order.status];
+}
+
 /** The happy-path steps shown on the tracking timeline. */
 export const TIMELINE_STEPS: { status: OrderStatus; label: string }[] = [
   { status: OrderStatus.PENDING_REVIEW, label: 'Paid' },

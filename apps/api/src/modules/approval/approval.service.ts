@@ -1,5 +1,10 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { type ShopMode, QuoteSchema, type UpdateShopModeRequest } from '@kagaz/shared';
+import {
+  COUNTER_PAYMENT_PROVIDER,
+  type ShopMode,
+  QuoteSchema,
+  type UpdateShopModeRequest,
+} from '@kagaz/shared';
 import { type Actor, SYSTEM_ACTOR, actorMetadata } from '../../common/actor.js';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
@@ -39,6 +44,7 @@ export class ApprovalService {
       include: {
         shop: true,
         files: { where: { kind: 'ORIGINAL', status: 'VALID' }, take: 1 },
+        payments: { where: { provider: COUNTER_PAYMENT_PROVIDER }, select: { id: true }, take: 1 },
       },
     });
     const printers = await db.printer.findMany({
@@ -60,6 +66,7 @@ export class ApprovalService {
         pageCount: file?.pageCount ?? null,
         printedSides: quote?.success ? quote.data.printedSides : null,
         fileValid: !!file,
+        payAtCounter: order.payments.length > 0,
       },
       order.shop,
       printers.map((p) => ({

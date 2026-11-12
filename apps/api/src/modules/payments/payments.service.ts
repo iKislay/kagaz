@@ -1,5 +1,10 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { OrderStatus, type PayResponse, QuoteSchema } from '@kagaz/shared';
+import {
+  COUNTER_PAYMENT_PROVIDER,
+  OrderStatus,
+  type PayResponse,
+  QuoteSchema,
+} from '@kagaz/shared';
 import { SYSTEM_ACTOR } from '../../common/actor.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
@@ -118,7 +123,8 @@ export class PaymentsService {
       });
     });
 
-    let mode: PayResponse['mode'] = 'DEMO_AUTO_APPROVED';
+    let mode: PayResponse['mode'] =
+      this.provider.name === COUNTER_PAYMENT_PROVIDER ? 'PAY_AT_COUNTER' : 'DEMO_AUTO_APPROVED';
     if (payment.status === 'CREATED' || payment.status === 'PENDING') {
       if (!payment.providerOrderId) {
         const order = await this.prisma.order.findUniqueOrThrow({
@@ -139,9 +145,9 @@ export class PaymentsService {
         });
         if (session.checkout.kind === 'PROVIDER_CHECKOUT') mode = 'PROVIDER_CHECKOUT';
       }
-      // Demo: the simulated gateway settles server-side, so confirm by status fetch now.
+      // Demo and pay-at-counter settle server-side, so confirm by status fetch now.
       // Live providers are confirmed by their webhook (or a later status fetch).
-      if (mode === 'DEMO_AUTO_APPROVED') await this.confirmFromProvider(payment.id);
+      if (mode !== 'PROVIDER_CHECKOUT') await this.confirmFromProvider(payment.id);
     }
 
     return { order: await this.orders.getPublic(orderId), mode };

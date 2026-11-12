@@ -1,4 +1,4 @@
-import { type ShopJob } from '@kagaz/shared';
+import { COUNTER_PAYMENT_PROVIDER, type ShopJob } from '@kagaz/shared';
 import { type Prisma } from '../../generated/prisma/client.js';
 import { parseOptions, parseQuote } from '../orders/order-view.js';
 import { pickupDateString } from '../pickup/pickup-number.service.js';
@@ -25,6 +25,7 @@ export function toShopJob(order: OrderWithShopView): ShopJob {
     printedSides: quote?.printedSides ?? null,
     amountPaise: order.amountPaise,
     simulatedPayment: order.payments[0]?.isSimulated ?? false,
+    payAtCounter: order.payments[0]?.provider === COUNTER_PAYMENT_PROVIDER,
     createdAt: order.createdAt.toISOString(),
     paidAt: order.paidAt?.toISOString() ?? null,
     pickupNumber: order.pickupNumber,

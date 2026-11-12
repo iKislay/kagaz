@@ -36,6 +36,11 @@ public sealed partial class JobItem : ObservableObject
     public ShopPrintJob? PrintJob => ShopJob.PrintJob;
     public bool IsDemoPayment => ShopJob.SimulatedPayment;
 
+    /// <summary>ADR-003: the customer pays <see cref="DisplayAmount"/> at the counter on pickup.</summary>
+    public bool PayAtCounter => ShopJob.PayAtCounter;
+    public string DisplayCollect => $"Collect {DisplayAmount} at the counter";
+    public string DisplayOrderedLine => PayAtCounter ? $"Ordered {DisplayPaidAt}" : $"Paid {DisplayPaidAt}";
+
     public string DisplayAmount => ShopJob.AmountPaise is int paise
         ? (paise / 100m).ToString("C", India)
         : "—";

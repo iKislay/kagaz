@@ -44,6 +44,7 @@ export function PaymentStatePanel({
   const refund = order.refund;
   const showRefund =
     refund &&
+    !payment?.atCounter && // pay-at-counter: nothing was collected, nothing to refund
     (order.status === OrderStatus.REFUND_PENDING || order.status === OrderStatus.REFUNDED);
 
   return (

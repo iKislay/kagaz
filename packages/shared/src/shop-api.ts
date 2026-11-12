@@ -149,6 +149,8 @@ export const ShopJobSchema = z.object({
   printedSides: z.int().nullable(),
   amountPaise: z.int().nullable(),
   simulatedPayment: z.boolean(),
+  /** ADR-003: the customer pays this amount at the counter on pickup. */
+  payAtCounter: z.boolean().default(false),
   createdAt: z.string(),
   paidAt: z.string().nullable(),
   /** ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified. */

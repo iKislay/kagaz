@@ -112,7 +112,8 @@ public record ShopJob(
     ShopRejection? Rejection,
     string? PreviewUrl,
     int? PickupNumber = null,
-    string? PickupDate = null);
+    string? PickupDate = null,
+    bool PayAtCounter = false);
 
 // ─── Actions ───
 

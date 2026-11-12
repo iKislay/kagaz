@@ -13,7 +13,8 @@ export async function DemoBanner() {
     () => 'UNKNOWN' as const,
   );
 
-  if (mode === PaymentMode.LIVE) return null;
+  // Live gateway or pay-at-counter (ADR-003): nothing is simulated, so no banner.
+  if (mode === PaymentMode.LIVE || mode === PaymentMode.COUNTER) return null;
 
   if (mode === PaymentMode.DEMO) {
     return (

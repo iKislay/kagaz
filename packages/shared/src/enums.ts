@@ -16,6 +16,8 @@ export type AppEnv = (typeof AppEnv)[keyof typeof AppEnv];
 export const PaymentMode = {
   DEMO: 'DEMO',
   LIVE: 'LIVE',
+  /** No online payment: the customer pays the shop at pickup (ADR-003). */
+  COUNTER: 'COUNTER',
 } as const;
 export type PaymentMode = (typeof PaymentMode)[keyof typeof PaymentMode];
 
