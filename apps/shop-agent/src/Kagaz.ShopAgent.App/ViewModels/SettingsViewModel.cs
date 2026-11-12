@@ -50,12 +50,19 @@ public sealed partial class SettingsViewModel : ObservableObject
         finally { _loadingStartup = false; }
         Settings = settings;
         Status = status;
+        status.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(AppStatus.Subscription)) OnPropertyChanged(nameof(PlanText));
+        };
         Version = typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
         RefreshLastRotated();
     }
 
     public UpdateViewModel Update { get; }
     public SupportViewModel Support { get; }
+
+    /// <summary>Plan line, e.g. "Active · 2 printers · until 1 Jan 2027" (billed per connected printer).</summary>
+    public string PlanText => BillingText.Plan(Status.Subscription);
 
     /// <summary>Order approval (Manual | Auto, pause auto-accept) — a shop setting since ADR-002.</summary>
     public ShopModeViewModel Mode { get; }

@@ -122,6 +122,11 @@
 
             <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                 <StackPanel>
+                    <TextBlock Text="Subscription" Style="{StaticResource HeadlineText}" />
+                    <TextBlock Text="{Binding PlanText}" Style="{StaticResource BodyText}" Margin="0,4,0,2" />
+                    <TextBlock Text="Kaggaz is billed per connected printer. To change your plan, contact Kaggaz support."
+                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" />
+                    <Border Style="{StaticResource Hairline}" />
                     <TextBlock Text="Help &amp; support" Style="{StaticResource HeadlineText}" />
                     <TextBlock Text="Questions about your account, logins, printers or billing? We're here to help."
                                Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,14" />

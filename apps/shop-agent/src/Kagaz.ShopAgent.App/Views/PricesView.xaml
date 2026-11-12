@@ -1,0 +1,81 @@
+<UserControl x:Class="Kagaz.ShopAgent.App.Views.PricesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
+             xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:PricesViewModel}"
+             d:DesignHeight="700" d:DesignWidth="800">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="560" HorizontalAlignment="Left">
+            <TextBlock Text="Prices" Style="{StaticResource TitleText}" />
+            <TextBlock Text="What customers pay per printed side, in rupees. Customers see the new prices for new orders."
+                       Style="{StaticResource SubtitleText}" TextWrapping="Wrap" />
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Black &amp; white, per side (₹)" Style="{StaticResource FieldLabel}" />
+                            <TextBox AutomationProperties.Name="Black and white price per side" Text="{Binding Mono, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextField}" MaxLength="10" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Colour, per side (₹)" Style="{StaticResource FieldLabel}" />
+                            <TextBox AutomationProperties.Name="Colour price per side" Text="{Binding Colour, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextField}" MaxLength="10" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Style="{StaticResource Hairline}" />
+                    <TextBlock Text="Double-sided (optional)" Style="{StaticResource HeadlineText}" FontSize="14" />
+                    <TextBlock Text="Leave empty to charge each side the same as single-sided."
+                               Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,10" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Black &amp; white, per side (₹)" Style="{StaticResource FieldLabel}" />
+                            <TextBox AutomationProperties.Name="Double-sided black and white price per side" Text="{Binding MonoDuplex, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextField}" MaxLength="10" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Colour, per side (₹)" Style="{StaticResource FieldLabel}" />
+                            <TextBox AutomationProperties.Name="Double-sided colour price per side" Text="{Binding ColourDuplex, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextField}" MaxLength="10" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Style="{StaticResource Hairline}" />
+                    <TextBlock Text="Minimum charge per order (₹)" Style="{StaticResource FieldLabel}" />
+                    <TextBox AutomationProperties.Name="Minimum charge per order" Text="{Binding Minimum, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextField}" MaxLength="10" Width="200" HorizontalAlignment="Left" />
+
+                    <Button Content="Save prices" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}"
+                            HorizontalAlignment="Left" Margin="0,20,0,0" />
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,12,0,0"
+                               Visibility="{Binding Message, Converter={StaticResource NullToVisibility}}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding MessageIsError}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -54,6 +54,7 @@ public sealed partial class AppStatus : ObservableObject
     private string? _operatorName;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOwner))]
     private string? _operatorRole;
 
     /// <summary>Heartbeat <c>shop</c> state (P2.6): <c>MANUAL|AUTO</c>; null until the first heartbeat.</summary>
@@ -65,6 +66,15 @@ public sealed partial class AppStatus : ObservableObject
 
     [ObservableProperty]
     private string? _shopOpenStatus;
+
+    /// <summary>Heartbeat <c>subscription</c> (billing): null on servers that don't send it.</summary>
+    [ObservableProperty]
+    private HeartbeatSubscription? _subscription;
+
+    public void ApplySubscription(HeartbeatSubscription? subscription) => OnUi(() => Subscription = subscription);
+
+    /// <summary>Signed-in operator is the shop owner: owner-only pages (Staff, Prices) are shown.</summary>
+    public bool IsOwner => OperatorRole == "Owner";
 
     /// <summary>P4.4: heartbeat <c>upgradeRequired</c> or any 426 — blocks the window with an update banner.</summary>
     [ObservableProperty]
@@ -96,6 +106,7 @@ public sealed partial class AppStatus : ObservableObject
             UpgradeRequired = session.IsUpgradeRequired;
             MinAgentVersion = session.MinAgentVersion;
         });
+        SyncOperator(); // an operator session restored from disk shows as signed in right away
     }
 
     public AgentSession Session => _session;
@@ -257,6 +268,9 @@ public sealed partial class AppStatus : ObservableObject
         await Task.Delay(TimeSpan.FromSeconds(6));
         Toasts.Remove(toast);
     }
+
+    /// <summary>Run on the UI thread (events from the API client arrive on any thread).</summary>
+    public void RunOnUi(Action action) => OnUi(action);
 
     private static void OnUi(Action action)
     {

@@ -41,7 +41,7 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
-            <TextBlock Text="Don't have a login? Ask your shop owner to add you in the Kaggaz dashboard (Logins), or contact Kaggaz support."
+            <TextBlock Text="Don't have a login? Ask your shop owner to add you under Staff in Kaggaz Shop, or contact Kaggaz support."
                        Style="{StaticResource SecondaryText}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,14,0,14" />
             <Border Style="{StaticResource Card}">
                 <views:SupportCard DataContext="{Binding Support}" />

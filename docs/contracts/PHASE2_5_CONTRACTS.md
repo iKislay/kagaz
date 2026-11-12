@@ -67,7 +67,7 @@ final report instead of silently changing it. Zod schemas go in `packages/shared
   `{ "operatorToken", "expiresAt", "operator": { "id", "name", "role": "SHOP_OWNER|SHOP_OPERATOR" } }`.
   The user must be a member of the **device's** shop; otherwise `401 INVALID_CREDENTIALS` (same error as a wrong
   password — no enumeration). Rate-limited.
-- `POST /api/shop/operator/logout`. Token: signed JWT (12 h) bound to `deviceId`; sent as header
+- `POST /api/shop/operator/logout`. Token: signed JWT bound to `deviceId` (session row expires 90 days after last use, sliding); sent as header
   `X-Operator-Token`.
 - Human actions (accept, reject, ready, resolve, pickups/verify, mode, printers PUT) require a valid operator
   token → else `401 OPERATOR_LOGIN_REQUIRED`. Agent-only calls (jobs list/detail, lease, status, heartbeat)

@@ -1,0 +1,84 @@
+<UserControl x:Class="Kagaz.ShopAgent.App.Views.StaffView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
+             xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:StaffViewModel}"
+             d:DesignHeight="700" d:DesignWidth="800">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="620" HorizontalAlignment="Left">
+            <TextBlock Text="Staff" Style="{StaticResource TitleText}" />
+            <TextBlock Text="People who can sign in to Kaggaz Shop for your shop with their mobile number."
+                       Style="{StaticResource SubtitleText}" TextWrapping="Wrap" />
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Add a staff member" Style="{StaticResource HeadlineText}" Margin="0,0,0,12" />
+                    <TextBlock Text="Mobile number" Style="{StaticResource FieldLabel}" />
+                    <TextBox AutomationProperties.Name="Staff mobile number" Text="{Binding NewPhone, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextField}" MaxLength="20" />
+                    <TextBlock Text="Name" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
+                    <TextBox AutomationProperties.Name="Staff name" Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextField}" MaxLength="80" />
+                    <TextBlock Text="Password for them (at least 8 characters)" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
+                    <TextBox AutomationProperties.Name="Staff password" Text="{Binding NewPassword, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextField}" MaxLength="200" />
+                    <TextBlock Text="Tell them this password; they can sign in on this PC right away."
+                               Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,6,0,0" />
+                    <Button Content="Add staff member" Style="{StaticResource PrimaryButton}" Command="{Binding AddCommand}"
+                            HorizontalAlignment="Left" Margin="0,18,0,0" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,0,0,12"
+                       Visibility="{Binding Message, Converter={StaticResource NullToVisibility}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding MessageIsError}" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!-- Remove confirmation -->
+            <Border Background="#14FF3B30" CornerRadius="12" Padding="16,12" Margin="0,0,0,12"
+                    Visibility="{Binding Confirming, Converter={StaticResource NullToVisibility}}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="Cancel" Style="{StaticResource QuietButton}" Command="{Binding CancelRemoveCommand}" Margin="0,0,8,0" />
+                        <Button Content="Remove" Style="{StaticResource DestructiveButton}" Command="{Binding ConfirmRemoveCommand}" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource BodyText}" TextWrapping="Wrap" VerticalAlignment="Center">
+                        <Run Text="Remove" /> <Run Text="{Binding Confirming.Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="? They are signed out and can't sign in again." />
+                    </TextBlock>
+                </DockPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="8">
+                <ItemsControl ItemsSource="{Binding Members}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:StaffRow}">
+                            <DockPanel Margin="8,8">
+                                <Button DockPanel.Dock="Right" Content="Remove" Style="{StaticResource LinkButton}" VerticalAlignment="Center"
+                                        Command="{Binding DataContext.AskRemoveCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        Visibility="{Binding IsOwner, Converter={StaticResource InverseBoolToVisibility}}" />
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource HeadlineText}" FontSize="14" />
+                                    <TextBlock Style="{StaticResource SecondaryText}" FontSize="12">
+                                        <Run Text="{Binding Phone, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding RoleLabel, Mode=OneWay}" />
+                                    </TextBlock>
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

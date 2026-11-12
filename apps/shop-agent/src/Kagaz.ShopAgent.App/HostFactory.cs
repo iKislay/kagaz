@@ -47,8 +47,8 @@ public static class HostFactory
         builder.Services.AddSingleton(paths);
         builder.Services.AddSingleton(stateStore);
         builder.Services.AddSingleton<ISecureStore>(_ => new DpapiSecureStore(paths.DeviceTokenPath));
-        // Operator token + server signals (revoked / login required / upgrade) — memory only.
-        builder.Services.AddSingleton(new AgentSession());
+        // Operator session (kept across restarts, DPAPI) + server signals (revoked / login required / upgrade).
+        builder.Services.AddSingleton(new AgentSession(new DpapiSecureStore(paths.OperatorTokenPath)));
         builder.Services.AddSingleton<AgentSignals>();
         builder.Services.AddSingleton<ISpoolerProbe, SystemPrintingSpoolerProbe>();
         builder.Services.AddSingleton<IUpdateService, VelopackUpdateService>();
@@ -69,6 +69,8 @@ public static class HostFactory
         builder.Services.AddSingleton(_ => new PrinterReachability());
 
         builder.Services.AddSingleton(sp => new SupportViewModel(sp.GetRequiredService<ShopApiClient>()));
+        builder.Services.AddSingleton(sp => new StaffViewModel(sp.GetRequiredService<ShopApiClient>()));
+        builder.Services.AddSingleton(sp => new PricesViewModel(sp.GetRequiredService<ShopApiClient>()));
         builder.Services.AddSingleton<PairingViewModel>();
         builder.Services.AddSingleton<OperatorLoginViewModel>();
         builder.Services.AddSingleton<PrintersViewModel>();

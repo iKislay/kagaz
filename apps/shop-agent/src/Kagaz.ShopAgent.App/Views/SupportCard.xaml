@@ -14,7 +14,7 @@
                     Visibility="{Binding Phone, Converter={StaticResource NullToVisibility}}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE717;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
-                    <TextBlock Text="{Binding Phone}" />
+                    <TextBlock Text="{Binding DisplayPhone}" />
                 </StackPanel>
             </Button>
             <Button Style="{StaticResource QuietButton}" Command="{Binding OpenWhatsAppCommand}" Margin="0,0,8,8"

@@ -50,7 +50,50 @@ public record HeartbeatResponse(
     int? LeaseTtlSeconds,
     string? MinAgentVersion,
     bool UpgradeRequired,
-    HeartbeatShop? Shop);
+    HeartbeatShop? Shop,
+    HeartbeatSubscription? Subscription = null);
+
+/// <summary>Billing state echoed by the heartbeat: <c>ACTIVE|EXPIRED|NONE</c>; seats = connected printers allowed.</summary>
+public record HeartbeatSubscription(string Status, int? PrinterSeats, string? PeriodEnd, int? DaysLeft);
+
+// ─── Account: sign in / sign up from the app (no website dashboard for shops) ───
+
+/// <summary><c>POST /shop/enroll-with-login</c>: pair this PC with the owner's mobile number + password.</summary>
+public record EnrollWithLoginRequest(string Login, string Password, string DeviceName, string? AppVersion, string? ShopId = null);
+
+/// <summary><c>POST /shop/signup</c>: create the shop + owner login and pair this PC in one go.</summary>
+public record ShopSignupRequest(string ShopName, string Address, string OwnerName, string Phone, string Password,
+    string DeviceName, string? AppVersion);
+
+/// <summary>One choice from <c>409 MULTIPLE_SHOPS</c> <c>details.shops</c>.</summary>
+public record ShopChoice(string Id, string Name)
+{
+    public override string ToString() => Name;
+}
+
+// ─── Owner pages: staff + prices ───
+
+public record ShopMember(string UserId, string? Name, string? Phone, string Role);
+
+public record AddShopMemberRequest(string Phone, string Name, string Password);
+
+/// <summary>The shop's current prices, integer paise (never floats).</summary>
+public record ShopPricing(
+    int MonoRatePaise,
+    int ColourRatePaise,
+    int? MonoDuplexRatePaise,
+    int? ColourDuplexRatePaise,
+    string DuplexRule,
+    int MinimumChargePaise,
+    string? EffectiveFrom = null);
+
+public record UpdateShopPricingRequest(
+    int MonoRatePaise,
+    int ColourRatePaise,
+    int? MonoDuplexRatePaise,
+    int? ColourDuplexRatePaise,
+    string DuplexRule,
+    int MinimumChargePaise);
 
 // ─── Approval mode (contract §3) ───
 
