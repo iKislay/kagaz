@@ -4,6 +4,7 @@ import { type AppConfig } from '../../common/config/config.schema.js';
 import { AppEnv, ShopStatus, type ShopSummary } from '@kagaz/shared';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { currentSubscriptionWhere } from '../billing/entitlement.js';
 import { isWithinOpeningHours } from './opening-hours.js';
 
 export interface ShopCapabilities {
@@ -23,7 +24,10 @@ export class ShopsService {
    * app isn't connected (no recent heartbeat) is listed but not accepting orders.
    */
   async listPublic(): Promise<ShopSummary[]> {
-    const onlineSince = new Date(Date.now() - this.config.DEVICE_ONLINE_THRESHOLD_SECONDS * 1000);
+    const now = new Date();
+    const onlineSince = new Date(
+      now.getTime() - this.config.DEVICE_ONLINE_THRESHOLD_SECONDS * 1000,
+    );
     const shops = await this.prisma.shop.findMany({
       // Seeded demo/test shops never appear to the public in production.
       where: this.config.APP_ENV === AppEnv.PRODUCTION ? { isDemo: false } : {},
@@ -36,15 +40,17 @@ export class ShopsService {
           take: 1,
         },
         pricing: {
-          where: { effectiveFrom: { lte: new Date() } },
+          where: { effectiveFrom: { lte: now } },
           orderBy: { effectiveFrom: 'desc' },
           take: 1,
         },
+        subscriptions: { where: currentSubscriptionWhere(now), select: { id: true }, take: 1 },
       },
     });
     return shops.map((shop) => {
       const pricing = shop.pricing[0] ?? null;
       const online = shop.devices.length > 0;
+      const subscribed = !this.config.BILLING_ENFORCED || shop.subscriptions.length > 0;
       return {
         id: shop.id,
         slug: shop.slug,
@@ -52,7 +58,8 @@ export class ShopsService {
         address: shop.address,
         status: shop.status,
         online,
-        acceptingOrders: online && this.unavailableReason(shop) === null && pricing !== null,
+        acceptingOrders:
+          online && subscribed && this.unavailableReason(shop) === null && pricing !== null,
         isDemo: shop.isDemo,
         capabilities: {
           colour: shop.printers.some((p) => p.colourCapable),
@@ -90,6 +97,20 @@ export class ShopsService {
           : `${shop.name} is not accepting orders right now`,
         HttpStatus.CONFLICT,
         { reason },
+      );
+    }
+    // ADR-004: new orders need a current subscription (orders already paid are never blocked).
+    if (
+      this.config.BILLING_ENFORCED &&
+      !(await this.prisma.subscription.findFirst({
+        where: { shopId, ...currentSubscriptionWhere(new Date()) },
+        select: { id: true },
+      }))
+    ) {
+      throw new AppError(
+        'SUBSCRIPTION_INACTIVE',
+        `${shop.name} is not taking Kaggaz orders right now`,
+        HttpStatus.CONFLICT,
       );
     }
     return shop;

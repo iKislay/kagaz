@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { type RegisterPrintersRequest, type ShopPrinter } from '@kagaz/shared';
 import { type DeviceContext, deviceActor } from '../../common/auth/device-auth.guard.js';
+import { APP_CONFIG } from '../../common/config/config.module.js';
+import { type AppConfig } from '../../common/config/config.schema.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { assertPrinterSeats } from '../billing/entitlement.js';
 
 @Injectable()
 export class ShopPrintersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   async list(device: DeviceContext): Promise<ShopPrinter[]> {
@@ -65,6 +69,7 @@ export class ShopPrintersService {
         where: { shopId: device.shopId, deviceId: device.deviceId, printerName: { notIn: names } },
         data: { enabled: false, isDefault: false },
       });
+      await assertPrinterSeats(tx, this.config, device.shopId);
       await this.audit.record(tx, deviceActor(device), 'printers.registered', {
         shopId: device.shopId,
         metadata: { printers: names },

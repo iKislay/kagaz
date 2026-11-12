@@ -167,6 +167,7 @@ model Shop {
   pricing         ShopPricing[]
   orders          Order[]
   pickupCounters  PickupCounter[]
+  subscriptions   Subscription[]
 
   @@map("shops")
 }
@@ -560,4 +561,101 @@ model PrinterUptimeDaily {
   @@id([printerId, day])
   @@index([shopId, day])
   @@map("printer_uptime_daily")
+}
+
+// ───────────────────────────── Subscriptions (ADR-004) ─────────────────────────────
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum SubscriptionSource {
+  MANUAL
+  RAZORPAY
+}
+
+enum SubscriptionPaymentMethod {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  OTHER
+  RAZORPAY
+}
+
+/// One paid-for period of a shop's plan: printerSeats connected printers for [periodStart, periodEnd).
+/// Renewal = a new row starting where the last one ends; active periods of a shop never overlap.
+/// Changes after creation (end date, plan, cancel) are recorded in SubscriptionChange.
+model Subscription {
+  id                   String             @id @default(uuid(7)) @db.Uuid
+  shopId               String             @map("shop_id") @db.Uuid
+  printerSeats         Int                @map("printer_seats")
+  pricePerPrinterPaise Int                @map("price_per_printer_paise")
+  months               Int
+  /// Price of [periodStart, periodEnd) for printerSeats (periodTotal); recomputed on a revision.
+  totalPaise           Int                @map("total_paise")
+  periodStart          DateTime           @map("period_start")
+  periodEnd            DateTime           @map("period_end")
+  status               SubscriptionStatus @default(ACTIVE)
+  source               SubscriptionSource @default(MANUAL)
+  notes                String?
+  createdById          String?            @map("created_by_id") @db.Uuid
+  createdAt            DateTime           @default(now()) @map("created_at")
+  cancelledAt          DateTime?          @map("cancelled_at")
+  cancelledById        String?            @map("cancelled_by_id") @db.Uuid
+  cancelReason         String?            @map("cancel_reason")
+
+  shop     Shop                  @relation(fields: [shopId], references: [id])
+  payments SubscriptionPayment[]
+  changes  SubscriptionChange[]
+
+  @@index([shopId, periodStart])
+  @@map("subscriptions")
+}
+
+/// Append-only payment ledger. Corrections are new rows (negative amount = refund/reversal).
+model SubscriptionPayment {
+  id             String                    @id @default(uuid(7)) @db.Uuid
+  subscriptionId String                    @map("subscription_id") @db.Uuid
+  shopId         String                    @map("shop_id") @db.Uuid
+  amountPaise    Int                       @map("amount_paise")
+  method         SubscriptionPaymentMethod
+  /// UTR / receipt / cheque number; for RAZORPAY the provider payment id.
+  reference      String?
+  receivedAt     DateTime                  @map("received_at")
+  recordedById   String?                   @map("recorded_by_id") @db.Uuid
+  note           String?
+  createdAt      DateTime                  @default(now()) @map("created_at")
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([shopId, receivedAt])
+  @@index([subscriptionId])
+  @@map("subscription_payments")
+}
+
+enum SubscriptionChangeKind {
+  CHANGE_PLAN
+  EXTEND
+  CANCEL
+}
+
+/// Revision history: every change to a subscription after creation, with who, when and why.
+model SubscriptionChange {
+  id             String                 @id @default(uuid(7)) @db.Uuid
+  subscriptionId String                 @map("subscription_id") @db.Uuid
+  shopId         String                 @map("shop_id") @db.Uuid
+  kind           SubscriptionChangeKind
+  reason         String
+  /// Terms before / after the change (SubscriptionSnapshot).
+  before         Json
+  after          Json
+  changedById    String?                @map("changed_by_id") @db.Uuid
+  createdAt      DateTime               @default(now()) @map("created_at")
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId])
+  @@map("subscription_changes")
 }

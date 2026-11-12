@@ -16,8 +16,9 @@ import {
   PrintersSection,
   SettingsSection,
 } from './sections';
+import { SubscriptionSection } from './subscription';
 
-type Tab = 'settings' | 'hours' | 'pricing' | 'members' | 'printers' | 'devices';
+type Tab = 'settings' | 'hours' | 'pricing' | 'members' | 'printers' | 'devices' | 'subscription';
 
 /** Shop management (P4.3): settings, hours, pricing, printers, devices + enrollment codes. */
 export default function ShopDetailPage() {
@@ -36,6 +37,7 @@ export default function ShopDetailPage() {
       ? [
           { value: 'printers' as const, label: 'Printers' },
           { value: 'devices' as const, label: 'Devices' },
+          { value: 'subscription' as const, label: 'Subscription' },
         ]
       : []),
   ];
@@ -81,6 +83,7 @@ export default function ShopDetailPage() {
               {tab === 'members' && <MembersSection shop={shop} admin={admin} onSaved={setData} />}
               {tab === 'printers' && admin && <PrintersSection shopId={shop.id} />}
               {tab === 'devices' && admin && <DevicesSection shopId={shop.id} />}
+              {tab === 'subscription' && admin && <SubscriptionSection shopId={shop.id} />}
             </>
           )}
         </>

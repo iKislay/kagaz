@@ -8,6 +8,7 @@ import {
   type HeartbeatResponse,
 } from '@kagaz/shared';
 import { isUpgradeRequired } from '../../common/auth/agent-version.guard.js';
+import { subscriptionSummary } from '../billing/entitlement.js';
 import { type DeviceContext } from '../../common/auth/device-auth.guard.js';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
@@ -283,6 +284,7 @@ export class DevicesService {
       minAgentVersion: min,
       upgradeRequired: isUpgradeRequired(result.appVersion, min ?? undefined),
       shop: result.shop,
+      subscription: await subscriptionSummary(this.prisma, device.shopId, now),
     };
   }
 

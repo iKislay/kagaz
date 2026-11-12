@@ -16,6 +16,7 @@ const NAV: { href: string; label: string; icon: ReactNode; adminOnly: boolean }[
   { href: '/superadmin', label: 'Overview', icon: icons.overview, adminOnly: true },
   { href: '/superadmin/metrics', label: 'Metrics', icon: icons.metrics, adminOnly: true },
   { href: '/superadmin/shops', label: 'Shops', icon: icons.shops, adminOnly: false },
+  { href: '/superadmin/billing', label: 'Billing', icon: icons.billing, adminOnly: true },
   { href: '/superadmin/orders', label: 'Orders', icon: icons.orders, adminOnly: true },
   { href: '/superadmin/health', label: 'Health', icon: icons.health, adminOnly: true },
   {

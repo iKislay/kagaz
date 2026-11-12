@@ -1,7 +1,10 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { type AdminPrinterDetail, type AdminPrinterUpdateRequest } from '@kagaz/shared';
+import { APP_CONFIG } from '../../common/config/config.module.js';
+import { type AppConfig } from '../../common/config/config.schema.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { assertPrinterSeats } from '../billing/entitlement.js';
 import { type StaffContext } from '../identity/staff-session.js';
 import { auditStaffAction, diffFields } from './admin-audit.js';
 import { shopNotFound } from './shop-settings.service.js';
@@ -29,7 +32,10 @@ export async function printerQueueDepths(
  */
 @Injectable()
 export class PrintersAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
 
   async list(shopId: string): Promise<AdminPrinterDetail[]> {
     const shop = await this.prisma.shop.findUnique({ where: { id: shopId }, select: { id: true } });
@@ -79,6 +85,7 @@ export class PrintersAdminService {
         });
       }
       await tx.printer.update({ where: { id: printerId }, data: req });
+      if (req.enabled) await assertPrinterSeats(tx, this.config, shopId);
       await auditStaffAction(tx, staff, 'printer.updated', shopId, {
         printerId,
         printerName: printer.printerName,

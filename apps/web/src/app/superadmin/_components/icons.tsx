@@ -35,6 +35,11 @@ export const icons = {
       <path d="M4 19V9M9.5 19V5M15 19v-7M20.5 19v-4M3 21h18" />
     </Icon>
   ),
+  billing: (
+    <Icon>
+      <path d="M3 6h18v12H3zM3 10h18M7 15h4" />
+    </Icon>
+  ),
   orders: (
     <Icon>
       <path d="M7 3h10l3 3v15H4V3h3zM8 9h8M8 13h8M8 17h5" />

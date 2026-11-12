@@ -3,6 +3,7 @@
  * The shop is always derived from the device token — never sent by the client.
  */
 import { z } from 'zod';
+import { SubscriptionSummarySchema } from './billing.js';
 import { PrintJobStatus, RejectReasonCode } from './enums.js';
 import { CreatePricingVersionSchema, MobileSchema } from './admin-api.js';
 import { OrderStatusSchema, PrintOptionsSchema } from './schemas.js';
@@ -128,6 +129,8 @@ export const HeartbeatResponseSchema = z.object({
     approvalMode: z.enum(['MANUAL', 'AUTO']),
     autoPaused: z.boolean(),
   }),
+  /** ADR-004: the shop's plan, for the app to show (older apps ignore it). */
+  subscription: SubscriptionSummarySchema.optional(),
 });
 export type HeartbeatResponse = z.infer<typeof HeartbeatResponseSchema>;
 
