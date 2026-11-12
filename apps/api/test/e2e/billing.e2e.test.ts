@@ -256,9 +256,18 @@ describe('subscriptions (ADR-004)', () => {
   it('billing is for Kaggaz admins only', async () => {
     const shop = await createShop(h.prisma);
     const owner = await createStaff(h.prisma, shop.id, 'OWNER');
-    const ownerAuth = await login(owner.email, E2E_STAFF_PASSWORD);
-    const res = await h.http().get(`/api/admin/shops/${shop.id}/billing`).set(ownerAuth);
-    expect([401, 403]).toContain(res.status);
-    await h.http().get('/api/admin/billing').set(ownerAuth).expect(res.status);
+    // Shop owners can't sign in to /superadmin at all, so they never get a session.
+    await h
+      .http()
+      .post('/api/admin/auth/login')
+      .send({ login: owner.email, password: E2E_STAFF_PASSWORD })
+      .expect(403);
+    await h.http().get(`/api/admin/shops/${shop.id}/billing`).expect(401);
+    await h.http().get('/api/admin/billing').expect(401);
+    await h
+      .http()
+      .post(`/api/admin/shops/${shop.id}/subscriptions`)
+      .send({ printerSeats: 1, pricePerPrinterPaise: 1, startDate: '2026-11-12', months: 1 })
+      .expect(401);
   });
 });
