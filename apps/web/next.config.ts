@@ -9,6 +9,13 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // NEXT_PUBLIC_API_PROXY=1 (see src/lib/api.ts): browser /api/* is forwarded to the real API.
+  async rewrites() {
+    const api = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+    return process.env.NEXT_PUBLIC_API_PROXY === '1' && api
+      ? [{ source: '/api/:path*', destination: `${api}/:path*` }]
+      : [];
+  },
   // Security headers (security review M1): no framing (clickjacking on /admin), no MIME sniffing,
   // no referrer leaks of tracking links (#t=… is a fragment, but keep paths private too).
   async headers() {
