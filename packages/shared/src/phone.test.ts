@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { AdminShopMemberRequestSchema, normalizePhone } from './admin-api.js';
+import { AdminShopMemberRequestSchema, formatIndianPhone, normalizePhone } from './admin-api.js';
+
+describe('formatIndianPhone', () => {
+  it('shows Indian mobiles as "XXXXX XXXXX" and leaves anything else alone', () => {
+    expect(formatIndianPhone('+918987263735')).toBe('89872 63735');
+    expect(formatIndianPhone('+919876543210')).toBe('98765 43210');
+    expect(formatIndianPhone('+14155550123')).toBe('+14155550123');
+    expect(formatIndianPhone('+9198765')).toBe('+9198765');
+  });
+});
 
 describe('normalizePhone', () => {
   it('turns typed Indian mobile numbers into E.164', () => {

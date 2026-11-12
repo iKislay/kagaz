@@ -139,7 +139,7 @@ const FAQ = [
   ],
   [
     'How do shops join?',
-    'Shops install the Kaggaz Windows app on their PC, pair it with a code and set their rates. Setup takes minutes.',
+    'Download Kaggaz Shop for Windows from kaggaz.in/download, create your shop account in the app with your mobile number, and Kaggaz activates your subscription. Setup takes minutes.',
   ],
   [
     'How do I pay?',

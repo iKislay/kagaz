@@ -16,7 +16,7 @@ import { hashPassword } from '../identity/passwords.js';
 import { type StaffContext } from '../identity/staff-session.js';
 import { auditStaffAction, diffFields } from './admin-audit.js';
 
-const DEFAULT_AUTO_LIMITS: AutoLimits = {
+export const DEFAULT_AUTO_LIMITS: AutoLimits = {
   maxPages: 50,
   maxCopies: 5,
   maxSides: 250,

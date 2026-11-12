@@ -1,8 +1,24 @@
 import { z } from 'zod';
-import { AppEnv, AppEnvSchema, PaymentMode, type PublicConfig } from '@kagaz/shared';
+import {
+  AppEnv,
+  AppEnvSchema,
+  PaymentMode,
+  type PublicConfig,
+  normalizePhone,
+} from '@kagaz/shared';
 
 const bool = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
 const int = (def: number) => z.coerce.number().int().positive().default(def);
+const emptyToUndefined = (v: unknown) => (v === '' ? undefined : v);
+const optionalPhone = (name: string) =>
+  z.preprocess(
+    emptyToUndefined,
+    z
+      .string()
+      .transform(normalizePhone)
+      .pipe(z.string().regex(/^\+[1-9]\d{7,14}$/, `${name} must be a phone number`))
+      .optional(),
+  );
 const secret = (name: string) =>
   z.string().min(32, `${name} must be at least 32 characters (use a random value)`);
 
@@ -51,6 +67,10 @@ export const EnvSchema = z.object({
     .transform((v) => v.toLowerCase())
     .optional(),
   ADMIN_PASSWORD: z.string().min(12, 'ADMIN_PASSWORD must be at least 12 characters').optional(),
+  /** Public Kaggaz support contact shown on the website (GET /api/config). All optional. */
+  SUPPORT_PHONE: optionalPhone('SUPPORT_PHONE'),
+  SUPPORT_WHATSAPP: optionalPhone('SUPPORT_WHATSAPP'),
+  SUPPORT_EMAIL: z.preprocess(emptyToUndefined, z.email().optional()),
 
   PRINTER_LEASE_TTL_SECONDS: int(60),
   DEVICE_ONLINE_THRESHOLD_SECONDS: int(45),
@@ -209,6 +229,11 @@ export function toPublicConfig(config: AppConfig): PublicConfig {
       maxPages: config.MAX_PAGES,
       maxCopies: config.MAX_COPIES,
       maxSides: config.MAX_SIDES,
+    },
+    support: {
+      phone: config.SUPPORT_PHONE ?? null,
+      whatsapp: config.SUPPORT_WHATSAPP ?? null,
+      email: config.SUPPORT_EMAIL ?? null,
     },
   };
 }

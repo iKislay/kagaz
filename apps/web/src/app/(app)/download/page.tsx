@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { btnOutline, btnPrimary, display, eyebrow } from '@/components/SiteChrome';
-import { API_URL } from '@/lib/api';
+import { SupportContact } from '@/components/SupportContact';
+import { API_URL, getPublicConfig } from '@/lib/api';
 
 export const metadata: Metadata = {
   title: 'Kaggaz Shop for Windows — for print shops',
@@ -12,13 +13,16 @@ export const metadata: Metadata = {
 const SETUP_URL = `${API_URL}/downloads/shop-agent/KagazShop-win-Setup.exe`;
 
 const STEPS = [
-  'Download the installer and run it on the shop PC as your normal Windows user. No admin rights needed.',
-  'If Windows says “Windows protected your PC”, click More info → Run anyway. The app is not code-signed yet.',
-  'Enter the one-time pairing code from the Kaggaz admin. The server address is already filled in.',
-  'Sign in as an operator, confirm your printer (colour / double-sided), and print a test order.',
+  'Download and install Kaggaz Shop on the shop PC (your normal Windows user, no admin rights needed). If Windows says “Windows protected your PC”, click More info → Run anyway.',
+  'Open Kaggaz Shop and choose Create shop account, or sign in with your mobile number if you already have one. The PC connects automatically.',
+  'Kaggaz activates your subscription. Then set your prices and printer in the app and start taking orders.',
 ];
 
-export default function DownloadPage() {
+export default async function DownloadPage() {
+  const support = await getPublicConfig().then(
+    (c) => c.support,
+    () => null,
+  );
   return (
     <section>
       <p className={eyebrow}>For print shops</p>
@@ -67,6 +71,11 @@ export default function DownloadPage() {
           </li>
         ))}
       </ol>
+      <SupportContact
+        support={support}
+        label="Questions or help setting up?"
+        className="mt-8 block text-[14px] text-ink-soft"
+      />
     </section>
   );
 }

@@ -63,6 +63,7 @@ Scripts default to `http://localhost:$API_PORT/api` (4000 = the live printer ser
 Shop app `appsettings.json` keys: `ApiBaseUrl`, `SafetyPollSeconds`, `TokenRotationDays`, `RealtimeEnabled`, `UpdateFeedUrl`.
 
 Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/SeaweedFS aren't running), `GET /api/config` (drives the web DEMO banner).
+Shop accounts are created in the Kaggaz Shop app: `POST /api/shop/signup` (shop CLOSED + owner login + this PC), `POST /api/shop/enroll-with-login` (owner connects another PC), `GET/POST/DELETE /api/shop/members` and `GET/PUT /api/shop/pricing` (owner signed in on the PC). Support contact on the website comes from `SUPPORT_PHONE` / `SUPPORT_WHATSAPP` / `SUPPORT_EMAIL`.
 
 ### Toolchain notes (versions matter)
 

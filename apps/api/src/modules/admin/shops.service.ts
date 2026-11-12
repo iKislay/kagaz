@@ -81,6 +81,7 @@ export class ShopsService {
         slug: shop.slug,
         name: shop.name,
         address: shop.address,
+        createdAt: shop.createdAt.toISOString(),
         status: shop.status,
         approvalMode: shop.approvalMode,
         autoPaused: shop.autoPaused,
