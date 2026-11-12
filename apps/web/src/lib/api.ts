@@ -23,6 +23,14 @@ export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:400
   '',
 );
 
+/**
+ * With NEXT_PUBLIC_API_PROXY=1 the browser calls the same-origin /api rewrite (next.config.ts) so the
+ * API's SameSite=Lax cookies are first-party when web and API live on different sites (vercel.app vs
+ * onrender.com). Server components and the socket still use the absolute API_URL.
+ */
+const FETCH_BASE =
+  process.env.NEXT_PUBLIC_API_PROXY === '1' && typeof window !== 'undefined' ? '/api' : API_URL;
+
 export class ApiRequestError extends Error {
   override name = 'ApiRequestError';
   constructor(
@@ -51,7 +59,7 @@ export async function apiFetch<T>(
 ): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await fetch(`${FETCH_BASE}${path}`, {
       ...init,
       credentials: 'include',
       cache: 'no-store',
