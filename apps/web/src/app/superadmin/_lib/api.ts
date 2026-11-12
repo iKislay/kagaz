@@ -23,6 +23,7 @@ import {
   type AdminPrinterUpdateRequest,
   AdminReconciliationSchema,
   AdminShopDetailSchema,
+  type AdminShopCreateRequest,
   type AdminShopMemberRequest,
   type AdminShopUpdateRequest,
   AdminShopsSchema,
@@ -54,6 +55,8 @@ export const adminApi = {
   shop: (id: string) => apiFetch(`/admin/shops/${id}`, AdminShopDetailSchema),
   updateShop: (id: string, body: AdminShopUpdateRequest) =>
     apiFetch(`/admin/shops/${id}`, AdminShopDetailSchema, { method: 'PATCH', body }),
+  createShop: (body: AdminShopCreateRequest) =>
+    apiFetch('/admin/shops', AdminShopDetailSchema, { method: 'POST', body }),
   addMember: (id: string, body: AdminShopMemberRequest) =>
     apiFetch(`/admin/shops/${id}/members`, AdminShopDetailSchema, { method: 'POST', body }),
   removeMember: (id: string, userId: string) =>

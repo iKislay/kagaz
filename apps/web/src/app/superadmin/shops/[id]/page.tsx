@@ -25,7 +25,13 @@ export default function ShopDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { me } = useAdminSession();
   const admin = me.role === 'ADMIN';
-  const [tab, setTab] = useState<Tab>('settings');
+  // ?tab=members (e.g. after "Add shop" when the owner login still needs fixing).
+  const [tab, setTab] = useState<Tab>(() =>
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('tab') === 'members'
+      ? 'members'
+      : 'settings',
+  );
   const { data: shop, error, loading, setData } = useLoad(() => adminApi.shop(id), [id]);
 
   const tabs: { value: Tab; label: string }[] = [

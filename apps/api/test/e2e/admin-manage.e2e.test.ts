@@ -470,13 +470,20 @@ describe('reconciliation (P3.7, T20)', () => {
       netPaise: 1000,
       mismatches: 0,
     });
-    expect(r.rows).toHaveLength(1);
-    expect(r.rows[0]).toMatchObject({
-      paidCount: 3,
-      refundCount: 1,
-      simulatedPaidPaise: 1500,
-      ordersByStatus: { COLLECTED: 1, REFUNDED: 1, PENDING_REVIEW: 1 },
-    });
+    // Fixtures are 30–60 min old: just after midnight Asia/Kolkata they span two business days,
+    // so add the per-day rows up instead of assuming one row.
+    const sum = (k: 'paidCount' | 'refundCount' | 'simulatedPaidPaise') =>
+      r.rows.reduce((n, row) => n + row[k], 0);
+    const byStatus: Record<string, number> = {};
+    for (const row of r.rows)
+      for (const [s, n] of Object.entries(row.ordersByStatus)) byStatus[s] = (byStatus[s] ?? 0) + n;
+    expect(r.rows.length).toBeGreaterThanOrEqual(1);
+    expect({
+      paidCount: sum('paidCount'),
+      refundCount: sum('refundCount'),
+      simulatedPaidPaise: sum('simulatedPaidPaise'),
+    }).toEqual({ paidCount: 3, refundCount: 1, simulatedPaidPaise: 1500 });
+    expect(byStatus).toEqual({ COLLECTED: 1, REFUNDED: 1, PENDING_REVIEW: 1 });
   });
 
   it('seeded inconsistent fixtures are flagged', async () => {

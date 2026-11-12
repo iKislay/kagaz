@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { Chevron, Dot, Pill } from '@/components/ui';
 import { adminApi } from '../_lib/api';
 import { humanize, rupees, shopStatusTone } from '../_lib/format';
 import {
+  Button,
   Card,
   Empty,
   ErrorNote,
@@ -14,6 +16,7 @@ import {
   Td,
   useLoad,
 } from '../_components/kit';
+import { AddShop } from './AddShop';
 
 const QUEUE_STATES = ['PENDING_REVIEW', 'QUEUED', 'PRINTING', 'NEEDS_OPERATOR_CHECK'];
 
@@ -24,10 +27,26 @@ const isNewSignup = (s: { status: string; createdAt: string }) =>
 /** Shop list (P2.13, FR-ADMIN-02): status, mode, device online, queue depth, today. */
 export default function ShopsPage() {
   const { data, error, loading } = useLoad(() => adminApi.shops(), []);
+  const [adding, setAdding] = useState(false);
 
   return (
     <>
-      <PageHeader title="Shops" subtitle="Status, approval mode, devices and today’s orders." />
+      <PageHeader
+        title="Shops"
+        subtitle="Status, approval mode, devices and today’s orders."
+        actions={
+          !adding && (
+            <Button variant="primary" onClick={() => setAdding(true)}>
+              Add shop
+            </Button>
+          )
+        }
+      />
+      {adding && (
+        <div className="mb-5">
+          <AddShop onClose={() => setAdding(false)} />
+        </div>
+      )}
       <ErrorNote error={error} />
       {loading && !data ? (
         <Loading />
@@ -35,7 +54,9 @@ export default function ShopsPage() {
         data && (
           <Card flush>
             {data.shops.length === 0 ? (
-              <Empty>No shops.</Empty>
+              <Empty>
+                No shops yet. Add one here, or the shopkeeper creates it in the Kaggaz Shop app.
+              </Empty>
             ) : (
               <Table head={['Shop', 'Status', 'Mode', 'Shop PC', 'Printers', 'Queue', 'Today', '']}>
                 {data.shops.map((s) => {
