@@ -13,7 +13,7 @@ export interface SamplePdf {
   bytes: Uint8Array;
 }
 
-export async function generatePdf(pages: number, label = 'Kagaz load test'): Promise<Uint8Array> {
+export async function generatePdf(pages: number, label = 'Kaggaz load test'): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   for (let i = 1; i <= pages; i++) {

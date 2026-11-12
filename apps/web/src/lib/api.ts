@@ -17,7 +17,7 @@ import {
   UploadUrlResponseSchema,
 } from '@kagaz/shared';
 
-/** Base URL of the Kagaz API, e.g. http://localhost:4000/api */
+/** Base URL of the Kaggaz API, e.g. http://localhost:4000/api */
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api').replace(
   /\/$/,
   '',
@@ -75,7 +75,7 @@ export async function apiFetch<T>(
     throw new ApiRequestError(
       0,
       'API_UNREACHABLE',
-      'Can’t reach Kagaz right now. Check your connection and try again.',
+      'Can’t reach Kaggaz right now. Check your connection and try again.',
     );
   }
 

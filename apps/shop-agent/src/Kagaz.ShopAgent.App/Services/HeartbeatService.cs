@@ -86,7 +86,7 @@ public sealed class HeartbeatService : BackgroundService
             var problems = health.Where(h => h.Health.IsProblem).Select(h => $"{h.Printer.DisplayName}: {h.Health.LastError}").ToList();
             _status.SetPrinterAlert(problems.Count == 0 ? null : string.Join(" · ", problems));
 
-            _status.SetConnection(ConnectionState.Connected, $"Connected · {_status.ShopName ?? "Kagaz"}");
+            _status.SetConnection(ConnectionState.Connected, $"Connected · {_status.ShopName ?? "Kaggaz"}");
             MarkConnected(true);
             return true;
         }

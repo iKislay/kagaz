@@ -1,5 +1,5 @@
 /**
- * Helpers shared by the Kagaz dev/ops scripts (sim-agent, load-orders, verify-run, demo-reset).
+ * Helpers shared by the Kaggaz dev/ops scripts (sim-agent, load-orders, verify-run, demo-reset).
  * Scripts run with tsx from the repo root package `@kagaz/scripts`; they talk to the real API
  * over HTTP exactly like the website and the Windows app do.
  */

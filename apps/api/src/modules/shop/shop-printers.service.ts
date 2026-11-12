@@ -31,7 +31,7 @@ export class ShopPrintersService {
 
   /**
    * Register/update the Windows printers on this device with operator-confirmed capabilities.
-   * The request is the complete "Use for Kagaz" set for this device: listed printers are
+   * The request is the complete "Use for Kaggaz" set for this device: listed printers are
    * enabled, and printers this device registered earlier but no longer lists are disabled
    * (so an unplugged printer stops receiving orders). Other devices' printers are untouched.
    */

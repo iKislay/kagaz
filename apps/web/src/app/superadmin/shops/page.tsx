@@ -42,7 +42,7 @@ export default function ShopsPage() {
                     <tr key={s.id} className="hover:bg-selection/40">
                       <Td className="min-w-56">
                         <Link
-                          href={`/admin/shops/${s.id}`}
+                          href={`/superadmin/shops/${s.id}`}
                           className="font-medium hover:text-accent"
                         >
                           {s.name}
@@ -102,7 +102,7 @@ export default function ShopsPage() {
                         </div>
                       </Td>
                       <Td>
-                        <Link href={`/admin/shops/${s.id}`} aria-label={`Open ${s.name}`}>
+                        <Link href={`/superadmin/shops/${s.id}`} aria-label={`Open ${s.name}`}>
                           <Chevron />
                         </Link>
                       </Td>

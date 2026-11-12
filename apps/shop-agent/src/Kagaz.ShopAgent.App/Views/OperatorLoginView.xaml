@@ -22,8 +22,8 @@
 
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Text="Email or phone" Style="{StaticResource FieldLabel}" />
-                    <TextBox x:Name="LoginBox" AutomationProperties.Name="Email or phone"
+                    <TextBlock Text="Mobile number" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="LoginBox" AutomationProperties.Name="Mobile number"
                              Text="{Binding Login, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" MaxLength="120" />
 
                     <TextBlock Text="Password" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />

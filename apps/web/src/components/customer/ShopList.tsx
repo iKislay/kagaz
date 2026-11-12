@@ -9,104 +9,90 @@ import {
   formatDistance,
   formatPaise,
 } from '@kagaz/shared';
-import { Chevron, Dot, Group } from '@/components/ui';
+import { QrScanButton } from '@/components/customer/QrScanner';
+import { Chevron, Dot, Group, Spinner } from '@/components/ui';
 
-/** Shops further than this from the customer are hidden once we know where they are. */
+/** Only shops this close to the customer are listed. */
 const NEARBY_KM = 5;
 
-type Locate = { kind: 'idle' | 'locating' | 'denied' } | { kind: 'located'; at: LatLng };
+type Locate =
+  { kind: 'locating' } | { kind: 'denied'; blocked: boolean } | { kind: 'located'; at: LatLng };
 
-/** Public shop list; "Near me" sorts by distance from the customer's location (asked on tap only). */
+/**
+ * Public shop list. Location is asked as soon as the page opens; once known, only shops within
+ * NEARBY_KM are listed, nearest first. Denied → a "Use my location" button in place of the list.
+ * In a shop, the customer scans its QR code instead (button above the list).
+ */
 export function ShopList({ shops }: { shops: ShopSummary[] }) {
-  const [locate, setLocate] = useState<Locate>({ kind: 'idle' });
-  const [showAll, setShowAll] = useState(false);
+  const [locate, setLocate] = useState<Locate>({ kind: 'locating' });
 
-  function findNearMe() {
-    if (!navigator.geolocation) return setLocate({ kind: 'denied' });
+  function askLocation() {
+    if (!('geolocation' in navigator)) return setLocate({ kind: 'denied', blocked: true });
     setLocate({ kind: 'locating' });
     navigator.geolocation.getCurrentPosition(
       (pos) =>
         setLocate({ kind: 'located', at: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
-      () => setLocate({ kind: 'denied' }),
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+      // PERMISSION_DENIED (1): the browser won't ask again until the site is allowed in settings.
+      (err) => setLocate({ kind: 'denied', blocked: err.code === 1 }),
+      { enableHighAccuracy: false, timeout: 15_000, maximumAge: 300_000 },
     );
   }
 
-  // Already allowed location before? Sort straight away instead of waiting for a tap.
-  useEffect(() => {
-    navigator.permissions
-      ?.query({ name: 'geolocation' })
-      .then((p) => p.state === 'granted' && findNearMe())
-      .catch(() => {});
-  }, []);
+  useEffect(askLocation, []);
 
-  const here = locate.kind === 'located' ? locate.at : null;
-  const all = shops.map((shop) => ({
-    shop,
-    km: here && shop.location ? distanceKm(here, shop.location) : null,
-  }));
-  // Located: only shops within NEARBY_KM, nearest first (no location set = can't confirm it's near).
-  const rows =
-    here && !showAll
-      ? all.filter((r) => r.km !== null && r.km <= NEARBY_KM).sort((a, b) => a.km! - b.km!)
-      : all.sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity));
+  const nearby =
+    locate.kind === 'located'
+      ? shops
+          .map((shop) => ({
+            shop,
+            km: shop.location ? distanceKm(locate.at, shop.location) : Infinity,
+          }))
+          .filter((r) => r.km <= NEARBY_KM)
+          .sort((a, b) => a.km - b.km)
+      : [];
 
   return (
     <>
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={findNearMe}
-          disabled={locate.kind === 'locating'}
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-separator bg-surface px-4 text-[13px] font-medium text-accent transition-colors hover:bg-selection disabled:opacity-60"
-        >
-          <svg
-            aria-hidden
-            viewBox="0 0 16 16"
-            className="size-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <circle cx="8" cy="8" r="2.5" />
-            <path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" strokeLinecap="round" />
-          </svg>
-          {locate.kind === 'locating'
-            ? 'Finding you…'
-            : here
-              ? `Within ${NEARBY_KM} km, nearest first`
-              : 'Shops near me'}
-        </button>
-        <span className="text-[13px] text-text-secondary">
-          {locate.kind === 'denied'
-            ? 'Couldn’t get your location. Pick a shop below.'
-            : 'In a shop? Scan the Kagaz QR code at the counter.'}
-        </span>
+      <div className="mac-card mt-6 flex items-center gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold">In a shop?</div>
+          <div className="text-[13px] text-text-secondary">
+            Scan the Kaggaz QR code at the counter.
+          </div>
+        </div>
+        <QrScanButton />
       </div>
 
       <Group
-        title={here && !showAll ? 'Print shops near you' : 'Print shops'}
-        footer="Prices are per printed side. The shop prints only after you pay."
+        title="Print shops near you"
+        footer={`Shops within ${NEARBY_KM} km. Prices are per printed side; you pay at the counter when you collect.`}
       >
-        {rows.length === 0 && (
-          <div className="px-4 py-6 text-center text-[14px] text-text-secondary">
-            {here && !showAll ? (
-              <>
-                No Kagaz shops within {NEARBY_KM} km of you yet.{' '}
-                <button
-                  type="button"
-                  onClick={() => setShowAll(true)}
-                  className="font-medium text-accent"
-                >
-                  Show all shops
-                </button>
-              </>
-            ) : (
-              'No shops yet.'
+        {locate.kind === 'locating' && (
+          <div className="flex items-center justify-center gap-2 px-4 py-8 text-[14px] text-text-secondary">
+            <Spinner /> Finding shops near you…
+          </div>
+        )}
+        {locate.kind === 'denied' && (
+          <div className="px-4 py-8 text-center">
+            <p className="text-[14px] text-text-secondary">
+              Share your location to see print shops near you.
+            </p>
+            <button type="button" onClick={askLocation} className="mac-button mt-3">
+              Use my location
+            </button>
+            {locate.blocked && (
+              <p className="mt-2 text-[12px] text-text-secondary">
+                If nothing happens, allow location for kaggaz.in in your browser settings.
+              </p>
             )}
           </div>
         )}
-        {rows.map(({ shop, km }) => (
+        {locate.kind === 'located' && nearby.length === 0 && (
+          <div className="px-4 py-8 text-center text-[14px] text-text-secondary">
+            No shops near you right now.
+          </div>
+        )}
+        {nearby.map(({ shop, km }) => (
           <ShopRow key={shop.id} shop={shop} km={km} />
         ))}
       </Group>
@@ -123,14 +109,14 @@ function ShopRow({ shop, km }: { shop: ShopSummary; km: number | null }) {
         .filter(Boolean)
         .join(' · ')
     : 'Prices not set';
-  const extras = [shop.capabilities.duplex && 'Double-sided', shop.isDemo && 'Demo shop']
+  const extras = [shop.capabilities.duplex && 'Double-sided', shop.isDemo && 'Test shop']
     .filter(Boolean)
     .join(' · ');
 
   const body = (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-accent/12 text-[17px] font-bold text-accent">
-        {shop.name.replace(/^Kagaz Demo Shop /, '').charAt(0)}
+        {shop.name.charAt(0)}
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] font-semibold">{shop.name}</div>

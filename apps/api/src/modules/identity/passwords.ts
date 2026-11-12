@@ -1,4 +1,5 @@
 import { hash, verify } from '@node-rs/argon2';
+import { normalizePhone } from '@kagaz/shared';
 
 /**
  * Staff passwords (P2.3): Argon2id — @node-rs/argon2's default algorithm — with its
@@ -24,8 +25,13 @@ export async function verifyPassword(
   return verify(passwordHash, password).catch(() => false);
 }
 
-/** Login identifiers: emails are compared lowercased; anything starting with + is a phone. */
+/**
+ * Login identifiers: anything with an @ is an email (compared lowercased); everything else is a
+ * phone number, normalized to E.164 so "98765 43210" finds +919876543210 (shop logins).
+ */
 export function loginWhere(login: string): { email: string } | { phone: string } {
   const trimmed = login.trim();
-  return trimmed.startsWith('+') ? { phone: trimmed } : { email: trimmed.toLowerCase() };
+  return trimmed.includes('@')
+    ? { email: trimmed.toLowerCase() }
+    : { phone: normalizePhone(trimmed) };
 }

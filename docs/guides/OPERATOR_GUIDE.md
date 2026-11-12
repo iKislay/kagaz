@@ -1,6 +1,6 @@
-# Operator guide — Kagaz Shop (Windows app)
+# Operator guide — Kaggaz Shop (Windows app)
 
-For the shopkeeper and counter staff. Kagaz Shop runs on the shop's Windows PC, receives paid
+For the shopkeeper and counter staff. Kaggaz Shop runs on the shop's Windows PC, receives paid
 orders, prints each one as **one packet** (customer pages + one pickup slip) and tells the customer
 when it is ready.
 
@@ -14,10 +14,10 @@ when it is ready.
 
 Follow [SHOP_AGENT_INSTALL.md](SHOP_AGENT_INSTALL.md) to install the app. Then:
 
-1. Get a **pairing code** from the Kagaz team (admin: Shops → your shop → Devices → **Generate
+1. Get a **pairing code** from the Kaggaz team (admin: Shops → your shop → Devices → **Generate
    pairing code**). It works once and expires after 30 minutes.
-2. In Kagaz Shop, **Pairing** screen:
-   - **Server address** — given by the Kagaz team, e.g. `https://api.example.com/api`.
+2. In Kaggaz Shop, **Pairing** screen:
+   - **Server address** — given by the Kaggaz team, e.g. `https://api.example.com/api`.
    - **Pairing code** — the code you were given (dashes don't matter).
    - **Name for this PC** — e.g. _Counter PC_.
 3. Click **Pair this PC**. The app shows your shop's name and goes to **Jobs**.
@@ -25,7 +25,7 @@ Follow [SHOP_AGENT_INSTALL.md](SHOP_AGENT_INSTALL.md) to install the app. Then:
 ![Pairing](../testing/evidence/p1-10-shop-app/01-pairing.png)
 
 The PC stays paired after restarts and updates. The device key is stored encrypted for this
-Windows user. If the app ever says _"An administrator revoked this PC's access"_, ask the Kagaz team
+Windows user. If the app ever says _"An administrator revoked this PC's access"_, ask the Kaggaz team
 for a new code and pair again.
 
 Optional: **Settings → Start with Windows** so the app opens when you log in to the PC.
@@ -33,7 +33,7 @@ Optional: **Settings → Start with Windows** so the app opens when you log in t
 ## 2. Sign in as operator
 
 1. Open the operator sign-in (the app asks when nobody is signed in).
-2. Enter your **Email or phone** and **Password** (given by the Kagaz team or your shop owner).
+2. Enter your **Email or phone** and **Password** (given by the Kaggaz team or your shop owner).
 3. Click **Sign in**.
 
 - You must be signed in to accept, reject, resolve checks and change settings.
@@ -46,7 +46,7 @@ Optional: **Settings → Start with Windows** so the app opens when you log in t
 Open **Printers**. The list shows printers installed in Windows on this PC.
 
 1. Make sure the printer is on, connected, loaded with **A4** paper, and prints a Windows test page.
-2. Tick **Use for Kagaz** on the printer you want.
+2. Tick **Use for Kaggaz** on the printer you want.
 3. Set what it can **really** do:
    - **Prints in colour** — only if it has colour ink/toner and you want colour orders.
    - **Prints double-sided (automatic duplex)** — **only** if the printer flips the paper by
@@ -61,10 +61,10 @@ Open **Printers**. The list shows printers installed in Windows on this PC.
 > **Warning — manual-duplex printers.** Many ink-tank printers (for example the **Canon G2010**)
 > can only do "manual" double-sided: they print one side and ask you to turn the stack over. The
 > Windows driver may still say it supports duplex. **Do not tick double-sided for these
-> printers.** Kagaz would send a double-sided job and it would come out wrong. Customers then see
+> printers.** Kaggaz would send a double-sided job and it would come out wrong. Customers then see
 > "Double-sided not available here" for your shop, which is correct.
 
-Kagaz never sends a colour or double-sided order to a printer you haven't confirmed for it. Auto
+Kaggaz never sends a colour or double-sided order to a printer you haven't confirmed for it. Auto
 mode only works with a confirmed printer.
 
 ## 4. Auto or Manual approval
@@ -148,8 +148,8 @@ holding period.
 
 ## 7. Needs check and safe reprint
 
-An order goes to **Needs check** when Kagaz can't be sure what was printed: printer error, jam or
-paper out, the app or PC restarted mid-print, the printer stopped answering. **Kagaz never reprints
+An order goes to **Needs check** when Kaggaz can't be sure what was printed: printer error, jam or
+paper out, the app or PC restarted mid-print, the printer stopped answering. **Kaggaz never reprints
 by itself** — that is how duplicate prints are avoided.
 
 The screen shows: _"Check the printer output tray before reprinting — reprinting may produce
@@ -171,14 +171,14 @@ Reprint rules:
 
 ## 8. Printer problems
 
-| You see                                                                | Do this                                                                                                                                                                  |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Printer is out of paper / jam / door open                              | Fix it on the printer. The order goes to Needs check; resolve as in §7.                                                                                                  |
-| _"installed but not responding — check it is on, awake and connected"_ | Turn the printer on, wake it, reconnect the USB cable or Wi-Fi. Print a Windows test page. Then resolve the order in Needs check.                                        |
-| Jobs stay in Queue                                                     | Is **Pause printing** on? Is the app Online? Is the printer ticked **Use for Kagaz** and confirmed? Is a colour/double-sided order waiting for a printer that can do it? |
-| Colour or double-sided came out wrong                                  | Untick that capability in **Printers**, save, and tell the Kagaz team. Kagaz can't change the options of a paid order: mark it failed so the customer is refunded.       |
-| Windows print queue has old jobs stuck                                 | Settings → Bluetooth & devices → Printers & scanners → your printer → **Open print queue**. Don't cancel a `KAGAZ-…` job that is printing; ask support first.            |
-| HP printer installed with "Microsoft IPP Class Driver" never prints    | Install HP's full driver for the model (see [support runbook](../runbooks/SUPPORT_RUNBOOK.md#5-printer-unreachable)).                                                    |
+| You see                                                                | Do this                                                                                                                                                                   |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Printer is out of paper / jam / door open                              | Fix it on the printer. The order goes to Needs check; resolve as in §7.                                                                                                   |
+| _"installed but not responding — check it is on, awake and connected"_ | Turn the printer on, wake it, reconnect the USB cable or Wi-Fi. Print a Windows test page. Then resolve the order in Needs check.                                         |
+| Jobs stay in Queue                                                     | Is **Pause printing** on? Is the app Online? Is the printer ticked **Use for Kaggaz** and confirmed? Is a colour/double-sided order waiting for a printer that can do it? |
+| Colour or double-sided came out wrong                                  | Untick that capability in **Printers**, save, and tell the Kaggaz team. Kaggaz can't change the options of a paid order: mark it failed so the customer is refunded.      |
+| Windows print queue has old jobs stuck                                 | Settings → Bluetooth & devices → Printers & scanners → your printer → **Open print queue**. Don't cancel a `KAGAZ-…` job that is printing; ask support first.             |
+| HP printer installed with "Microsoft IPP Class Driver" never prints    | Install HP's full driver for the model (see [support runbook](../runbooks/SUPPORT_RUNBOOK.md#5-printer-unreachable)).                                                     |
 
 ## 9. Settings
 
@@ -199,4 +199,4 @@ Reprint rules:
 - During the day: watch **Pending** and **Needs check**. Keep the tray tidy so packets stay in
   number order.
 - Closing: turn on **Pause auto** (or switch to Manual), let the Queue finish, sign out. Ask the
-  Kagaz team to set the shop **Closed** if you won't open tomorrow.
+  Kaggaz team to set the shop **Closed** if you won't open tomorrow.

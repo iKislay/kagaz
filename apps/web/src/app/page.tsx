@@ -30,11 +30,11 @@ const PROBLEMS = [
 const STEPS = [
   [
     'Pick a shop',
-    'Open Kagaz on any phone browser and choose a print shop in Mandya. No app to install.',
+    'Open Kaggaz on any phone browser and choose a print shop in Mandya. No app to install.',
   ],
   [
     'Upload your file',
-    'Choose copies, B/W or colour, single or double-sided and page range. Kagaz checks the file before you pay.',
+    'Choose copies, B/W or colour, single or double-sided and page range. Kaggaz checks the file before you pay.',
   ],
   [
     'Pay the exact price',
@@ -50,7 +50,7 @@ const SHOP_FEATURES = [
   {
     title: 'Orders',
     items: [
-      'Paid orders arrive on the Windows shop app',
+      'Orders arrive on the Windows shop app',
       'Manual approval, or auto-accept with safety limits',
       'Pause new orders with one switch',
       'Full order details: pages, copies, sides, colour',
@@ -82,13 +82,13 @@ const CUSTOMER_FEATURES = [
   ['Your print settings', 'Copies, colour, double-sided and page range.'],
   ['Live status', 'See when your order is paid, printing and ready.'],
   ['Private files', 'Stored privately and deleted automatically after pickup.'],
-  ['Pay online', 'UPI, cards and netbanking when payments go live.'],
+  ['Pay at the counter', 'Cash or UPI when you collect. Online payment is coming soon.'],
 ] as const;
 
 const WHY = [
   [
     'Prices you can trust',
-    'Kagaz computes every price from the shop’s rates in whole paise. The browser never decides what you pay.',
+    'Kaggaz computes every price from the shop’s rates in whole paise. The browser never decides what you pay.',
   ],
   [
     'Payments checked by the server',
@@ -106,8 +106,8 @@ const WHY = [
 
 const FAQ = [
   [
-    'What is Kagaz?',
-    'Kagaz connects customers with print shops in Mandya. You upload a file from your phone, pay online, and pick up the printout at the shop using a pickup code.',
+    'What is Kaggaz?',
+    'Kaggaz connects customers with print shops in Mandya. You upload a file from your phone, then collect the printout at the shop with your pickup code and pay at the counter.',
   ],
   [
     'Do I need an app or an account?',
@@ -119,7 +119,7 @@ const FAQ = [
   ],
   [
     'How is the price calculated?',
-    'Each shop sets a rate per printed side for B/W and colour. Kagaz multiplies that by the pages and copies you choose and shows the total before you pay.',
+    'Each shop sets a rate per printed side for B/W and colour. Kaggaz multiplies that by the pages and copies you choose and shows the total before you pay.',
   ],
   [
     'Is my document safe?',
@@ -139,7 +139,7 @@ const FAQ = [
   ],
   [
     'How do shops join?',
-    'Shops install the Kagaz Windows app on their PC, pair it with a code and set their rates. Setup takes minutes.',
+    'Shops install the Kaggaz Windows app on their PC, pair it with a code and set their rates. Setup takes minutes.',
   ],
   [
     'How do I pay?',
@@ -257,8 +257,8 @@ export default function LandingPage() {
               Your shop runs the queue. <em className="text-forest">You just hand over pages.</em>
             </h2>
             <p className="mt-5 max-w-[56ch] text-[16px] leading-relaxed text-ink-soft">
-              The Kagaz Windows app sits on your shop PC, receives paid orders and prints them on
-              your printer. Each order ends with a pickup slip, so the stack sorts itself.
+              The Kaggaz Windows app sits on your shop PC, receives orders and prints them on your
+              printer. Each order ends with a pickup slip, so the stack sorts itself.
             </p>
             <div className="mt-12 grid gap-4 md:grid-cols-3">
               {SHOP_FEATURES.map((group) => (
@@ -317,7 +317,7 @@ export default function LandingPage() {
                 You pay the shop’s rate. Nothing hidden.
               </h2>
               <p className="mt-5 max-w-[48ch] text-[16px] leading-relaxed text-ink-soft">
-                Every shop sets its own price per printed side for B/W and colour. Kagaz shows the
+                Every shop sets its own price per printed side for B/W and colour. Kaggaz shows the
                 full breakdown before you pay, and the price is locked once you do.
               </p>
             </div>
@@ -347,9 +347,9 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Why Kagaz */}
+        {/* Why Kaggaz */}
         <section className="mx-auto max-w-6xl px-4 py-20 md:px-6 md:py-28">
-          <p className={eyebrow}>Why Kagaz</p>
+          <p className={eyebrow}>Why Kaggaz</p>
           <h2 className={`${display} mt-5 max-w-[20ch] text-[36px] leading-[1.1] md:text-[44px]`}>
             Built so nothing gets lost, overcharged or printed twice.
           </h2>

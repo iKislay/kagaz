@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
     void adminApi
       .me()
       .then(() => {
-        if (!cancelled) router.replace('/admin');
+        if (!cancelled) router.replace('/superadmin');
       })
       .catch(() => undefined);
     return () => {
@@ -41,7 +41,7 @@ export default function AdminLoginPage() {
     try {
       await adminApi.login(login.trim(), password);
       setPassword('');
-      router.replace('/admin');
+      router.replace('/superadmin');
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Sign-in failed');
     } finally {
@@ -56,7 +56,7 @@ export default function AdminLoginPage() {
           <span className="grid size-11 place-items-center rounded-xl bg-accent text-lg font-bold text-white">
             K
           </span>
-          <h1 className="text-[20px] font-semibold tracking-tight">Kagaz Admin</h1>
+          <h1 className="text-[20px] font-semibold tracking-tight">Kaggaz Admin</h1>
           <p className="text-[13px] text-text-secondary">Sign in with your staff account.</p>
         </div>
         <label className="mb-1 block text-[12px] text-text-secondary" htmlFor="admin-login">

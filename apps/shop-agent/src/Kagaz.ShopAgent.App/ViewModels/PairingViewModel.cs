@@ -80,7 +80,7 @@ public sealed partial class PairingViewModel : ObservableObject
             {
                 "ENROLLMENT_CODE_INVALID" => "This pairing code is invalid, expired or already used.",
                 "VALIDATION_FAILED" => "Check the pairing code and device name.",
-                "NETWORK_ERROR" => "Can't reach the Kagaz server. Check the address and your internet connection.",
+                "NETWORK_ERROR" => "Can't reach the Kaggaz server. Check the address and your internet connection.",
                 _ => ex.Message,
             };
         }

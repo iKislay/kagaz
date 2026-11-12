@@ -21,7 +21,7 @@ export default async function NewOrderPage({
   const shop = shops?.find((s) => s.id === shopId);
 
   if (!shops || !config) {
-    return <Notice tone="red">Can’t reach Kagaz right now. Please try again in a moment.</Notice>;
+    return <Notice tone="red">Can’t reach Kaggaz right now. Please try again in a moment.</Notice>;
   }
   if (!shop || !shop.acceptingOrders) {
     return (

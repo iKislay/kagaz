@@ -33,7 +33,7 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
     const user = await this.prisma.user.upsert({
       where: { email },
       update: { kind: 'ADMIN', passwordHash },
-      create: { email, name: 'Kagaz Admin', kind: 'ADMIN', passwordHash },
+      create: { email, name: 'Kaggaz Admin', kind: 'ADMIN', passwordHash },
     });
     await this.prisma.auditLog.create({
       data: {

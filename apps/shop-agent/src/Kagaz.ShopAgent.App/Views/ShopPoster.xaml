@@ -23,7 +23,7 @@
                 <TextBlock Text="K" Foreground="White" FontFamily="{StaticResource DisplayFont}" FontSize="22" FontWeight="Bold"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
-            <TextBlock Text="Kagaz" Margin="12,0,0,0" FontFamily="{StaticResource DisplayFont}" FontSize="26" FontWeight="SemiBold"
+            <TextBlock Text="Kaggaz" Margin="12,0,0,0" FontFamily="{StaticResource DisplayFont}" FontSize="26" FontWeight="SemiBold"
                        Foreground="#1D1D1F" VerticalAlignment="Center" />
         </StackPanel>
 

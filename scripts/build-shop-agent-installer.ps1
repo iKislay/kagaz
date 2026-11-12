@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds the Kagaz Shop Windows installer + update feed with Velopack (P5.4).
+  Builds the Kaggaz Shop Windows installer + update feed with Velopack (P5.4).
 
 .DESCRIPTION
   1. dotnet publish the WPF app self-contained for win-x64 (the print helper
@@ -78,7 +78,7 @@ $packArgs = @(
     "--packVersion", $Version,
     "--packDir", $publishDir,
     "--mainExe", $MainExe,
-    "--packTitle", "Kagaz Shop",
+    "--packTitle", "Kaggaz Shop",
     "--packAuthors", "Kagaz",
     "--channel", $Channel,
     "--runtime", "win-x64",

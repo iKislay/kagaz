@@ -22,7 +22,7 @@ public interface IUpdateService
 public sealed class NoUpdateService : IUpdateService
 {
     public bool IsAvailable => false;
-    public string? UnavailableReason => "Updates are installed by the Kagaz Shop installer; this copy was not installed with it.";
+    public string? UnavailableReason => "Updates are installed by the Kaggaz Shop installer; this copy was not installed with it.";
     public Task<UpdateCheck> CheckAsync(CancellationToken ct = default) =>
         Task.FromResult(new UpdateCheck(false, null, UnavailableReason!));
     public Task<bool> DownloadAndRestartAsync(IProgress<int>? progress = null, CancellationToken ct = default) =>

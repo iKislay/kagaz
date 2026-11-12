@@ -17,7 +17,7 @@
 
         <StackPanel Grid.Row="0" MaxWidth="720" HorizontalAlignment="Left">
             <TextBlock Text="Printers" Style="{StaticResource TitleText}" />
-            <TextBlock Text="Choose the printer Kagaz orders print on and confirm what it can really do. Kagaz never sends a colour or double-sided order to a printer you haven't confirmed for it."
+            <TextBlock Text="Choose the printer Kaggaz orders print on and confirm what it can really do. Kaggaz never sends a colour or double-sided order to a printer you haven't confirmed for it."
                        Style="{StaticResource SubtitleText}" />
         </StackPanel>
 
@@ -49,7 +49,7 @@
                                         </StackPanel>
                                         <TextBlock Text="{Binding DriverSummary}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0" />
                                     </StackPanel>
-                                    <CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" Content="Use for Kagaz" IsChecked="{Binding IsUsed}" />
+                                    <CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" Content="Use for Kaggaz" IsChecked="{Binding IsUsed}" />
                                 </Grid>
 
                                 <StackPanel Visibility="{Binding IsUsed, Converter={StaticResource BoolToVisibility}}" Margin="34,4,0,0">

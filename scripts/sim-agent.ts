@@ -171,7 +171,7 @@ async function registerPrinter(): Promise<void> {
     body: {
       printers: [
         {
-          printerName: `Kagaz Simulated Printer (${SLUG})`,
+          printerName: `Kaggaz Simulated Printer (${SLUG})`,
           displayName: 'Simulated printer',
           colourCapable: true,
           duplexCapable: true,

@@ -80,7 +80,7 @@
                     <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding StartWithWindows, Mode=TwoWay}">
                         <StackPanel>
                             <TextBlock Text="Start with Windows" Style="{StaticResource HeadlineText}" FontSize="14" />
-                            <TextBlock Text="Open Kagaz Shop automatically when you sign in to this PC."
+                            <TextBlock Text="Open Kaggaz Shop automatically when you sign in to this PC."
                                        Style="{StaticResource SecondaryText}" FontSize="12" />
                         </StackPanel>
                     </CheckBox>

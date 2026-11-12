@@ -28,7 +28,7 @@ public sealed class VelopackUpdateService : IUpdateService
             var manager = new UpdateManager(settings.UpdateFeedUrl.Trim());
             if (!manager.IsInstalled)
             {
-                UnavailableReason = "This copy of Kagaz Shop was not installed with the installer, so it can't update itself.";
+                UnavailableReason = "This copy of Kaggaz Shop was not installed with the installer, so it can't update itself.";
                 return;
             }
             _manager = manager;
@@ -50,7 +50,7 @@ public sealed class VelopackUpdateService : IUpdateService
         _pending = await _manager.CheckForUpdatesAsync();
         if (_pending is null)
         {
-            return new UpdateCheck(false, null, $"Kagaz Shop {_manager.CurrentVersion} is up to date.");
+            return new UpdateCheck(false, null, $"Kaggaz Shop {_manager.CurrentVersion} is up to date.");
         }
         var version = _pending.TargetFullRelease.Version.ToString();
         return new UpdateCheck(true, version, $"Version {version} is available.");

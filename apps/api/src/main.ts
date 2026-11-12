@@ -41,7 +41,7 @@ async function bootstrap(): Promise<void> {
 
   app
     .get(Logger)
-    .log(`Kagaz API listening on :${config.API_PORT} | ${startupSummary(config)}`, 'Bootstrap');
+    .log(`Kaggaz API listening on :${config.API_PORT} | ${startupSummary(config)}`, 'Bootstrap');
 }
 
 bootstrap().catch((err: unknown) => {

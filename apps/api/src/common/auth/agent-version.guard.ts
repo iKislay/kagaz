@@ -69,7 +69,7 @@ export class AgentVersionGuard implements CanActivate {
     if (isUpgradeRequired(version, min)) {
       throw new AppError(
         'AGENT_UPGRADE_REQUIRED',
-        `This Kagaz shop app (${version}) is too old; please update to ${min} or later`,
+        `This Kaggaz shop app (${version}) is too old; please update to ${min} or later`,
         426 as HttpStatus, // 426 Upgrade Required is missing from Nest's HttpStatus enum
         { minAgentVersion: min, appVersion: version },
       );

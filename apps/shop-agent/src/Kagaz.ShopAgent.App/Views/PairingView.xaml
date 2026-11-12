@@ -10,7 +10,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="560" HorizontalAlignment="Left">
             <TextBlock Text="Pairing" Style="{StaticResource TitleText}" />
-            <TextBlock Text="Connect this PC to your Kagaz shop with the one-time code from the Kagaz team."
+            <TextBlock Text="Connect this PC to your Kaggaz shop with the one-time code from the Kaggaz team."
                        Style="{StaticResource SubtitleText}" />
 
             <!-- Revoked (P2.4) -->
@@ -21,7 +21,7 @@
                                Margin="0,0,10,0" VerticalAlignment="Top" />
                     <StackPanel>
                         <TextBlock Text="{Binding Status.RevokedNotice}" Style="{StaticResource HeadlineText}" />
-                        <TextBlock Text="An administrator revoked this PC's access. Ask the Kagaz team for a new pairing code."
+                        <TextBlock Text="An administrator revoked this PC's access. Ask the Kaggaz team for a new pairing code."
                                    Style="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="460" Margin="0,2,0,0" />
                     </StackPanel>
                 </StackPanel>

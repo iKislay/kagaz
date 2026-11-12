@@ -10,13 +10,14 @@ import { ErrorNote, Loading, PageHeader, useLoad } from '../../_components/kit';
 import { useAdminSession } from '../../_components/session';
 import {
   DevicesSection,
+  MembersSection,
   HoursSection,
   PricingSection,
   PrintersSection,
   SettingsSection,
 } from './sections';
 
-type Tab = 'settings' | 'hours' | 'pricing' | 'printers' | 'devices';
+type Tab = 'settings' | 'hours' | 'pricing' | 'members' | 'printers' | 'devices';
 
 /** Shop management (P4.3): settings, hours, pricing, printers, devices + enrollment codes. */
 export default function ShopDetailPage() {
@@ -30,6 +31,7 @@ export default function ShopDetailPage() {
     { value: 'settings', label: 'Settings' },
     { value: 'hours', label: 'Hours' },
     { value: 'pricing', label: 'Pricing' },
+    { value: 'members', label: 'Logins' },
     ...(admin
       ? [
           { value: 'printers' as const, label: 'Printers' },
@@ -41,7 +43,7 @@ export default function ShopDetailPage() {
   return (
     <>
       <Link
-        href="/admin/shops"
+        href="/superadmin/shops"
         className="mb-2 inline-block text-[13px] text-accent hover:underline"
       >
         ‹ Shops
@@ -76,6 +78,7 @@ export default function ShopDetailPage() {
               )}
               {tab === 'hours' && <HoursSection shop={shop} onSaved={setData} />}
               {tab === 'pricing' && <PricingSection shopId={shop.id} />}
+              {tab === 'members' && <MembersSection shop={shop} admin={admin} onSaved={setData} />}
               {tab === 'printers' && admin && <PrintersSection shopId={shop.id} />}
               {tab === 'devices' && admin && <DevicesSection shopId={shop.id} />}
             </>

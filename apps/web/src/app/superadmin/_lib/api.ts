@@ -23,6 +23,7 @@ import {
   type AdminPrinterUpdateRequest,
   AdminReconciliationSchema,
   AdminShopDetailSchema,
+  type AdminShopMemberRequest,
   type AdminShopUpdateRequest,
   AdminShopsSchema,
 } from '@kagaz/shared';
@@ -53,6 +54,10 @@ export const adminApi = {
   shop: (id: string) => apiFetch(`/admin/shops/${id}`, AdminShopDetailSchema),
   updateShop: (id: string, body: AdminShopUpdateRequest) =>
     apiFetch(`/admin/shops/${id}`, AdminShopDetailSchema, { method: 'PATCH', body }),
+  addMember: (id: string, body: AdminShopMemberRequest) =>
+    apiFetch(`/admin/shops/${id}/members`, AdminShopDetailSchema, { method: 'POST', body }),
+  removeMember: (id: string, userId: string) =>
+    apiFetch(`/admin/shops/${id}/members/${userId}`, AdminShopDetailSchema, { method: 'DELETE' }),
 
   devices: (shopId: string) => apiFetch(`/admin/shops/${shopId}/devices`, AdminDeviceListSchema),
   revokeDevice: (shopId: string, deviceId: string) =>

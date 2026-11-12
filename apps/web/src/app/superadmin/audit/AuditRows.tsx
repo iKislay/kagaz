@@ -39,7 +39,10 @@ export function AuditRows({
           {!hideOrder && (
             <Td>
               {a.orderId ? (
-                <Link href={`/admin/orders/${a.orderId}`} className="text-accent hover:underline">
+                <Link
+                  href={`/superadmin/orders/${a.orderId}`}
+                  className="text-accent hover:underline"
+                >
                   Open
                 </Link>
               ) : (

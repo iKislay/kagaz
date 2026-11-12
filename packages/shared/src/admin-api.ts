@@ -1,5 +1,5 @@
 /**
- * Request/response contracts for the Kagaz admin API (PRD §11.3).
+ * Request/response contracts for the Kaggaz admin API (PRD §11.3).
  * Shared by apps/api (validation) and apps/web (typed client).
  *
  * All money amounts are integer paise. Responses never include token hashes,
@@ -425,6 +425,33 @@ export const OWNER_EDITABLE_SHOP_FIELDS = [
   'autoPaused',
   'openingHours',
 ] as const;
+
+/**
+ * Indian mobile numbers as typed by people → E.164: "98765 43210" / "09876543210" /
+ * "919876543210" → "+919876543210". Anything already starting with + only loses spaces/dashes.
+ */
+export function normalizePhone(input: string): string {
+  const v = input.trim().replace(/[\s()-]/g, '');
+  if (v.startsWith('+')) return v;
+  if (/^0?\d{10}$/.test(v)) return `+91${v.slice(-10)}`;
+  if (/^91\d{10}$/.test(v)) return `+${v}`;
+  return v;
+}
+
+/**
+ * POST /api/admin/shops/:id/members — add a shop owner/operator login (phone + password), or
+ * reset the password and role of an existing member with that phone.
+ */
+export const AdminShopMemberRequestSchema = z.strictObject({
+  phone: z
+    .string()
+    .transform(normalizePhone)
+    .pipe(z.string().regex(/^\+[1-9]\d{7,14}$/, 'Enter a 10-digit mobile number')),
+  name: z.string().trim().min(2).max(80),
+  role: z.enum(['SHOP_OWNER', 'SHOP_OPERATOR']),
+  password: z.string().min(8, 'At least 8 characters').max(200),
+});
+export type AdminShopMemberRequest = z.infer<typeof AdminShopMemberRequestSchema>;
 
 export const AdminShopCreateRequestSchema = z.strictObject({
   slug: z

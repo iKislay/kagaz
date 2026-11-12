@@ -72,7 +72,7 @@ public sealed class TokenRotationService : BackgroundService
         catch (ApiException ex)
         {
             _log.LogWarning("Device token rotation failed: {Code}", ex.Code);
-            return ex.Code == ApiErrorCodes.NetworkError ? "Can't reach the Kagaz server." : ex.Message;
+            return ex.Code == ApiErrorCodes.NetworkError ? "Can't reach the Kaggaz server." : ex.Message;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
         {
