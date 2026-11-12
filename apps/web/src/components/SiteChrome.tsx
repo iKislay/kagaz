@@ -110,7 +110,7 @@ export async function SiteFooter() {
           />
         </div>
         <div className="mt-12 flex flex-wrap justify-between gap-2 text-[12px] text-ink-soft">
-          <span>© 2026 Kagaz. Mandya, Karnataka.</span>
+          <span>© 2026 Kaggaz. Mandya, Karnataka.</span>
           <span>Pay at the shop counter when you collect your prints.</span>
         </div>
       </div>
