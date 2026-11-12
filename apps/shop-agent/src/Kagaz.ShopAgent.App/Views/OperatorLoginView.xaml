@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
              xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             xmlns:views="clr-namespace:Kagaz.ShopAgent.App.Views"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:OperatorLoginViewModel}"
              d:DesignHeight="600" d:DesignWidth="800">
@@ -40,8 +41,11 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
-            <TextBlock Text="Your session stays in memory only and ends when you sign out or close the app."
-                       Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,14,0,0" />
+            <TextBlock Text="Don't have a login? Ask your shop owner to add you in the Kaggaz dashboard (Logins), or contact Kaggaz support."
+                       Style="{StaticResource SecondaryText}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,14,0,14" />
+            <Border Style="{StaticResource Card}">
+                <views:SupportCard DataContext="{Binding Support}" />
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

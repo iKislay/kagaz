@@ -170,10 +170,10 @@
                                 <Run Text="{Binding DisplayAmount, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding DisplayPrintedSides, Mode=OneWay}" />
                             </TextBlock>
                             <TextBlock Grid.Row="4" Text="Payment" Style="{StaticResource SecondaryText}" Margin="0,0,0,8"
-                                       Visibility="{Binding IsDemoPayment, Converter={StaticResource BoolToVisibility}}" />
-                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Demo payment — no money charged" Style="{StaticResource BodyText}"
-                                       Foreground="{StaticResource AmberTextBrush}"
-                                       Visibility="{Binding IsDemoPayment, Converter={StaticResource BoolToVisibility}}" />
+                                       Visibility="{Binding PayAtCounter, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Pay at the counter on pickup" Style="{StaticResource BodyText}"
+                                       Foreground="{StaticResource OrangeBrush}" FontWeight="SemiBold"
+                                       Visibility="{Binding PayAtCounter, Converter={StaticResource BoolToVisibility}}" />
                             <TextBlock Grid.Row="5" Text="Print job" Style="{StaticResource SecondaryText}" Margin="0,0,0,8"
                                        Visibility="{Binding PrintJobDetail, Converter={StaticResource NullToVisibility}}" />
                             <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding PrintJobDetail}" Style="{StaticResource BodyText}"

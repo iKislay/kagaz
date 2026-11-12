@@ -68,6 +68,7 @@ public static class HostFactory
 
         builder.Services.AddSingleton(_ => new PrinterReachability());
 
+        builder.Services.AddSingleton(sp => new SupportViewModel(sp.GetRequiredService<ShopApiClient>()));
         builder.Services.AddSingleton<PairingViewModel>();
         builder.Services.AddSingleton<OperatorLoginViewModel>();
         builder.Services.AddSingleton<PrintersViewModel>();

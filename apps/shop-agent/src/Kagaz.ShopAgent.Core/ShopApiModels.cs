@@ -10,6 +10,20 @@ public record ApiDevice(string Id, string Name);
 
 public record ApiShop(string Id, string Name, bool IsDemo);
 
+/// <summary>Kaggaz support contact from <c>GET /config</c>; a null field is not configured.</summary>
+public record SupportContact(string? Phone, string? Whatsapp, string? Email)
+{
+    /// <summary>A wa.me chat link from any typed number ("+91 98765 43210" → https://wa.me/919876543210).</summary>
+    public static string? WhatsAppUrl(string? number)
+    {
+        var digits = new string((number ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+        return digits.Length >= 8 ? $"https://wa.me/{digits}" : null;
+    }
+}
+
+/// <summary>The part of <c>GET /config</c> the shop app reads.</summary>
+public record PublicConfigResponse(SupportContact? Support);
+
 /// <summary><c>GET /shop/poster</c>: what the in-shop QR poster shows.</summary>
 public record ShopPosterInfo(string ShopName, string Url);
 

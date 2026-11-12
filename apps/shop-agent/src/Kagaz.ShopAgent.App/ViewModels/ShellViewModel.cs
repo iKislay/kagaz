@@ -41,8 +41,11 @@ public sealed partial class ShellViewModel : ObservableObject
         ShopQrViewModel qr,
         SettingsViewModel settings,
         ShopModeViewModel mode,
-        UpdateViewModel update)
+        UpdateViewModel update,
+        SupportViewModel support)
     {
+        _ = support.LoadAsync();
+        status.Paired += () => _ = support.LoadAsync();
         _api = api;
         _qr = qr;
         Status = status;

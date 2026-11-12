@@ -114,15 +114,6 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- DEMO notice (invariant 4): always visible for demo shops, calm amber bar. -->
-            <Border Grid.Row="0" Style="{StaticResource NoticeBar}"
-                    Visibility="{Binding Status.ShopIsDemo, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="13" Foreground="{StaticResource OrangeBrush}" Margin="0,0,8,0" />
-                    <TextBlock Text="DEMO PAYMENT — NO MONEY CHARGED" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AmberTextBrush}" />
-                </StackPanel>
-            </Border>
-
             <!-- Printer problems on this PC (P2.10): paper out, offline, error… -->
             <Border Grid.Row="1" Style="{StaticResource NoticeBar}" Background="#14FF3B30" BorderBrush="#26FF3B30"
                     Visibility="{Binding Status.PrinterAlert, Converter={StaticResource NullToVisibility}}">

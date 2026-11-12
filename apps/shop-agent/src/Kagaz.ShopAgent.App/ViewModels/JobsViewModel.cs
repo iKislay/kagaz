@@ -34,7 +34,6 @@ public sealed partial class JobItem : ObservableObject
     public string Status => ShopJob.Status;
     public ShopPrintOptions Options => ShopJob.Options;
     public ShopPrintJob? PrintJob => ShopJob.PrintJob;
-    public bool IsDemoPayment => ShopJob.SimulatedPayment;
 
     /// <summary>ADR-003: the customer pays <see cref="DisplayAmount"/> at the counter on pickup.</summary>
     public bool PayAtCounter => ShopJob.PayAtCounter;
@@ -401,7 +400,7 @@ public sealed partial class JobsViewModel : ObservableObject
         {
             await _api.RejectJobAsync(job.OrderId, new RejectJobRequest(RejectReason!.Code, note));
             IsRejectOpen = false;
-            _status.ShowToast($"Rejected {job.PublicRef}", job.IsDemoPayment ? "Demo refund — no money moved" : "The customer will be refunded.");
+            _status.ShowToast($"Rejected {job.PublicRef}", job.PayAtCounter ? "Order rejected. The customer pays nothing." : "The customer will be refunded.");
         });
     }
 
@@ -492,7 +491,7 @@ public sealed partial class JobsViewModel : ObservableObject
                     _signals.Jobs.Pulse();
                     break;
                 default:
-                    _status.ShowToast($"{job.PublicRef} marked failed", job.IsDemoPayment ? "Demo refund — no money moved" : "The customer will be refunded.");
+                    _status.ShowToast($"{job.PublicRef} marked failed", job.PayAtCounter ? "The customer pays nothing." : "The customer will be refunded.");
                     break;
             }
         });

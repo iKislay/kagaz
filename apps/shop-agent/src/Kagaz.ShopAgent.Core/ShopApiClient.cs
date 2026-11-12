@@ -130,6 +130,13 @@ public sealed class ShopApiClient
         return await ReadAsync<ShopModeResponse>(response, ct);
     }
 
+    /// <summary><c>GET /config</c> (public, no token): Kaggaz support contact, or null if not set.</summary>
+    public async Task<SupportContact?> GetSupportAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/config", null, ct, auth: Auth.None);
+        return (await ReadAsync<PublicConfigResponse>(response, ct)).Support;
+    }
+
     /// <summary><c>GET /shop/poster</c>: the shop's "scan to print" QR target (kaggaz.in/s/&lt;slug&gt;).</summary>
     public async Task<ShopPosterInfo> GetPosterAsync(CancellationToken ct = default)
     {

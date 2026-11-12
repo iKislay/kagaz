@@ -4,14 +4,31 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
              xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             xmlns:views="clr-namespace:Kagaz.ShopAgent.App.Views"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:PairingViewModel}"
-             d:DesignHeight="600" d:DesignWidth="800">
+             d:DesignHeight="700" d:DesignWidth="800">
+    <UserControl.Resources>
+        <!-- Numbered step badge for the welcome steps. -->
+        <Style x:Key="StepBadge" TargetType="Border">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="CornerRadius" Value="13" />
+            <Setter Property="Background" Value="#1A007AFF" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+        </Style>
+        <Style x:Key="StepNumber" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="560" HorizontalAlignment="Left">
-            <TextBlock Text="Pairing" Style="{StaticResource TitleText}" />
-            <TextBlock Text="Connect this PC to your Kaggaz shop with the one-time code from the Kaggaz team."
-                       Style="{StaticResource SubtitleText}" />
+        <StackPanel MaxWidth="600" HorizontalAlignment="Left">
 
             <!-- Revoked (P2.4) -->
             <Border Background="#14FF3B30" CornerRadius="12" Padding="16,12" Margin="0,0,0,16"
@@ -21,57 +38,120 @@
                                Margin="0,0,10,0" VerticalAlignment="Top" />
                     <StackPanel>
                         <TextBlock Text="{Binding Status.RevokedNotice}" Style="{StaticResource HeadlineText}" />
-                        <TextBlock Text="An administrator revoked this PC's access. Ask the Kaggaz team for a new pairing code."
-                                   Style="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="460" Margin="0,2,0,0" />
+                        <TextBlock Text="This PC was disconnected from your shop. Generate a new pairing code in your Kaggaz dashboard (Devices) and enter it below."
+                                   Style="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="480" Margin="0,2,0,0" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- Paired -->
-            <Border Style="{StaticResource Card}" Visibility="{Binding Status.IsPaired, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <Border Width="36" Height="36" CornerRadius="18" Background="#1F34C759">
-                            <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource GreenBrush}" HorizontalAlignment="Center" />
-                        </Border>
-                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Status.ShopName, StringFormat=Paired with {0}}" Style="{StaticResource HeadlineText}" />
-                            <TextBlock Text="{Binding DeviceName, StringFormat=This PC: {0}}" Style="{StaticResource SecondaryText}" />
+            <StackPanel Visibility="{Binding Status.IsPaired, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="This PC" Style="{StaticResource TitleText}" />
+                <TextBlock Text="This PC receives your shop's Kaggaz orders and prints them." Style="{StaticResource SubtitleText}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="#1F34C759">
+                                <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource GreenBrush}" HorizontalAlignment="Center" />
+                            </Border>
+                            <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Status.ShopName, StringFormat=Connected to {0}}" Style="{StaticResource HeadlineText}" />
+                                <TextBlock Text="{Binding DeviceName, StringFormat=This PC: {0}}" Style="{StaticResource SecondaryText}" />
+                            </StackPanel>
+                        </StackPanel>
+                        <Border Style="{StaticResource Hairline}" />
+                        <TextBlock Text="This PC's access key is stored securely for this Windows user."
+                                   Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,0,0,16" />
+                        <Button Content="Disconnect this PC" Style="{StaticResource DestructiveButton}" HorizontalAlignment="Left"
+                                Command="{Binding UnpairCommand}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Not paired: first-run welcome for a new shop -->
+            <StackPanel Visibility="{Binding Status.IsPaired, Converter={StaticResource InverseBoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="44" Height="44" CornerRadius="12" Background="{StaticResource AccentBrush}">
+                        <TextBlock Text="K" Foreground="White" FontFamily="{StaticResource DisplayFont}" FontSize="24" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="Welcome to Kaggaz Shop" Style="{StaticResource TitleText}" />
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Text="Customers send their files from their phones. Kaggaz prints them on your shop printer, each with a pickup slip, and they pay you at the counter."
+                           Style="{StaticResource SubtitleText}" TextWrapping="Wrap" Margin="0,10,0,18" />
+
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Get started in 3 steps" Style="{StaticResource HeadlineText}" Margin="0,0,0,14" />
+
+                        <DockPanel Margin="0,0,0,14">
+                            <Border Style="{StaticResource StepBadge}"><TextBlock Text="1" Style="{StaticResource StepNumber}" /></Border>
+                            <StackPanel>
+                                <TextBlock Text="Create your shop account" Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                                <TextBlock Text="Sign up at kaggaz.in/register, or contact Kaggaz support and we'll set it up for you."
+                                           Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,2,0,8" />
+                                <Button Style="{StaticResource QuietButton}" HorizontalAlignment="Left" Command="{Binding Support.CreateAccountCommand}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE8FA;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
+                                        <TextBlock Text="Create shop account" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <DockPanel Margin="0,0,0,14">
+                            <Border Style="{StaticResource StepBadge}"><TextBlock Text="2" Style="{StaticResource StepNumber}" /></Border>
+                            <StackPanel>
+                                <TextBlock Text="Get a pairing code" Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                                <TextBlock Text="In your shop dashboard at kaggaz.in/superadmin, open your shop → Devices → Generate pairing code."
+                                           Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </DockPanel>
+
+                        <DockPanel>
+                            <Border Style="{StaticResource StepBadge}"><TextBlock Text="3" Style="{StaticResource StepNumber}" /></Border>
+                            <StackPanel>
+                                <TextBlock Text="Enter the code below" Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                                <TextBlock Text="This PC is then connected to your shop and ready for orders."
+                                           Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Pairing code" Style="{StaticResource FieldLabel}" />
+                        <TextBox AutomationProperties.Name="Pairing code" Text="{Binding PairingCode, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}"
+                                 FontFamily="{StaticResource MonoFont}" FontSize="18" MaxLength="16" />
+                        <TextBlock Text="Looks like ABCD-EFGH. Each code works once." Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,6,0,0" />
+
+                        <TextBlock Text="Name for this PC" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
+                        <TextBox AutomationProperties.Name="Name for this PC" Text="{Binding DeviceName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" MaxLength="80" />
+
+                        <TextBlock Text="{Binding Error}" Style="{StaticResource ErrorText}" Margin="0,14,0,0" TextWrapping="Wrap"
+                                   Visibility="{Binding Error, Converter={StaticResource NullToVisibility}}" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                            <Button Content="Connect this PC" Style="{StaticResource PrimaryButton}" Command="{Binding PairCommand}" IsDefault="True" />
+                            <TextBlock Text="Connecting…" Style="{StaticResource SecondaryText}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       Visibility="{Binding IsPairing, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+
+                        <Button Content="Advanced" Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="0,18,0,0"
+                                Command="{Binding ToggleAdvancedCommand}" FontSize="12" />
+                        <StackPanel Visibility="{Binding ShowAdvanced, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0">
+                            <TextBlock Text="Server address (only change this if Kaggaz support asks you to)" Style="{StaticResource FieldLabel}" />
+                            <TextBox AutomationProperties.Name="Server address" Text="{Binding ApiUrl, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" />
                         </StackPanel>
                     </StackPanel>
-                    <Border Style="{StaticResource Hairline}" />
-                    <TextBlock Text="Server" Style="{StaticResource FieldLabel}" />
-                    <TextBlock Text="{Binding ApiUrl}" Style="{StaticResource BodyText}" />
-                    <TextBlock Text="The device token is stored encrypted for this Windows user (DPAPI)."
-                               Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,12,0,16" />
-                    <Button Content="Unpair this PC" Style="{StaticResource DestructiveButton}" HorizontalAlignment="Left"
-                            Command="{Binding UnpairCommand}" />
-                </StackPanel>
-            </Border>
+                </Border>
+            </StackPanel>
 
-            <!-- Not paired -->
-            <Border Style="{StaticResource Card}" Visibility="{Binding Status.IsPaired, Converter={StaticResource InverseBoolToVisibility}}">
-                <StackPanel>
-                    <TextBlock Text="Server address" Style="{StaticResource FieldLabel}" />
-                    <TextBox AutomationProperties.Name="Server address" Text="{Binding ApiUrl, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" />
-
-                    <TextBlock Text="Pairing code" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
-                    <TextBox AutomationProperties.Name="Pairing code" Text="{Binding PairingCode, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}"
-                             FontFamily="{StaticResource MonoFont}" FontSize="18" MaxLength="16" />
-                    <TextBlock Text="Looks like ABCD-EFGH. Each code works once." Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,6,0,0" />
-
-                    <TextBlock Text="Name for this PC" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
-                    <TextBox AutomationProperties.Name="Name for this PC" Text="{Binding DeviceName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}" MaxLength="80" />
-
-                    <TextBlock Text="{Binding Error}" Style="{StaticResource ErrorText}" Margin="0,14,0,0"
-                               Visibility="{Binding Error, Converter={StaticResource NullToVisibility}}" />
-
-                    <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
-                        <Button Content="Pair this PC" Style="{StaticResource PrimaryButton}" Command="{Binding PairCommand}" IsDefault="True" />
-                        <TextBlock Text="Pairing…" Style="{StaticResource SecondaryText}" VerticalAlignment="Center" Margin="12,0,0,0"
-                                   Visibility="{Binding IsPairing, Converter={StaticResource BoolToVisibility}}" />
-                    </StackPanel>
-                </StackPanel>
+            <Border Style="{StaticResource Card}">
+                <views:SupportCard DataContext="{Binding Support}" />
             </Border>
         </StackPanel>
     </ScrollViewer>

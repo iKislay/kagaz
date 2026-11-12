@@ -6,7 +6,7 @@ using Kagaz.ShopAgent.Core;
 namespace Kagaz.ShopAgent.App.ViewModels;
 
 /// <summary>
-/// Pairing (P1.9, FR-SHOP-01): API URL + one-time enrollment code → device token, stored with DPAPI.
+/// Pairing (P1.9, FR-SHOP-01): one-time enrollment code (+ API URL under Advanced) → device token, stored with DPAPI.
 /// The shop is whatever the server binds the code to; this PC never chooses a shop id.
 /// </summary>
 public sealed partial class PairingViewModel : ObservableObject
@@ -31,16 +31,23 @@ public sealed partial class PairingViewModel : ObservableObject
     [ObservableProperty]
     private string? _error;
 
-    public PairingViewModel(ShopApiClient api, AgentSettings settings, AgentStateStore state, AppStatus status)
+    /// <summary>The server address is for Kaggaz support only; shopkeepers never need it.</summary>
+    [ObservableProperty]
+    private bool _showAdvanced;
+
+    public PairingViewModel(ShopApiClient api, AgentSettings settings, AgentStateStore state, AppStatus status,
+        SupportViewModel? support = null)
     {
         _api = api;
         _settings = settings;
         Status = status;
+        Support = support ?? new SupportViewModel();
         _apiUrl = settings.ApiBaseUrl;
         _deviceName = state.Load().DeviceName ?? Environment.MachineName;
     }
 
     public AppStatus Status { get; }
+    public SupportViewModel Support { get; }
 
     partial void OnApiUrlChanged(string value) => _settings.ApiBaseUrl = value.Trim();
 
@@ -62,7 +69,8 @@ public sealed partial class PairingViewModel : ObservableObject
         {
             if (!Uri.TryCreate(ApiUrl.Trim(), UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https"))
             {
-                Error = "Enter the full server address, e.g. http://localhost:4000/api";
+                Error = "The server address is not valid. Under Advanced, set it to https://api.kaggaz.in/api.";
+                ShowAdvanced = true;
                 return;
             }
 
@@ -78,7 +86,7 @@ public sealed partial class PairingViewModel : ObservableObject
         {
             Error = ex.Code switch
             {
-                "ENROLLMENT_CODE_INVALID" => "This pairing code is invalid, expired or already used.",
+                "ENROLLMENT_CODE_INVALID" => "This pairing code is invalid, expired or already used. Generate a new one in your Kaggaz dashboard.",
                 "VALIDATION_FAILED" => "Check the pairing code and device name.",
                 "NETWORK_ERROR" => "Can't reach the Kaggaz server. Check the address and your internet connection.",
                 _ => ex.Message,
@@ -92,6 +100,9 @@ public sealed partial class PairingViewModel : ObservableObject
 
     [RelayCommand]
     private void Unpair() => Status.Unpair();
+
+    [RelayCommand]
+    private void ToggleAdvanced() => ShowAdvanced = !ShowAdvanced;
 
     private static string NormalizeCode(string? value) =>
         new((value ?? string.Empty).Where(char.IsLetterOrDigit).ToArray());

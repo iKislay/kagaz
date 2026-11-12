@@ -30,13 +30,15 @@ public sealed partial class OperatorLoginViewModel : ObservableObject
     [ObservableProperty]
     private string? _error;
 
-    public OperatorLoginViewModel(ShopApiClient api, AppStatus status)
+    public OperatorLoginViewModel(ShopApiClient api, AppStatus status, SupportViewModel? support = null)
     {
         _api = api;
         Status = status;
+        Support = support ?? new SupportViewModel();
     }
 
     public AppStatus Status { get; }
+    public SupportViewModel Support { get; }
 
     /// <summary>The view clears its PasswordBox when this fires (after every attempt).</summary>
     public event Action? PasswordCleared;
