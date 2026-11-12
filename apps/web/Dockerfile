@@ -26,7 +26,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} NEXT_OUTPUT=standalone
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY apps/web apps/web
-RUN pnpm --filter @kagaz/shared build && pnpm --filter @kagaz/web build
+RUN pnpm --filter @kagaz/web build
 
 FROM node:${NODE_VERSION} AS runtime
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
