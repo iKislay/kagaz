@@ -56,11 +56,13 @@ export default function AdminLoginPage() {
           <span className="grid size-11 place-items-center rounded-xl bg-accent text-lg font-bold text-white">
             K
           </span>
-          <h1 className="text-[20px] font-semibold tracking-tight">Kaggaz Admin</h1>
-          <p className="text-[13px] text-text-secondary">Sign in with your staff account.</p>
+          <h1 className="text-[20px] font-semibold tracking-tight">Kaggaz Superadmin</h1>
+          <p className="text-[13px] text-text-secondary">
+            For the Kaggaz team. Shop owners use the Kaggaz Shop app.
+          </p>
         </div>
         <label className="mb-1 block text-[12px] text-text-secondary" htmlFor="admin-login">
-          Email or phone
+          Email
         </label>
         <input
           id="admin-login"

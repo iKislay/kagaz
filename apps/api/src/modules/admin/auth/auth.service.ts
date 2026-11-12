@@ -5,7 +5,7 @@ import { type AppConfig } from '../../../common/config/config.schema.js';
 import { AppError } from '../../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../../common/prisma/prisma.service.js';
 import { LoginRateLimiter } from '../../identity/login-rate-limiter.js';
-import { loginWhere, verifyPassword } from '../../identity/passwords.js';
+import { verifyPassword } from '../../identity/passwords.js';
 import {
   resolveStaff,
   signStaffToken,
@@ -35,11 +35,22 @@ export class AdminAuthService {
     const key = `${ip}|${login.toLowerCase()}`;
     if (this.limiter.isBlocked(key)) throw rateLimited();
 
-    const user = await this.prisma.user.findUnique({
-      where: loginWhere(login),
-      select: { id: true, email: true, passwordHash: true },
-    });
+    // /superadmin is for Kaggaz staff only: email logins, ADMIN accounts. Shops use the app.
+    const user = login.includes('@')
+      ? await this.prisma.user.findUnique({
+          where: { email: login.toLowerCase() },
+          select: { id: true, email: true, passwordHash: true, kind: true },
+        })
+      : null;
     const passwordOk = await verifyPassword(user?.passwordHash, body.password);
+    if (user && passwordOk && user.kind !== 'ADMIN') {
+      await this.audit('ADMIN_LOGIN_FAILED', user.id, ip, { login, reason: 'not_admin' });
+      throw new AppError(
+        'ADMIN_LOGIN_FAILED',
+        'This sign-in is for the Kaggaz team. Shops use the Kaggaz Shop app.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
     const staff = user && passwordOk ? await resolveStaff(this.prisma, user.id) : null;
 
     if (!user || !staff) {
