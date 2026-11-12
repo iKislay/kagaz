@@ -1,7 +1,7 @@
-# Admin guide — Kagaz dashboard
+# Admin guide — Kaggaz dashboard
 
-For the Kagaz team. The dashboard lives at `/admin` on the website, e.g.
-`https://demo.kagaz.example/admin` (locally `http://localhost:3000/admin`).
+For the Kaggaz team. The dashboard lives at `/superadmin` on the website, e.g.
+`https://demo.kagaz.example/superadmin` (locally `http://localhost:3000/superadmin`).
 
 ## 1. Sign in
 

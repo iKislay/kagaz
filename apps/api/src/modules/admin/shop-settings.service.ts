@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   type AdminShopCreateRequest,
   type AdminShopDetail,
+  type AdminShopMemberRequest,
   type AdminShopUpdateRequest,
   type AutoLimits,
   OPENING_DAYS,
@@ -11,6 +12,7 @@ import {
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type Prisma } from '../../generated/prisma/client.js';
+import { hashPassword } from '../identity/passwords.js';
 import { type StaffContext } from '../identity/staff-session.js';
 import { auditStaffAction, diffFields } from './admin-audit.js';
 
@@ -29,6 +31,112 @@ const DEFAULT_AUTO_LIMITS: AutoLimits = {
 @Injectable()
 export class ShopSettingsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Add a shop login (phone + password), or reset the password/role/name of an existing member
+   * with that phone. Admins manage anyone; a shop owner only operators of their own shop.
+   */
+  async addMember(
+    staff: StaffContext,
+    shopId: string,
+    req: AdminShopMemberRequest,
+  ): Promise<AdminShopDetail> {
+    if (staff.role !== 'ADMIN' && req.role !== 'SHOP_OPERATOR') {
+      throw new AppError(
+        'FORBIDDEN_FIELD',
+        'Only a Kaggaz admin can add shop owners',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    const passwordHash = await hashPassword(req.password);
+    await this.prisma.$transaction(async (tx) => {
+      const shop = await tx.shop.findUnique({ where: { id: shopId }, select: { id: true } });
+      if (!shop) throw shopNotFound();
+      const existing = await tx.user.findUnique({ where: { phone: req.phone } });
+      if (existing?.kind === 'ADMIN') {
+        throw new AppError(
+          'MEMBER_IS_ADMIN',
+          'This number belongs to a Kaggaz admin',
+          HttpStatus.CONFLICT,
+        );
+      }
+      const role = req.role === 'SHOP_OWNER' ? 'OWNER' : 'OPERATOR';
+      if (existing && staff.role !== 'ADMIN') {
+        // Owners must not take over (or reset) logins they don't manage.
+        const membership = await tx.shopUser.findUnique({
+          where: { shopId_userId: { shopId, userId: existing.id } },
+        });
+        const otherShops = await tx.shopUser.count({
+          where: { userId: existing.id, shopId: { not: shopId } },
+        });
+        if (
+          membership?.role === 'OWNER' ||
+          otherShops > 0 ||
+          (existing.passwordHash && !membership)
+        ) {
+          throw new AppError(
+            'FORBIDDEN_FIELD',
+            'Ask a Kaggaz admin to change this login',
+            HttpStatus.FORBIDDEN,
+          );
+        }
+      }
+      // A customer account with this number becomes a staff login too (its orders stay linked).
+      const user = await tx.user.upsert({
+        where: { phone: req.phone },
+        update: { name: req.name, kind: 'STAFF', passwordHash },
+        create: { phone: req.phone, name: req.name, kind: 'STAFF', passwordHash },
+      });
+      await tx.shopUser.upsert({
+        where: { shopId_userId: { shopId, userId: user.id } },
+        update: { role },
+        create: { shopId, userId: user.id, role },
+      });
+      await auditStaffAction(
+        tx,
+        staff,
+        existing ? 'shop.member_updated' : 'shop.member_added',
+        shopId,
+        {
+          userId: user.id,
+          role,
+        },
+      );
+    });
+    return this.detail(shopId);
+  }
+
+  /** Remove a shop login from this shop and sign it out of the shop's PCs. */
+  async removeMember(
+    staff: StaffContext,
+    shopId: string,
+    userId: string,
+  ): Promise<AdminShopDetail> {
+    await this.prisma.$transaction(async (tx) => {
+      const membership = await tx.shopUser.findUnique({
+        where: { shopId_userId: { shopId, userId } },
+      });
+      if (!membership)
+        throw new AppError('MEMBER_NOT_FOUND', 'Member not found', HttpStatus.NOT_FOUND);
+      if (staff.role !== 'ADMIN' && membership.role !== 'OPERATOR') {
+        throw new AppError(
+          'FORBIDDEN_FIELD',
+          'Only a Kaggaz admin can remove shop owners',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+      await tx.shopUser.delete({ where: { id: membership.id } });
+      await tx.operatorSession.updateMany({
+        where: { shopId, userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await auditStaffAction(tx, staff, 'shop.member_removed', shopId, {
+        userId,
+        role: membership.role,
+      });
+    });
+    return this.detail(shopId);
+  }
 
   async detail(shopId: string): Promise<AdminShopDetail> {
     const shop = await this.prisma.shop.findUnique({
@@ -106,7 +214,7 @@ export class ShopSettingsService {
       if (forbidden.length > 0) {
         throw new AppError(
           'FORBIDDEN_FIELD',
-          `Only a Kagaz admin can change: ${forbidden.join(', ')}`,
+          `Only a Kaggaz admin can change: ${forbidden.join(', ')}`,
           HttpStatus.FORBIDDEN,
           { fields: forbidden },
         );

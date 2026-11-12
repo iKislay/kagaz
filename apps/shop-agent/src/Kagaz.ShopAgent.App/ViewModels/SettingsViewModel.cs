@@ -73,7 +73,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         try
         {
             _startup.SetEnabled(value);
-            StartupMessage = value ? "Kagaz Shop will start when you sign in to Windows." : null;
+            StartupMessage = value ? "Kaggaz Shop will start when you sign in to Windows." : null;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {

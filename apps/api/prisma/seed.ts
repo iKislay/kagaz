@@ -45,14 +45,14 @@ const OPENING_HOURS = {
 const SHOPS = [
   {
     slug: 'demo-shop-a',
-    name: 'Kagaz Demo Shop A — College Road',
+    name: 'Kaggaz Demo Shop A — College Road',
     address: 'College Road, Mandya, Karnataka',
     location: { latitude: 12.5243, longitude: 76.8968 },
     pricing: { monoRatePaise: 200, colourRatePaise: 1000, minimumChargePaise: 500 },
   },
   {
     slug: 'demo-shop-b',
-    name: 'Kagaz Demo Shop B — Bus Stand',
+    name: 'Kaggaz Demo Shop B — Bus Stand',
     address: 'Near KSRTC Bus Stand, Mandya, Karnataka',
     location: { latitude: 12.5218, longitude: 76.8951 },
     pricing: {
@@ -66,7 +66,7 @@ const SHOPS = [
   },
   {
     slug: 'demo-shop-c',
-    name: 'Kagaz Demo Shop C — VV Nagar',
+    name: 'Kaggaz Demo Shop C — VV Nagar',
     address: 'VV Nagar, Mandya, Karnataka',
     location: { latitude: 12.5334, longitude: 76.8901 },
     pricing: { monoRatePaise: 200, colourRatePaise: 1200, minimumChargePaise: 500 },
@@ -119,7 +119,7 @@ async function main() {
     }
   }
 
-  await upsertUser(adminEmail, 'Kagaz Admin', 'ADMIN', adminPasswordHash);
+  await upsertUser(adminEmail, 'Kaggaz Admin', 'ADMIN', adminPasswordHash);
   if (printedPassword) {
     console.log(`Admin password for ${adminEmail}: ${printedPassword}`);
   }

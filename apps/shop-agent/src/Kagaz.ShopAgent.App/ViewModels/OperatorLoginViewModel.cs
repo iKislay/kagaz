@@ -73,10 +73,10 @@ public sealed partial class OperatorLoginViewModel : ObservableObject
     {
         ApiErrorCodes.InvalidCredentials => "Wrong login or password, or this account isn't part of this shop.",
         ApiErrorCodes.RateLimited or "TOO_MANY_REQUESTS" or "TooManyRequests" => "Too many attempts. Wait a few minutes and try again.",
-        ApiErrorCodes.NetworkError => "Can't reach the Kagaz server. Check the internet connection.",
+        ApiErrorCodes.NetworkError => "Can't reach the Kaggaz server. Check the internet connection.",
         ApiErrorCodes.DeviceRevoked => AppStatus.RevokedText,
         ApiErrorCodes.DeviceUnauthorized => "This PC is not paired with a shop.",
-        ApiErrorCodes.AgentUpgradeRequired => "This version of Kagaz Shop is too old. Update it to continue.",
+        ApiErrorCodes.AgentUpgradeRequired => "This version of Kaggaz Shop is too old. Update it to continue.",
         "VALIDATION_FAILED" => "Enter your email or phone number and password.",
         _ => ex.Message,
     };

@@ -108,7 +108,7 @@ export default function ReconciliationPage() {
                       <Td mono>
                         {m.orderId ? (
                           <Link
-                            href={`/admin/orders/${m.orderId}`}
+                            href={`/superadmin/orders/${m.orderId}`}
                             className="text-accent hover:underline"
                           >
                             {m.publicRef}

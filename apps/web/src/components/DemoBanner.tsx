@@ -35,7 +35,7 @@ export async function DemoBanner() {
       data-testid="api-unreachable-banner"
       className="border-t border-separator bg-red/10 px-4 py-1.5 text-center text-[12px] font-semibold text-red"
     >
-      Can&apos;t reach the Kagaz service right now. Ordering is unavailable.
+      Can&apos;t reach the Kaggaz service right now. Ordering is unavailable.
     </div>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * Money helpers. All amounts in Kagaz are integer paise (1 INR = 100 paise). No floats.
+ * Money helpers. All amounts in Kaggaz are integer paise (1 INR = 100 paise). No floats.
  */
 
 export class MoneyError extends Error {

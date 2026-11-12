@@ -28,6 +28,6 @@ public sealed partial class ShopQrView : UserControl
         sheet.Measure(page);
         sheet.Arrange(new Rect(page));
         sheet.UpdateLayout();
-        dialog.PrintVisual(sheet, "Kagaz QR poster");
+        dialog.PrintVisual(sheet, "Kaggaz QR poster");
     }
 }

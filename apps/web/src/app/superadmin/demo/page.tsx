@@ -40,7 +40,7 @@ type Load =
 export default function AdminDemoPage() {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   useEffect(() => {
-    document.title = 'Demo controls — Kagaz admin';
+    document.title = 'Demo controls — Kaggaz admin';
   }, []);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -54,7 +54,7 @@ export default function AdminDemoPage() {
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 401) setLoad({ kind: 'signed-out' });
       else if (err instanceof ApiRequestError && err.status === 404) setLoad({ kind: 'disabled' });
-      else setLoad({ kind: 'error', message: 'Can’t reach the Kagaz API.' });
+      else setLoad({ kind: 'error', message: 'Can’t reach the Kaggaz API.' });
     }
   }, []);
 
@@ -85,7 +85,7 @@ export default function AdminDemoPage() {
   return (
     <section>
       <p className="text-[13px] font-medium text-text-secondary">
-        <Link href="/admin" className="text-accent">
+        <Link href="/superadmin" className="text-accent">
           Admin
         </Link>{' '}
         · Demo

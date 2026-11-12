@@ -96,7 +96,7 @@ export default function OrdersPage() {
             {data.items.map((o) => (
               <tr key={o.id} className="hover:bg-selection/40">
                 <Td mono>
-                  <Link href={`/admin/orders/${o.id}`} className="text-accent hover:underline">
+                  <Link href={`/superadmin/orders/${o.id}`} className="text-accent hover:underline">
                     {o.publicRef}
                   </Link>
                 </Td>

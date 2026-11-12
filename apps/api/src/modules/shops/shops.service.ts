@@ -1,7 +1,7 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
-import { ShopStatus, type ShopSummary } from '@kagaz/shared';
+import { AppEnv, ShopStatus, type ShopSummary } from '@kagaz/shared';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { isWithinOpeningHours } from './opening-hours.js';
@@ -25,6 +25,8 @@ export class ShopsService {
   async listPublic(): Promise<ShopSummary[]> {
     const onlineSince = new Date(Date.now() - this.config.DEVICE_ONLINE_THRESHOLD_SECONDS * 1000);
     const shops = await this.prisma.shop.findMany({
+      // Seeded demo/test shops never appear to the public in production.
+      where: this.config.APP_ENV === AppEnv.PRODUCTION ? { isDemo: false } : {},
       orderBy: { name: 'asc' },
       include: {
         printers: { where: { enabled: true } },

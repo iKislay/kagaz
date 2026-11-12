@@ -1,4 +1,4 @@
-# Kagaz Shop — install and update (P5.4)
+# Kaggaz Shop — install and update (P5.4)
 
 The Windows shop app ships as a **per-user** Velopack installer: no administrator rights, no service, nothing
 installed for other Windows users. It installs to `%LOCALAPPDATA%\KagazShop\` and keeps its data (device token,
@@ -49,15 +49,15 @@ is shown in Settings, sent as `X-Agent-Version` and in the heartbeat (`appVersio
 ## Install on a shop PC
 
 1. Copy `KagazShop-win-Setup.exe` to the PC (USB or download) and run it as the shop's normal Windows user.
-2. Kagaz Shop starts; shortcuts are added to the Start menu and desktop.
+2. Kaggaz Shop starts; shortcuts are added to the Start menu and desktop.
 3. **Pairing** → enter the server address (e.g. `https://api.example.com/api`) and the one-time pairing code.
 4. Sign in as an operator, set up **Printers** (confirm colour/duplex), then print a test order.
 5. Optional: **Settings → Start with Windows** (writes `HKCU\…\CurrentVersion\Run\KagazShop`; removed on uninstall).
 
 Only one copy runs per Windows session (named mutex `Kagaz.ShopAgent.SingleInstance`); a second launch shows
-"Kagaz Shop is already running."
+"Kaggaz Shop is already running."
 
-Uninstall from **Settings → Apps → Installed apps → Kagaz Shop**. The data folder `%LOCALAPPDATA%\Kagaz\` is left in
+Uninstall from **Settings → Apps → Installed apps → Kaggaz Shop**. The data folder `%LOCALAPPDATA%\Kagaz\` is left in
 place (delete it to forget the pairing).
 
 ## Unsigned builds and SmartScreen

@@ -44,9 +44,9 @@ export async function buildPrintPacket(
 
   const selected = parsePageRange(options.pageRange, source.getPageCount());
   const packet = await PDFDocument.create();
-  packet.setTitle(`Kagaz ${slip.publicRef}`);
-  packet.setCreator('Kagaz');
-  packet.setProducer('Kagaz');
+  packet.setTitle(`Kaggaz ${slip.publicRef}`);
+  packet.setCreator('Kaggaz');
+  packet.setProducer('Kaggaz');
 
   const embedded = await packet.embedPages(selected.map((n) => source.getPage(n - 1)));
 

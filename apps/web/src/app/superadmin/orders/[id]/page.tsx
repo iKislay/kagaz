@@ -27,7 +27,7 @@ export default function OrderDetailPage() {
   return (
     <>
       <Link
-        href="/admin/orders"
+        href="/superadmin/orders"
         className="mb-2 inline-block text-[13px] text-accent hover:underline"
       >
         ‹ Orders
@@ -59,7 +59,7 @@ function Detail({ o }: { o: AdminOrderDetail }) {
             <Pill tone={orderTone(o.events.at(-1)?.toStatus ?? 'DRAFT')}>
               {humanize(o.events.at(-1)?.toStatus ?? 'DRAFT')}
             </Pill>
-            <Link href={`/admin/shops/${o.shop.id}`} className="hover:text-accent">
+            <Link href={`/superadmin/shops/${o.shop.id}`} className="hover:text-accent">
               {o.shop.name}
             </Link>
           </span>

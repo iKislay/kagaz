@@ -64,7 +64,7 @@ public sealed partial class UpdateViewModel : ObservableObject
             var progress = new Progress<int>(p => Message = $"Downloading the update… {p}%");
             if (!await _updates.DownloadAndRestartAsync(progress))
             {
-                Message = "No newer version is available yet. Ask the Kagaz team to publish the update.";
+                Message = "No newer version is available yet. Ask the Kaggaz team to publish the update.";
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

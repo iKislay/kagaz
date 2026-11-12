@@ -31,10 +31,10 @@
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Status.ShopName, TargetNullValue=Kagaz Shop, FallbackValue=Kagaz Shop}"
+                        <TextBlock Text="{Binding Status.ShopName, TargetNullValue=Kaggaz Shop, FallbackValue=Kaggaz Shop}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
                                    TextTrimming="CharacterEllipsis" MaxWidth="160" />
-                        <TextBlock Text="{Binding Version, StringFormat=Kagaz Shop {0}}" Style="{StaticResource SecondaryText}" FontSize="11" />
+                        <TextBlock Text="{Binding Version, StringFormat=Kaggaz Shop {0}}" Style="{StaticResource SecondaryText}" FontSize="11" />
                     </StackPanel>
                 </StackPanel>
 
@@ -198,7 +198,7 @@
                     <TextBlock Text="&#xE777;" Style="{StaticResource IconText}" FontSize="28" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Left" />
                     <TextBlock Text="Update required" Style="{StaticResource TitleText}" FontSize="22" Margin="0,10,0,0" />
                     <TextBlock Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,6,0,0">
-                        <Run Text="This is Kagaz Shop" />
+                        <Run Text="This is Kaggaz Shop" />
                         <Run Text="{Binding CurrentVersion, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=". The server needs version" />
                         <Run Text="{Binding Status.MinAgentVersion, Mode=OneWay, TargetNullValue=a newer one}" FontWeight="SemiBold" />
                         <Run Text="or later. No new jobs will print until this PC is updated." />

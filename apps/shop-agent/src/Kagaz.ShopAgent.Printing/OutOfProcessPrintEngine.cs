@@ -47,7 +47,7 @@ public sealed class OutOfProcessPrintEngine : IPrintEngine
         ct.ThrowIfCancellationRequested();
         if (!File.Exists(_hostPath))
         {
-            throw new PrintEngineException(PrintEngineException.PrinterNotFound, "The Kagaz print helper is missing; reinstall Kagaz Shop.");
+            throw new PrintEngineException(PrintEngineException.PrinterNotFound, "The Kaggaz print helper is missing; reinstall Kaggaz Shop.");
         }
 
         var requestPath = Path.ChangeExtension(pdfPath, ".request.json");

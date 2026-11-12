@@ -8,7 +8,7 @@ const slip: SlipData = {
   pickupNumber: 7,
   pickupDate: '2026-11-07',
   publicRef: 'KGZ-TEST23',
-  shopName: 'Kagaz Demo Shop A - College Road',
+  shopName: 'Kaggaz Demo Shop A - College Road',
   pages: 0,
   copies: 0,
   colour: false,
@@ -85,7 +85,7 @@ describe('buildPrintPacket (Appendix A.1, T10 logic)', () => {
     expect(last).toMatch(/#7(?!\d)/);
     expect(last).toContain('7 Nov');
     expect(last).not.toContain('ABCD');
-    expect(last).toContain('Kagaz Demo Shop A');
+    expect(last).toContain('Kaggaz Demo Shop A');
     expect(last).toContain('KGZ-TEST23');
     expect(last).toContain('REMOVE THIS SLIP BEFORE HANDOVER');
     expect(last).toContain('2 pages x 2 copies');

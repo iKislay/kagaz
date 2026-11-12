@@ -8,7 +8,7 @@ const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono', dis
 const display = Outfit({ subsets: ['latin'], variable: '--font-outfit', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Kagaz — print it, pick it up',
+  title: 'Kaggaz — print it, pick it up',
   description: 'Upload a file, pay, and collect your prints from a Mandya print shop.',
 };
 

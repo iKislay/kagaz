@@ -135,7 +135,7 @@ public sealed partial class PrintersViewModel : ObservableObject
         var used = Printers.Where(p => p.IsUsed).ToList();
         if (used.Count == 0)
         {
-            ShowMessage("Turn on at least one printer for Kagaz orders.", error: true);
+            ShowMessage("Turn on at least one printer for Kaggaz orders.", error: true);
             return;
         }
         if (!used.Any(p => p.IsDefault))

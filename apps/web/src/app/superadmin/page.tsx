@@ -30,7 +30,7 @@ export default function AdminOverviewPage() {
   const { me } = useAdminSession();
   const router = useRouter();
   useEffect(() => {
-    if (me.role !== 'ADMIN') router.replace('/admin/shops');
+    if (me.role !== 'ADMIN') router.replace('/superadmin/shops');
   }, [me.role, router]);
   if (me.role !== 'ADMIN') return null;
   return <Overview />;
@@ -96,7 +96,7 @@ function ShopCard({ shop }: { shop: AdminShop }) {
       <header className="flex items-start justify-between gap-3 border-b border-separator px-4 py-3">
         <div className="min-w-0">
           <h2 className="truncate text-[15px] font-semibold">
-            <Link href={`/admin/shops/${shop.id}`} className="hover:text-accent">
+            <Link href={`/superadmin/shops/${shop.id}`} className="hover:text-accent">
               {shop.name}
             </Link>
           </h2>
@@ -147,7 +147,7 @@ function ShopCard({ shop }: { shop: AdminShop }) {
           <p className="mt-2 text-[12px] text-text-secondary">
             Printing{' '}
             <Link
-              href={`/admin/orders/${printer.activeJob.orderId}`}
+              href={`/superadmin/orders/${printer.activeJob.orderId}`}
               className="text-accent hover:underline"
             >
               {printer.activeJob.publicRef}

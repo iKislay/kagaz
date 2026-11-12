@@ -33,7 +33,7 @@ const REPORT_FROM: Record<PrintStatusReport['status'], PrintJobStatus[]> = {
 
 /**
  * Printer leases and print progress (Appendix A.2, CLAUDE.md invariant 8):
- * one active Kagaz job per physical printer, FIFO per printer, an attempt is never
+ * one active Kaggaz job per physical printer, FIFO per printer, an attempt is never
  * resubmitted, and anything ambiguous goes to NEEDS_OPERATOR_CHECK — never auto-reprint.
  */
 @Injectable()

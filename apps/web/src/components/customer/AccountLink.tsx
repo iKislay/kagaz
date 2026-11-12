@@ -21,7 +21,7 @@ export function AccountLink() {
     };
   }, [pathname]);
 
-  if (signedIn === null || pathname.startsWith('/admin')) return null;
+  if (signedIn === null || pathname.startsWith('/superadmin')) return null;
   return (
     <Link
       href={signedIn ? '/orders' : '/signin'}

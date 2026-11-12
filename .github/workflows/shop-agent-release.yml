@@ -1,4 +1,4 @@
-# Builds the Kagaz Shop Windows installer (for print-shop owners, NOT customers) and uploads it with the
+# Builds the Kaggaz Shop Windows installer (for print-shop owners, NOT customers) and uploads it with the
 # Velopack update feed to Cloudflare R2 (private bucket, prefix downloads/shop-agent/). The API serves it
 # at /api/downloads/shop-agent/<file> via short-lived signed URLs: kaggaz.in/download links the installer,
 # installed apps self-update from the same feed (UpdateFeedUrl).

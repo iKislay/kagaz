@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 namespace Kagaz.ShopAgent.Core;
 
 /// <summary>
-/// Typed client for the Kagaz shop/device API.
+/// Typed client for the Kaggaz shop/device API.
 /// <list type="bullet">
 /// <item>Every call except enrollment sends <c>Authorization: Bearer &lt;deviceToken&gt;</c>, loaded from
 /// the DPAPI <see cref="ISecureStore"/>, and <c>X-Agent-Version</c>.</item>
@@ -271,11 +271,11 @@ public sealed class ShopApiClient
         }
         catch (HttpRequestException ex)
         {
-            throw new ApiException(ApiErrorCodes.NetworkError, $"Cannot reach the Kagaz server ({ex.Message})");
+            throw new ApiException(ApiErrorCodes.NetworkError, $"Cannot reach the Kaggaz server ({ex.Message})");
         }
         catch (TaskCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new ApiException(ApiErrorCodes.NetworkError, "The Kagaz server did not respond in time");
+            throw new ApiException(ApiErrorCodes.NetworkError, "The Kaggaz server did not respond in time");
         }
         finally
         {

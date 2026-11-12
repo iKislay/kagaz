@@ -50,7 +50,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Mode = mode;
         Update = update;
         Version = typeof(ShellViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
-        WindowTitle = "Kagaz Shop";
+        WindowTitle = "Kaggaz Shop";
 
         NavigationItems =
         [
@@ -58,7 +58,7 @@ public sealed partial class ShellViewModel : ObservableObject
             new NavigationItem("Today's pickups", "", "Today's paid orders by pickup number.", pickups, RequiresOperator: true),
             new NavigationItem("Printers", "", "Printers on this PC and what they can do.", printers, RequiresOperator: true),
             new NavigationItem("Shop QR code", "", "The scan-to-print poster for your counter.", qr),
-            new NavigationItem("Pairing", "", "Connect this PC to your Kagaz shop.", pairing),
+            new NavigationItem("Pairing", "", "Connect this PC to your Kaggaz shop.", pairing),
             new NavigationItem("Settings", "", "Order approval, connection and app details.", settings),
         ];
         Jobs = NavigationItems[0];

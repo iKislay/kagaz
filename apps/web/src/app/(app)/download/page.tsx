@@ -4,8 +4,8 @@ import { btnOutline, btnPrimary, display, eyebrow } from '@/components/SiteChrom
 import { API_URL } from '@/lib/api';
 
 export const metadata: Metadata = {
-  title: 'Kagaz Shop for Windows — for print shops',
-  description: 'Download the Kagaz Shop Windows app. For print-shop owners and operators only.',
+  title: 'Kaggaz Shop for Windows — for print shops',
+  description: 'Download the Kaggaz Shop Windows app. For print-shop owners and operators only.',
 };
 
 // Uploaded to R2 by .github/workflows/shop-agent-release.yml; the API redirects to a signed URL of the newest build.
@@ -14,7 +14,7 @@ const SETUP_URL = `${API_URL}/downloads/shop-agent/KagazShop-win-Setup.exe`;
 const STEPS = [
   'Download the installer and run it on the shop PC as your normal Windows user. No admin rights needed.',
   'If Windows says “Windows protected your PC”, click More info → Run anyway. The app is not code-signed yet.',
-  'Enter the one-time pairing code from the Kagaz admin. The server address is already filled in.',
+  'Enter the one-time pairing code from the Kaggaz admin. The server address is already filled in.',
   'Sign in as an operator, confirm your printer (colour / double-sided), and print a test order.',
 ];
 
@@ -23,12 +23,11 @@ export default function DownloadPage() {
     <section>
       <p className={eyebrow}>For print shops</p>
       <h1 className={`${display} mt-4 text-[34px] leading-[1.1] md:text-[40px]`}>
-        Kagaz Shop for Windows
+        Kaggaz Shop for Windows
       </h1>
       <p className="mt-3 max-w-[56ch] text-[16px] leading-relaxed text-ink-soft">
         The app for <strong className="font-medium text-ink">shop owners and operators</strong>. It
-        runs on your shop PC, receives paid orders and prints them on your printer with a pickup
-        slip.
+        runs on your shop PC, receives orders and prints them on your printer with a pickup slip.
       </p>
 
       <div className="mt-6 rounded-2xl border border-line bg-cream p-5">

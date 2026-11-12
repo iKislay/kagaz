@@ -4,6 +4,7 @@ export * from './money.js';
 export * from './page-range.js';
 export * from './pickup.js';
 export * from './geo.js';
+export * from './qr.js';
 export * from './constants.js';
 export * from './schemas.js';
 export * from './api.js';

@@ -36,7 +36,7 @@ public sealed partial class App : Application
 
         if (!_ownsSingleInstanceMutex)
         {
-            _ = MessageBox.Show("Kagaz Shop is already running.", "Kagaz Shop", MessageBoxButton.OK, MessageBoxImage.Information);
+            _ = MessageBox.Show("Kaggaz Shop is already running.", "Kaggaz Shop", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
         }
@@ -60,8 +60,8 @@ public sealed partial class App : Application
         }
         catch (Exception ex)
         {
-            Log.Fatal(ex, "Kagaz Shop failed to start");
-            _ = MessageBox.Show($"Kagaz Shop failed to start: {ex.Message}", "Kagaz Shop", MessageBoxButton.OK, MessageBoxImage.Stop);
+            Log.Fatal(ex, "Kaggaz Shop failed to start");
+            _ = MessageBox.Show($"Kaggaz Shop failed to start: {ex.Message}", "Kaggaz Shop", MessageBoxButton.OK, MessageBoxImage.Stop);
             Shutdown();
         }
     }

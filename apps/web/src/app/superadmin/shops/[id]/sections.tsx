@@ -642,7 +642,7 @@ export function DevicesSection({ shopId }: { shopId: string }) {
               {fresh.code}
             </code>
             <div className="text-[13px] text-text-secondary">
-              Enter this in the Kagaz app on the shop PC.
+              Enter this in the Kaggaz app on the shop PC.
               <br />
               Single use · expires {fmtDateTime(fresh.expiresAt)}. It won’t be shown again.
             </div>
@@ -732,6 +732,145 @@ export function DevicesSection({ shopId }: { shopId: string }) {
                 </Td>
                 <Td>{fmtDateTime(c.expiresAt)}</Td>
                 <Td>{fmtDateTime(c.usedAt)}</Td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Shop logins (owners/operators): mobile number + password, used in the Kaggaz Shop app and,
+ * for owners, in this dashboard. Adding an existing number again resets its password.
+ */
+export function MembersSection({
+  shop,
+  admin,
+  onSaved,
+}: {
+  shop: AdminShopDetail;
+  admin: boolean;
+  onSaved: (s: AdminShopDetail) => void;
+}) {
+  const [phone, setPhone] = useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'SHOP_OWNER' | 'SHOP_OPERATOR'>('SHOP_OPERATOR');
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const action = useAction();
+
+  async function add() {
+    setSaved(null);
+    const res = await action.run(() =>
+      adminApi.addMember(shop.id, {
+        phone,
+        name,
+        password,
+        role: admin ? role : 'SHOP_OPERATOR',
+      }),
+    );
+    if (res) {
+      onSaved(res);
+      setSaved(`Saved. They sign in with ${phone.trim()} and the password you set.`);
+      setPhone('');
+      setName('');
+      setPassword('');
+    }
+  }
+  async function remove(userId: string) {
+    const res = await action.run(() => adminApi.removeMember(shop.id, userId));
+    if (res) {
+      onSaved(res);
+      setConfirming(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <ErrorNote error={action.error} />
+      <Card title="Add a login">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input
+            label="Mobile number"
+            value={phone}
+            onChange={setPhone}
+            placeholder="98765 43210"
+            inputMode="numeric"
+            autoComplete="off"
+          />
+          <Input
+            label="Name"
+            value={name}
+            onChange={setName}
+            placeholder="Raju"
+            autoComplete="off"
+          />
+          <Input
+            label="Password (min 8 characters)"
+            value={password}
+            onChange={setPassword}
+            type="password"
+            autoComplete="new-password"
+          />
+          {admin && (
+            <div>
+              <div className="mb-1 text-[12px] font-medium text-text-secondary">Role</div>
+              <SegmentedControl
+                label="Role"
+                value={role}
+                onChange={setRole}
+                options={[
+                  { value: 'SHOP_OPERATOR', label: 'Operator' },
+                  { value: 'SHOP_OWNER', label: 'Owner' },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button variant="primary" busy={action.busy} onClick={() => void add()}>
+            Save login
+          </Button>
+          <span className="text-[12px] text-text-secondary">
+            Operators sign in to the Kaggaz Shop app on the shop PC; owners can also open this
+            dashboard. Adding an existing number again resets its password.
+          </span>
+        </div>
+        {saved && <p className="mt-3 text-[13px] text-green">{saved}</p>}
+      </Card>
+
+      <Card title="Logins" flush>
+        {shop.members.length === 0 ? (
+          <Empty>No logins yet. Add the shop owner first.</Empty>
+        ) : (
+          <Table head={['Name', 'Mobile', 'Role', '']}>
+            {shop.members.map((m) => (
+              <tr key={m.userId}>
+                <Td>{m.name ?? '—'}</Td>
+                <Td mono>{m.phone ?? m.email ?? '—'}</Td>
+                <Td>{m.role === 'SHOP_OWNER' ? 'Owner' : 'Operator'}</Td>
+                <Td>
+                  {(admin || m.role === 'SHOP_OPERATOR') &&
+                    (confirming === m.userId ? (
+                      <span className="inline-flex gap-1.5">
+                        <Button
+                          variant="danger"
+                          busy={action.busy}
+                          onClick={() => void remove(m.userId)}
+                        >
+                          Confirm remove
+                        </Button>
+                        <Button onClick={() => setConfirming(null)}>Cancel</Button>
+                      </span>
+                    ) : (
+                      <Button variant="danger" onClick={() => setConfirming(m.userId)}>
+                        Remove
+                      </Button>
+                    ))}
+                </Td>
               </tr>
             ))}
           </Table>

@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Kagaz.ShopAgent.Core;
 
 /// <summary>
-/// Typed HTTP client for the Kagaz API. Calls <c>GET {ApiBaseUrl}/health</c> with a 5 second timeout.
+/// Typed HTTP client for the Kaggaz API. Calls <c>GET {ApiBaseUrl}/health</c> with a 5 second timeout.
 /// Network errors and non-2xx responses become a failed <see cref="HealthResult"/>; it never throws to the UI.
 /// </summary>
 public sealed class KagazApiClient

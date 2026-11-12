@@ -36,9 +36,9 @@ export async function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-cream/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
-        <Link href="/" className="flex items-center gap-2" aria-label="Kagaz home">
+        <Link href="/" className="flex items-center gap-2" aria-label="Kaggaz home">
           <Logo />
-          <span className="text-[16px] font-semibold tracking-tight">Kagaz</span>
+          <span className="text-[16px] font-semibold tracking-tight">Kaggaz</span>
         </Link>
         <nav className="hidden items-center gap-0.5 md:flex">
           {NAV.map(([label, href]) => (
@@ -75,7 +75,7 @@ export async function SiteFooter() {
           <div>
             <div className="flex items-center gap-2">
               <Logo />
-              <span className="text-[16px] font-semibold tracking-tight">Kagaz</span>
+              <span className="text-[16px] font-semibold tracking-tight">Kaggaz</span>
             </div>
             <p className="mt-4 max-w-[34ch] text-[14px] leading-relaxed text-ink-soft">
               Upload from your phone, collect from a print shop in Mandya, Karnataka.
@@ -106,7 +106,6 @@ export async function SiteFooter() {
             links={[
               ['For print shops', '/#shops'],
               ['Download shop app', '/download'],
-              ['Shop admin', '/admin'],
             ]}
           />
         </div>

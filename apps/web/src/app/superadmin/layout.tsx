@@ -3,7 +3,7 @@ import { DemoBanner } from '@/components/DemoBanner';
 import { AdminShell } from './_components/AdminShell';
 
 export const metadata: Metadata = {
-  title: 'Kagaz Admin',
+  title: 'Kaggaz Admin',
   robots: { index: false, follow: false },
 };
 

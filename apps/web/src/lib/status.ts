@@ -31,7 +31,7 @@ export const STATUS_COPY: Record<OrderStatus, { label: string; detail: string; t
     detail: 'Your prints are waiting at the shop counter.',
     tone: 'green',
   },
-  COLLECTED: { label: 'Collected', detail: 'Picked up. Thanks for using Kagaz!', tone: 'green' },
+  COLLECTED: { label: 'Collected', detail: 'Picked up. Thanks for using Kaggaz!', tone: 'green' },
   REJECTED: { label: 'Rejected', detail: 'The shop couldn’t print this order.', tone: 'red' },
   CANCELLED: {
     label: 'Cancelled',

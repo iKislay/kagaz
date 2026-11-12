@@ -85,7 +85,7 @@ public sealed class AgentState
 }
 
 /// <summary>
-/// Reads/writes <c>state.json</c> under the Kagaz local state folder. Thread-safe: the print worker,
+/// Reads/writes <c>state.json</c> under the Kaggaz local state folder. Thread-safe: the print worker,
 /// heartbeat and UI all update it.
 /// </summary>
 public sealed class AgentStateStore

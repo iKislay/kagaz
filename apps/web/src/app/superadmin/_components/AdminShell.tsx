@@ -10,29 +10,29 @@ import { icons } from './icons';
 import { AdminSessionContext, type AdminSession } from './session';
 
 /** Unauthenticated /admin/* visits land here. */
-export const ADMIN_LOGIN_PATH = '/admin/login';
+export const ADMIN_LOGIN_PATH = '/superadmin/login';
 
 const NAV: { href: string; label: string; icon: ReactNode; adminOnly: boolean }[] = [
-  { href: '/admin', label: 'Overview', icon: icons.overview, adminOnly: true },
-  { href: '/admin/metrics', label: 'Metrics', icon: icons.metrics, adminOnly: true },
-  { href: '/admin/shops', label: 'Shops', icon: icons.shops, adminOnly: false },
-  { href: '/admin/orders', label: 'Orders', icon: icons.orders, adminOnly: true },
-  { href: '/admin/health', label: 'Health', icon: icons.health, adminOnly: true },
+  { href: '/superadmin', label: 'Overview', icon: icons.overview, adminOnly: true },
+  { href: '/superadmin/metrics', label: 'Metrics', icon: icons.metrics, adminOnly: true },
+  { href: '/superadmin/shops', label: 'Shops', icon: icons.shops, adminOnly: false },
+  { href: '/superadmin/orders', label: 'Orders', icon: icons.orders, adminOnly: true },
+  { href: '/superadmin/health', label: 'Health', icon: icons.health, adminOnly: true },
   {
-    href: '/admin/reconciliation',
+    href: '/superadmin/reconciliation',
     label: 'Reconciliation',
     icon: icons.reconciliation,
     adminOnly: true,
   },
-  { href: '/admin/audit', label: 'Audit log', icon: icons.audit, adminOnly: true },
-  { href: '/admin/demo', label: 'Demo controls', icon: icons.demo, adminOnly: true },
+  { href: '/superadmin/audit', label: 'Audit log', icon: icons.audit, adminOnly: true },
+  { href: '/superadmin/demo', label: 'Demo controls', icon: icons.demo, adminOnly: true },
 ];
 
 /**
  * macOS-style window for /admin: translucent source-list sidebar + content area, covering the
  * customer toolbar. The DEMO banner stays visible at the top (invariant 4).
  *
- * The sign-in form lives on its own route (/admin/login); every other admin route redirects
+ * The sign-in form lives on its own route (/superadmin/login); every other admin route redirects
  * there when there is no session.
  */
 export function AdminShell({ banner, children }: { banner: ReactNode; children: ReactNode }) {
@@ -122,8 +122,8 @@ function Sidebar({ me, onLogout }: { me: AdminMe; onLogout: () => Promise<void> 
   const pathname = usePathname();
   const items = NAV.filter((n) => me.role === 'ADMIN' || !n.adminOnly);
   const active = (href: string) =>
-    href === '/admin'
-      ? pathname === '/admin'
+    href === '/superadmin'
+      ? pathname === '/superadmin'
       : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
@@ -134,7 +134,7 @@ function Sidebar({ me, onLogout }: { me: AdminMe; onLogout: () => Promise<void> 
             K
           </span>
           <div className="leading-tight">
-            <div className="text-[14px] font-semibold tracking-tight">Kagaz Admin</div>
+            <div className="text-[14px] font-semibold tracking-tight">Kaggaz Admin</div>
             <div className="text-[11px] text-text-secondary">
               {me.role === 'ADMIN' ? 'Platform admin' : 'Shop owner'}
             </div>
@@ -191,7 +191,7 @@ function OperatorNotice() {
     <div className="mx-auto mt-16 max-w-md text-center">
       <h1 className="mac-title">Use the shop app</h1>
       <p className="mt-2 text-[14px] text-text-secondary">
-        Operators work from the Kagaz app on the shop PC. Ask your shop owner or a Kagaz admin if
+        Operators work from the Kaggaz app on the shop PC. Ask your shop owner or a Kaggaz admin if
         you need dashboard access.
       </p>
     </div>

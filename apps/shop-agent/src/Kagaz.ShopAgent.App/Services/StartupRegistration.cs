@@ -34,7 +34,7 @@ public sealed class CurrentUserRunKey : IRunKey
 }
 
 /// <summary>
-/// "Start Kagaz Shop when I sign in to Windows" (P5.4). Per-user only — no admin rights, no service.
+/// "Start Kaggaz Shop when I sign in to Windows" (P5.4). Per-user only — no admin rights, no service.
 /// The value points at the running executable, which for a Velopack install is the stable
 /// <c>%LOCALAPPDATA%\KagazShop\current\Kagaz.ShopAgent.App.exe</c> across updates.
 /// </summary>

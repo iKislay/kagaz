@@ -1,9 +1,21 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { z } from 'zod';
 import {
   type AdminShopCreateRequest,
   AdminShopCreateRequestSchema,
   AdminShopDetailSchema,
+  type AdminShopMemberRequest,
+  AdminShopMemberRequestSchema,
   type AdminShopUpdateRequest,
   AdminShopUpdateRequestSchema,
   AdminShopsSchema,
@@ -56,6 +68,30 @@ export class ShopsController {
   @Roles('ADMIN', 'SHOP_OWNER')
   async detail(@Param('id', UuidParam) id: string) {
     return AdminShopDetailSchema.parse(await this.settings.detail(id));
+  }
+
+  /** Add a shop login by phone, or reset an existing member's password/role. */
+  @Post(':id/members')
+  @HttpCode(200)
+  @UseGuards(StaffAuthGuard, RolesGuard, ShopScopeGuard)
+  @Roles('ADMIN', 'SHOP_OWNER')
+  async addMember(
+    @CurrentStaff() staff: StaffContext,
+    @Param('id', UuidParam) id: string,
+    @Body(new ZodValidationPipe(AdminShopMemberRequestSchema)) body: AdminShopMemberRequest,
+  ) {
+    return AdminShopDetailSchema.parse(await this.settings.addMember(staff, id, body));
+  }
+
+  @Delete(':id/members/:userId')
+  @UseGuards(StaffAuthGuard, RolesGuard, ShopScopeGuard)
+  @Roles('ADMIN', 'SHOP_OWNER')
+  async removeMember(
+    @CurrentStaff() staff: StaffContext,
+    @Param('id', UuidParam) id: string,
+    @Param('userId', UuidParam) userId: string,
+  ) {
+    return AdminShopDetailSchema.parse(await this.settings.removeMember(staff, id, userId));
   }
 
   @Patch(':id')

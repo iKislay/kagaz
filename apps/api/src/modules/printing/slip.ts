@@ -43,7 +43,7 @@ export async function drawPickupSlip(doc: PDFDocument, data: SlipData): Promise<
 
   // Header band
   page.drawRectangle({ x: 0, y: height - 90, width, height: 90, color: BRAND });
-  page.drawText('Kagaz', { x: 48, y: height - 60, size: 34, font: bold, color: rgb(1, 1, 1) });
+  page.drawText('Kaggaz', { x: 48, y: height - 60, size: 34, font: bold, color: rgb(1, 1, 1) });
   const tagline = 'PICKUP SLIP';
   page.drawText(tagline, {
     x: width - 48 - bold.widthOfTextAtSize(tagline, 14),

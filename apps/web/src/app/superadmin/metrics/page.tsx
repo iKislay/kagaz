@@ -29,7 +29,7 @@ export default function AdminMetricsPage() {
   const { me } = useAdminSession();
   const router = useRouter();
   useEffect(() => {
-    if (me.role !== 'ADMIN') router.replace('/admin/shops');
+    if (me.role !== 'ADMIN') router.replace('/superadmin/shops');
   }, [me.role, router]);
   if (me.role !== 'ADMIN') return null;
   return <Metrics />;
