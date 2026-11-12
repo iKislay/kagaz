@@ -143,73 +143,19 @@ describe('device enrollment + revocation (P2.4)', () => {
   });
 });
 
-describe('roles + shop scope (P2.3 / P4.3)', () => {
-  it('owners see and edit only their own shop, and only owner fields', async () => {
-    const mine = await createShop(h.prisma);
-    const theirs = await createShop(h.prisma);
-    const owner = await createStaff(h.prisma, mine.id, 'OWNER');
-    const session = await login(owner.email, E2E_STAFF_PASSWORD);
-
-    const me = await h.http().get('/api/admin/auth/me').set(session).expect(200);
-    expect(me.body).toMatchObject({
-      role: 'SHOP_OWNER',
-      shops: [{ id: mine.id, role: 'SHOP_OWNER' }],
-    });
-
-    const list = await h.http().get('/api/admin/shops').set(session).expect(200);
-    expect(list.body.shops.map((s: { id: string }) => s.id)).toEqual([mine.id]);
-    await h.http().get(`/api/admin/shops/${theirs.id}`).set(session).expect(404);
-    await h
-      .http()
-      .patch(`/api/admin/shops/${theirs.id}`)
-      .set(session)
-      .send({ autoPaused: true })
-      .expect(404);
-    await h.http().get(`/api/admin/shops/${theirs.id}/pricing`).set(session).expect(404);
-
-    const hours = {
-      mon: [
-        ['09:00', '13:00'],
-        ['14:00', '20:00'],
-      ],
-      sun: [],
-    };
-    const updated = await h
-      .http()
-      .patch(`/api/admin/shops/${mine.id}`)
-      .set(session)
-      .send({ openingHours: hours, approvalMode: 'AUTO', autoPaused: true })
-      .expect(200);
-    expect(updated.body).toMatchObject({ approvalMode: 'AUTO', autoPaused: true });
-    expect(updated.body.openingHours.mon).toEqual(hours.mon);
-    expect(updated.body.openingHours.tue).toEqual([]);
-
-    const forbidden = await h
-      .http()
-      .patch(`/api/admin/shops/${mine.id}`)
-      .set(session)
-      .send({ status: 'MAINTENANCE' })
-      .expect(403);
-    expect(forbidden.body.error.code).toBe('FORBIDDEN_FIELD');
-
-    // Admin-only areas.
-    await h.http().get('/api/admin/health').set(session).expect(403);
-    await h.http().get('/api/admin/orders').set(session).expect(403);
-    await h.http().post(`/api/admin/shops/${mine.id}/enrollment-codes`).set(session).expect(403);
-
-    const audit = await h.prisma.auditLog.findMany({ where: { shopId: mine.id } });
-    expect(audit.map((a) => a.action)).toEqual(
-      expect.arrayContaining(['shop.updated', 'SHOP_MODE_CHANGED']),
-    );
-    expect(audit.find((a) => a.action === 'shop.updated')).toMatchObject({
-      actorType: 'STAFF',
-      actorId: owner.userId,
-    });
-
-    // Operators have no web role.
-    const operator = await createStaff(h.prisma, mine.id, 'OPERATOR');
-    const opSession = await login(operator.email, E2E_STAFF_PASSWORD);
-    await h.http().get('/api/admin/shops').set(opSession).expect(403);
+describe('superadmin is Kaggaz staff only', () => {
+  it('shop owners and operators cannot sign in to /superadmin, even with the right password', async () => {
+    const shop = await createShop(h.prisma);
+    for (const role of ['OWNER', 'OPERATOR'] as const) {
+      const staff = await createStaff(h.prisma, shop.id, role);
+      const res = await h
+        .http()
+        .post('/api/admin/auth/login')
+        .send({ login: staff.email, password: E2E_STAFF_PASSWORD })
+        .expect(403);
+      expect(res.body.error.message).toMatch(/Kaggaz Shop app/);
+      expect(res.headers['set-cookie']).toBeUndefined();
+    }
   });
 });
 
