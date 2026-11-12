@@ -275,6 +275,18 @@ export default function LandingPage() {
                 </article>
               ))}
             </div>
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <Link href="/download" className={btnPrimary}>
+                Get the shop app for Windows
+              </Link>
+              <span className="text-[13px] text-ink-soft">
+                For shop owners. Printing a file? Go to{' '}
+                <Link href="/shops" className="text-forest underline-offset-2 hover:underline">
+                  kaggaz.in/shops
+                </Link>
+                .
+              </span>
+            </div>
           </div>
         </section>
 

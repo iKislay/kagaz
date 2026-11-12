@@ -395,6 +395,8 @@ export const AdminShopDetailSchema = z.object({
   autoLimits: AutoLimitsSchema.partial(),
   openingHours: OpeningHoursSchema,
   isDemo: z.boolean(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
   members: z.array(
     z.object({
       userId: z.uuid(),
@@ -424,6 +426,8 @@ export const AdminShopUpdateRequestSchema = z.strictObject({
   autoLimits: AutoLimitsSchema.optional(),
   openingHours: OpeningHoursSchema.optional(),
   isDemo: z.boolean().optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
 });
 export type AdminShopUpdateRequest = z.infer<typeof AdminShopUpdateRequestSchema>;
 export const OWNER_EDITABLE_SHOP_FIELDS = [

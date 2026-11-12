@@ -10,6 +10,9 @@ public record ApiDevice(string Id, string Name);
 
 public record ApiShop(string Id, string Name, bool IsDemo);
 
+/// <summary><c>GET /shop/poster</c>: what the in-shop QR poster shows.</summary>
+public record ShopPosterInfo(string ShopName, string Url);
+
 /// <summary>
 /// <c>POST /api/shop/heartbeat</c> every 15 s (contract §1). All fields beyond the first two are
 /// optional for back-compat with the P1 <c>/devices/heartbeat</c> schema.

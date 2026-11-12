@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Inject,
   Param,
   Post,
   Put,
@@ -44,6 +45,9 @@ import { PrintJobsService } from './print-jobs.service.js';
 import { ShopJobsService } from './shop-jobs.service.js';
 import { ShopPrintersService } from './shop-printers.service.js';
 import { RequireOperator } from '../identity/operator-auth.guard.js';
+import { APP_CONFIG } from '../../common/config/config.module.js';
+import { type AppConfig } from '../../common/config/config.schema.js';
+import { PrismaService } from '../../common/prisma/prisma.service.js';
 
 const Uuid = new ZodValidationPipe(z.uuid());
 const StatusList = new ZodValidationPipe(
@@ -67,7 +71,20 @@ export class ShopController {
     private readonly jobs: ShopJobsService,
     private readonly printJobs: PrintJobsService,
     private readonly printers: ShopPrintersService,
+    private readonly prisma: PrismaService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
+
+  /** The in-shop "scan to print" QR target: <web>/s/<slug> opens a new order at this shop. */
+  @Get('poster')
+  async poster(@CurrentDevice() device: DeviceContext): Promise<{ shopName: string; url: string }> {
+    const shop = await this.prisma.shop.findUniqueOrThrow({
+      where: { id: device.shopId },
+      select: { name: true, slug: true },
+    });
+    const web = this.config.PUBLIC_WEB_URL.replace(/\/$/, '');
+    return { shopName: shop.name, url: `${web}/s/${shop.slug}` };
+  }
 
   @Get('jobs')
   async listJobs(

@@ -1,4 +1,6 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG } from '../../common/config/config.module.js';
+import { type AppConfig } from '../../common/config/config.schema.js';
 import { ShopStatus, type ShopSummary } from '@kagaz/shared';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
@@ -11,14 +13,26 @@ export interface ShopCapabilities {
 
 @Injectable()
 export class ShopsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
 
-  /** Public shop list (FR-CUST-01): status, current rates and capabilities. */
+  /**
+   * Public shop list (FR-CUST-01): status, current rates and capabilities. A shop whose Windows
+   * app isn't connected (no recent heartbeat) is listed but not accepting orders.
+   */
   async listPublic(): Promise<ShopSummary[]> {
+    const onlineSince = new Date(Date.now() - this.config.DEVICE_ONLINE_THRESHOLD_SECONDS * 1000);
     const shops = await this.prisma.shop.findMany({
       orderBy: { name: 'asc' },
       include: {
         printers: { where: { enabled: true } },
+        devices: {
+          where: { status: 'ACTIVE', lastHeartbeatAt: { gte: onlineSince } },
+          select: { id: true },
+          take: 1,
+        },
         pricing: {
           where: { effectiveFrom: { lte: new Date() } },
           orderBy: { effectiveFrom: 'desc' },
@@ -28,18 +42,24 @@ export class ShopsService {
     });
     return shops.map((shop) => {
       const pricing = shop.pricing[0] ?? null;
+      const online = shop.devices.length > 0;
       return {
         id: shop.id,
         slug: shop.slug,
         name: shop.name,
         address: shop.address,
         status: shop.status,
-        acceptingOrders: this.unavailableReason(shop) === null && pricing !== null,
+        online,
+        acceptingOrders: online && this.unavailableReason(shop) === null && pricing !== null,
         isDemo: shop.isDemo,
         capabilities: {
           colour: shop.printers.some((p) => p.colourCapable),
           duplex: shop.printers.some((p) => p.duplexCapable),
         },
+        location:
+          shop.latitude !== null && shop.longitude !== null
+            ? { lat: shop.latitude, lng: shop.longitude }
+            : null,
         pricing: pricing && {
           monoRatePaise: pricing.monoRatePaise,
           colourRatePaise: pricing.colourRatePaise,

@@ -1,0 +1,92 @@
+# Builds the Kagaz Shop Windows installer (for print-shop owners, NOT customers) and uploads it with the
+# Velopack update feed to Cloudflare R2 (private bucket, prefix downloads/shop-agent/). The API serves it
+# at /api/downloads/shop-agent/<file> via short-lived signed URLs: kaggaz.in/download links the installer,
+# installed apps self-update from the same feed (UpdateFeedUrl).
+#
+# Release: Actions → "Shop app release" → Run workflow → version 0.3.0
+#     or:  git tag shop-agent-v0.3.0 && git push origin shop-agent-v0.3.0
+# Secrets: R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY.
+name: Shop app release
+
+on:
+  push:
+    tags: ['shop-agent-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (X.Y.Z), must be higher than the last release'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shop-agent-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      API_BASE_URL: https://api.kaggaz.in/api
+      UPDATE_FEED_URL: https://api.kaggaz.in/api/downloads/shop-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $v = if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $env:INPUT_VERSION } else { $env:GITHUB_REF_NAME -replace '^shop-agent-v', '' }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Version must be X.Y.Z, got '$v'" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test apps/shop-agent/tests/Kagaz.ShopAgent.Tests/Kagaz.ShopAgent.Tests.csproj
+
+      - name: Build installer + update feed
+        shell: pwsh
+        run: ./scripts/build-shop-agent-installer.ps1 -Version ${{ steps.v.outputs.version }} -ApiBaseUrl $env:API_BASE_URL -UpdateFeedUrl $env:UPDATE_FEED_URL
+
+      - name: Upload to Cloudflare R2
+        shell: pwsh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # R2 rejects the CLI's default extra checksums on PutObject.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          $dest = "s3://$env:R2_BUCKET/downloads/shop-agent"
+          $files = Get-ChildItem artifacts/shop-agent/releases -File
+          # Packages and installer first, feed index last: the feed never points at a missing package.
+          $index = @('releases.win.json', 'assets.win.json', 'RELEASES')
+          foreach ($f in ($files | Where-Object { $index -notcontains $_.Name }) + ($files | Where-Object { $index -contains $_.Name })) {
+            $type = if ($f.Extension -eq '.json') { 'application/json' } else { 'application/octet-stream' }
+            aws s3 cp $f.FullName "$dest/$($f.Name)" --endpoint-url $env:R2_ENDPOINT --content-type $type --cache-control 'no-cache' --only-show-errors
+            if ($LASTEXITCODE -ne 0) { throw "Upload of $($f.Name) failed" }
+            Write-Host "uploaded $($f.Name) ($([math]::Round($f.Length / 1MB, 1)) MB)"
+          }
+
+      - name: Check the public download
+        shell: pwsh
+        run: |
+          $r = Invoke-WebRequest "$env:UPDATE_FEED_URL/releases.win.json" -UseBasicParsing
+          if ($r.Content -notmatch '${{ steps.v.outputs.version }}') { throw "Feed does not list ${{ steps.v.outputs.version }}" }
+          Write-Host "Feed serves ${{ steps.v.outputs.version }}. Installer: $env:UPDATE_FEED_URL/KagazShop-win-Setup.exe"
+
+      - name: Tag the release
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          git tag "shop-agent-v${{ steps.v.outputs.version }}" $env:GITHUB_SHA
+          git push origin "shop-agent-v${{ steps.v.outputs.version }}"

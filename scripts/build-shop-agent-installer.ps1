@@ -26,7 +26,11 @@ param(
     [string]$OutputDir = "artifacts/shop-agent",
     [string]$Channel = "win",
     # Optional signtool parameters, e.g. '/a /fd sha256 /tr http://timestamp.digicert.com /td sha256'
-    [string]$SignParams = ""
+    [string]$SignParams = "",
+    # Baked into the published appsettings.json (repo default stays localhost for dev), e.g.
+    # -ApiBaseUrl https://api.kaggaz.in/api -UpdateFeedUrl https://github.com/iKislay/kagaz/releases/latest/download
+    [string]$ApiBaseUrl = "",
+    [string]$UpdateFeedUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,6 +53,15 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
 
 foreach ($required in @($MainExe, "Kagaz.ShopAgent.PrintHost.exe", "appsettings.json")) {
     if (-not (Test-Path (Join-Path $publishDir $required))) { throw "Publish output is missing $required" }
+}
+
+if ($ApiBaseUrl -or $UpdateFeedUrl) {
+    $settingsPath = Join-Path $publishDir "appsettings.json"
+    $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+    if ($ApiBaseUrl) { $settings.ApiBaseUrl = $ApiBaseUrl }
+    if ($UpdateFeedUrl) { $settings.UpdateFeedUrl = $UpdateFeedUrl }
+    $settings | ConvertTo-Json | Set-Content $settingsPath -Encoding utf8
+    Write-Host "==> appsettings.json: ApiBaseUrl=$($settings.ApiBaseUrl) UpdateFeedUrl=$($settings.UpdateFeedUrl)"
 }
 
 if (-not (Test-Path $vpk)) {

@@ -150,6 +150,9 @@
                     <DataTemplate DataType="{x:Type vm:TodaysPickupsViewModel}">
                         <views:TodaysPickupsView />
                     </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:ShopQrViewModel}">
+                        <views:ShopQrView />
+                    </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
                         <views:SettingsView />
                     </DataTemplate>

@@ -94,6 +94,7 @@ export function SiteFooter() {
             title="Shops"
             links={[
               ['For print shops', '/#shops'],
+              ['Download shop app', '/download'],
               ['Shop admin', '/admin'],
             ]}
           />

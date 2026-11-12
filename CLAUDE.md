@@ -53,7 +53,8 @@ pnpm demo:reset [-- --yes] [-- --shop demo-shop-a]     # wipe demo-shop orders (
 docker build -f apps/api/Dockerfile -t kagaz-api .     # --target migrate for the migration image
 docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=... -t kagaz-web .
 docker compose -f infra/docker-compose.demo.yml --env-file infra/demo.env up -d --build
-pwsh scripts/build-shop-agent-installer.ps1           # Velopack Setup.exe + update feed (needs internet once)
+pwsh scripts/build-shop-agent-installer.ps1           # Velopack Setup.exe + update feed (needs internet once); -ApiBaseUrl/-UpdateFeedUrl bake prod URLs
+git tag shop-agent-v0.3.0 && git push origin shop-agent-v0.3.0   # CI builds + publishes the release (or run "Shop app release" workflow)
 dotnet build apps/shop-agent/Kagaz.ShopAgent.sln
 dotnet test  apps/shop-agent/tests/Kagaz.ShopAgent.Tests/Kagaz.ShopAgent.Tests.csproj   # .sln run can crash MSBuild
 ```

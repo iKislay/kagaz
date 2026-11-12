@@ -151,6 +151,9 @@ model Shop {
   /// { mon: [["09:00","20:00"]], ... } in Asia/Kolkata — evaluated from P3.6
   openingHours     Json         @map("opening_hours")
   isDemo           Boolean      @default(false) @map("is_demo")
+  /// WGS84 degrees for the customer "near me" sort; null = location not set.
+  latitude         Float?
+  longitude        Float?
   /// Live-payment settlement fields — present, not active (PRD §8.8 / D6)
   gatewayAccountId String?      @map("gateway_account_id")
   settlementConfig Json?        @map("settlement_config")

@@ -22,10 +22,14 @@ export const ShopSummarySchema = z.object({
   name: z.string(),
   address: z.string(),
   status: z.enum(enumValues(ShopStatus)),
-  /** True when new orders can be placed right now. */
+  /** The shop's Windows app is connected (recent heartbeat). */
+  online: z.boolean(),
+  /** True when new orders can be placed right now (open, in hours, priced and online). */
   acceptingOrders: z.boolean(),
   isDemo: z.boolean(),
   capabilities: z.object({ colour: z.boolean(), duplex: z.boolean() }),
+  /** For the customer's "near me" sort; null when the shop hasn't set its location. */
+  location: z.object({ lat: z.number(), lng: z.number() }).nullable(),
   pricing: z
     .object({
       monoRatePaise: z.int(),

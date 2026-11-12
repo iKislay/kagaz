@@ -130,6 +130,13 @@ public sealed class ShopApiClient
         return await ReadAsync<ShopModeResponse>(response, ct);
     }
 
+    /// <summary><c>GET /shop/poster</c>: the shop's "scan to print" QR target (kaggaz.in/s/&lt;slug&gt;).</summary>
+    public async Task<ShopPosterInfo> GetPosterAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/poster", null, ct);
+        return await ReadAsync<ShopPosterInfo>(response, ct);
+    }
+
     // ─── Printers ───
 
     public async Task<List<ShopPrinter>> GetPrintersAsync(CancellationToken ct = default)

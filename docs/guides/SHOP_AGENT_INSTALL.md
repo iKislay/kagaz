@@ -4,7 +4,21 @@ The Windows shop app ships as a **per-user** Velopack installer: no administrato
 installed for other Windows users. It installs to `%LOCALAPPDATA%\KagazShop\` and keeps its data (device token,
 `state.json`, logs) in `%LOCALAPPDATA%\Kagaz\`, which survives updates and reinstalls.
 
-## Build the installer
+## Release (CI)
+
+Releases are built by `.github/workflows/shop-agent-release.yml` on Windows CI: Actions → **Shop app release** →
+Run workflow → version (the run tags `shop-agent-vX.Y.Z`), or push such a tag yourself. Each version must be higher
+than the previous one.
+
+- The build bakes `ApiBaseUrl=https://api.kaggaz.in/api` and
+  `UpdateFeedUrl=https://api.kaggaz.in/api/downloads/shop-agent` into the shipped `appsettings.json`.
+- Installer, packages and feed are uploaded to Cloudflare R2 (the private bucket, prefix `downloads/shop-agent/`;
+  repo secrets `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`). Packages go first, the feed
+  index last.
+- `GET /api/downloads/shop-agent/<file>` redirects allow-listed file names to a 5-minute signed URL, so the bucket
+  stays private. Shopkeepers download from **kaggaz.in/download**; installed apps self-update from the same feed.
+
+## Build the installer locally
 
 On a Windows machine with the .NET 10 SDK, from the repository root:
 

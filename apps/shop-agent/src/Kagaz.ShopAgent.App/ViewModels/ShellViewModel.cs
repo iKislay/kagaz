@@ -24,6 +24,7 @@ public sealed record NavigationItem(string Title, string Icon, string Subtitle, 
 public sealed partial class ShellViewModel : ObservableObject
 {
     private readonly ShopApiClient _api;
+    private readonly ShopQrViewModel _qr;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentPage))]
@@ -37,11 +38,13 @@ public sealed partial class ShellViewModel : ObservableObject
         PrintersViewModel printers,
         JobsViewModel jobs,
         TodaysPickupsViewModel pickups,
+        ShopQrViewModel qr,
         SettingsViewModel settings,
         ShopModeViewModel mode,
         UpdateViewModel update)
     {
         _api = api;
+        _qr = qr;
         Status = status;
         Login = login;
         Mode = mode;
@@ -54,13 +57,14 @@ public sealed partial class ShellViewModel : ObservableObject
             new NavigationItem("Jobs", "", "Paid orders to accept, print and hand over.", jobs, RequiresOperator: true),
             new NavigationItem("Today's pickups", "", "Today's paid orders by pickup number.", pickups, RequiresOperator: true),
             new NavigationItem("Printers", "", "Printers on this PC and what they can do.", printers, RequiresOperator: true),
+            new NavigationItem("Shop QR code", "", "The scan-to-print poster for your counter.", qr),
             new NavigationItem("Pairing", "", "Connect this PC to your Kagaz shop.", pairing),
             new NavigationItem("Settings", "", "Order approval, connection and app details.", settings),
         ];
         Jobs = NavigationItems[0];
         Printers = NavigationItems[2];
-        Pairing = NavigationItems[3];
-        Settings = NavigationItems[4];
+        Pairing = NavigationItems[4];
+        Settings = NavigationItems[5];
 
         SelectedNavigation = status.IsPaired ? Jobs : Pairing;
 
@@ -87,6 +91,7 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         // Show the server's approval mode as soon as Settings opens (never PATCHes).
         if (value is not null && ReferenceEquals(value, Settings)) _ = Mode.LoadAsync();
+        if (value is not null && ReferenceEquals(value.Page, _qr)) _ = _qr.LoadAsync();
     }
 
     /// <summary>

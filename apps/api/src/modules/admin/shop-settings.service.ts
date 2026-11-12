@@ -53,6 +53,8 @@ export class ShopSettingsService {
       autoLimits: (shop.autoLimits ?? {}) as Partial<AutoLimits>,
       openingHours: normalizeHours(shop.openingHours),
       isDemo: shop.isDemo,
+      latitude: shop.latitude,
+      longitude: shop.longitude,
       members: shop.members.map((m) => ({
         userId: m.userId,
         name: m.user.name,

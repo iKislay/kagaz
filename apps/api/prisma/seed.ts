@@ -47,12 +47,14 @@ const SHOPS = [
     slug: 'demo-shop-a',
     name: 'Kagaz Demo Shop A — College Road',
     address: 'College Road, Mandya, Karnataka',
+    location: { latitude: 12.5243, longitude: 76.8968 },
     pricing: { monoRatePaise: 200, colourRatePaise: 1000, minimumChargePaise: 500 },
   },
   {
     slug: 'demo-shop-b',
     name: 'Kagaz Demo Shop B — Bus Stand',
     address: 'Near KSRTC Bus Stand, Mandya, Karnataka',
+    location: { latitude: 12.5218, longitude: 76.8951 },
     pricing: {
       monoRatePaise: 150,
       colourRatePaise: 800,
@@ -66,6 +68,7 @@ const SHOPS = [
     slug: 'demo-shop-c',
     name: 'Kagaz Demo Shop C — VV Nagar',
     address: 'VV Nagar, Mandya, Karnataka',
+    location: { latitude: 12.5334, longitude: 76.8901 },
     pricing: { monoRatePaise: 200, colourRatePaise: 1200, minimumChargePaise: 500 },
   },
 ];
@@ -125,11 +128,12 @@ async function main() {
   for (const [i, def] of SHOPS.entries()) {
     const shop = await prisma.shop.upsert({
       where: { slug: def.slug },
-      update: { name: def.name, address: def.address, isDemo: true },
+      update: { name: def.name, address: def.address, isDemo: true, ...def.location },
       create: {
         slug: def.slug,
         name: def.name,
         address: def.address,
+        ...def.location,
         status: 'OPEN',
         approvalMode: 'MANUAL',
         autoLimits: DEFAULT_AUTO_LIMITS,

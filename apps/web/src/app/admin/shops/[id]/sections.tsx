@@ -46,6 +46,9 @@ export function SettingsSection({
   const [mode, setMode] = useState(shop.approvalMode);
   const [paused, setPaused] = useState(shop.autoPaused);
   const [isDemo, setIsDemo] = useState(shop.isDemo);
+  const [location, setLocation] = useState(
+    shop.latitude !== null && shop.longitude !== null ? `${shop.latitude}, ${shop.longitude}` : '',
+  );
   const [limits, setLimits] = useState<Record<keyof AutoLimits, string>>({
     maxPages: String(shop.autoLimits.maxPages ?? 50),
     maxCopies: String(shop.autoLimits.maxCopies ?? 5),
@@ -66,6 +69,14 @@ export function SettingsSection({
     if (address.trim() !== shop.address) p.address = address.trim();
     if (status !== shop.status) p.status = status;
     if (isDemo !== shop.isDemo) p.isDemo = isDemo;
+    // "lat, lng" as copied from a Google Maps pin; empty clears it. Bad input is caught by the API.
+    const [lat = null, lng = null] = location.trim()
+      ? location.split(',').map((v) => Number(v.trim()))
+      : [];
+    if (lat !== shop.latitude || lng !== shop.longitude) {
+      p.latitude = lat;
+      p.longitude = lng;
+    }
     const nextLimits = Object.fromEntries(
       Object.entries(limits).map(([k, v]) => [k, Number.parseInt(v, 10)]),
     ) as AutoLimits;
@@ -94,6 +105,12 @@ export function SettingsSection({
             <>
               <Input label="Name" value={name} onChange={setName} />
               <Input label="Address" value={address} onChange={setAddress} />
+              <Input
+                label="Map location (lat, lng)"
+                value={location}
+                onChange={setLocation}
+                placeholder="12.5243, 76.8968"
+              />
             </>
           ) : (
             <Facts

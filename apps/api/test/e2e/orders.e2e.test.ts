@@ -21,9 +21,24 @@ afterAll(async () => {
 describe('shops', () => {
   it('GET /api/shops lists shops with pricing and capabilities', async () => {
     const shop = await createShop(h.prisma, { printer: true, colour: true });
-    const res = await h.http().get('/api/shops').expect(200);
-    const listed = (res.body.shops as Array<Record<string, unknown>>).find((s) => s.id === shop.id);
-    expect(listed).toMatchObject({
+    const find = async () =>
+      (
+        (await h.http().get('/api/shops').expect(200)).body.shops as Array<Record<string, unknown>>
+      ).find((s) => s.id === shop.id);
+
+    // Shop app not connected: listed, but not taking orders.
+    expect(await find()).toMatchObject({ online: false, acceptingOrders: false });
+
+    await h.prisma.shopDevice.create({
+      data: {
+        shopId: shop.id,
+        name: 'E2E PC',
+        tokenHash: `e2e-${shop.id}`,
+        lastHeartbeatAt: new Date(),
+      },
+    });
+    expect(await find()).toMatchObject({
+      online: true,
       acceptingOrders: true,
       isDemo: true,
       capabilities: { colour: true, duplex: false },
