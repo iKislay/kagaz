@@ -1,52 +1,27 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
-import Link from 'next/link';
-import { DemoBanner } from '@/components/DemoBanner';
-import { AccountLink } from '@/components/customer/AccountLink';
+import { Geist, Geist_Mono, Outfit } from 'next/font/google';
 import './globals.css';
 
-// Fallback for non-Apple devices; Apple devices use SF via -apple-system (see globals.css).
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
+// Site-wide type: Geist for text, Outfit for titles, Geist Mono for labels.
+const sans = Geist({ subsets: ['latin'], variable: '--font-geist', display: 'swap' });
+const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono', display: 'swap' });
+const display = Outfit({ subsets: ['latin'], variable: '--font-outfit', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Kagaz — print it, pick it up',
-  description: 'Upload a PDF, pay, and collect your prints from a Mandya print shop.',
+  description: 'Upload a file, pay, and collect your prints from a Mandya print shop.',
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f5f5f7' },
-    { media: '(prefers-color-scheme: dark)', color: '#1c1c1e' },
-  ],
+  themeColor: '#fbf8f1',
 };
-
-// The banner reads live config from the API on every request.
-export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-IN" className={inter.variable}>
-      <body className="min-h-screen">
-        {/* macOS-style translucent toolbar */}
-        <header className="sticky top-0 z-40 border-b border-separator bg-toolbar backdrop-blur-xl backdrop-saturate-150">
-          <div className="mx-auto flex h-13 max-w-3xl items-center justify-between px-4">
-            <Link href="/" className="flex items-center gap-2.5">
-              <span className="grid size-7 place-items-center rounded-lg bg-accent text-sm font-bold text-white">
-                K
-              </span>
-              <span className="text-[15px] font-semibold tracking-tight">Kagaz</span>
-            </Link>
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] text-text-secondary">Mandya</span>
-              <AccountLink />
-            </div>
-          </div>
-          <DemoBanner />
-        </header>
-        <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>
-      </body>
+    <html lang="en-IN" className={`${sans.variable} ${display.variable} ${mono.variable}`}>
+      <body className="min-h-screen">{children}</body>
     </html>
   );
 }

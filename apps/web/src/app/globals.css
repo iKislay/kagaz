@@ -1,49 +1,27 @@
 @import 'tailwindcss';
 
 /*
- * Kagaz design language — macOS-style, shared with the Windows shop app.
- * Source of truth: CLAUDE.md "Design language". Use these tokens; don't add ad-hoc colors.
+ * Kagaz web design language: warm editorial look (cream canvas, Outfit titles, forest-green accent).
+ * Light-only by design. Use these tokens; don't add ad-hoc colors.
  */
 :root {
-  --bg: #f5f5f7;
-  --surface: #ffffff;
-  --sidebar: rgba(236, 236, 239, 0.72);
-  --toolbar: rgba(245, 245, 247, 0.72);
-  --text: #1d1d1f;
-  --text-secondary: #6e6e73;
-  --separator: rgba(0, 0, 0, 0.1);
-  --selection: rgba(0, 0, 0, 0.07);
-  --accent: #007aff;
-  --accent-hover: #0068d9;
-  --green: #34c759;
-  --orange: #ff9500;
-  --red: #ff3b30;
-  --notice-bg: rgba(255, 204, 0, 0.16);
+  --bg: #fbf8f1;
+  --surface: #fffdfa;
+  --sidebar: rgba(243, 238, 229, 0.8);
+  --toolbar: rgba(251, 248, 241, 0.82);
+  --text: #292524;
+  --text-secondary: #78716c;
+  --separator: #ded6c9;
+  --selection: rgba(41, 37, 36, 0.06);
+  --accent: #0d6e4f;
+  --accent-hover: #0b6146;
+  --green: #2f855a;
+  --orange: #c2710c;
+  --red: #c0392b;
+  --notice-bg: rgba(217, 160, 40, 0.14);
   --notice-text: #8a5a00;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 2px rgba(41, 37, 36, 0.04), 0 12px 32px rgba(41, 37, 36, 0.06);
   color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1c1e;
-    --surface: #2c2c2e;
-    --sidebar: rgba(35, 35, 37, 0.72);
-    --toolbar: rgba(28, 28, 30, 0.72);
-    --text: #f5f5f7;
-    --text-secondary: #a1a1a6;
-    --separator: rgba(255, 255, 255, 0.12);
-    --selection: rgba(255, 255, 255, 0.1);
-    --accent: #0a84ff;
-    --accent-hover: #409cff;
-    --green: #30d158;
-    --orange: #ff9f0a;
-    --red: #ff453a;
-    --notice-bg: rgba(255, 214, 10, 0.14);
-    --notice-text: #ffd60a;
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
-    color-scheme: dark;
-  }
 }
 
 @theme inline {
@@ -63,10 +41,18 @@
   --color-notice: var(--notice-bg);
   --color-notice-text: var(--notice-text);
   --shadow-card: var(--shadow-card);
-  --radius-card: 12px;
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', var(--font-inter), 'Segoe UI Variable Text',
-    system-ui, sans-serif;
+  --radius-card: 16px;
+  /* Same palette under editorial names, used by the landing page. */
+  --color-cream: #fbf8f1;
+  --color-paper: #fffdfa;
+  --color-ink: #292524;
+  --color-ink-soft: #78716c;
+  --color-line: #ded6c9;
+  --color-forest: #0d6e4f;
+  --color-forest-hover: #0b6146;
+  --font-display: var(--font-outfit), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'Cascadia Mono', monospace;
+  --font-sans: var(--font-geist), system-ui, 'Segoe UI', sans-serif;
 }
 
 html,
@@ -87,10 +73,16 @@ body {
     box-shadow: var(--shadow-card);
   }
   .mac-title {
-    font-size: 28px;
-    line-height: 1.15;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-family: var(--font-display);
+    font-size: 36px;
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+  /* Outfit has no italic: keep highlighted words upright instead of a faux slant. */
+  .font-display em,
+  .mac-title em {
+    font-style: normal;
   }
   .mac-button {
     display: inline-flex;
@@ -100,9 +92,12 @@ body {
     border-radius: 9999px;
     background: var(--accent);
     color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    padding: 9px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 11px 24px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 1px 2px rgba(13, 110, 79, 0.22);
     transition:
       background-color 120ms ease,
       transform 120ms ease;

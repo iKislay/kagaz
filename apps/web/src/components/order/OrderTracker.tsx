@@ -28,7 +28,7 @@ export function OrderTracker({ orderId }: { orderId: string }) {
           This link is incomplete or has expired. Open the tracking link from the device you ordered
           on.
         </Notice>
-        <Link href="/" className="mac-button mt-5">
+        <Link href="/shops" className="mac-button mt-5">
           Start a new order
         </Link>
       </section>

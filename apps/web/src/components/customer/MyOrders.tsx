@@ -78,7 +78,7 @@ export function MyOrders() {
           className="mt-1 shrink-0 rounded-full border border-separator px-3 py-1 text-[13px] font-semibold text-accent hover:bg-selection"
           onClick={async () => {
             await signOut().catch(() => undefined);
-            router.push('/');
+            router.push('/shops');
             router.refresh();
           }}
         >
@@ -90,7 +90,7 @@ export function MyOrders() {
         {state.orders.length === 0 && (
           <div className="px-4 py-6 text-center text-[14px] text-text-secondary">
             No orders yet.{' '}
-            <Link href="/" className="font-semibold text-accent">
+            <Link href="/shops" className="font-semibold text-accent">
               Start one
             </Link>
           </div>

@@ -12,7 +12,7 @@ export default async function NewOrderPage({
   searchParams: Promise<{ shop?: string }>;
 }) {
   const { shop: shopId } = await searchParams;
-  if (!shopId) redirect('/');
+  if (!shopId) redirect('/shops');
 
   const [shops, config] = await Promise.all([
     listShops().catch(() => null),
@@ -28,7 +28,7 @@ export default async function NewOrderPage({
       <section>
         <h1 className="mac-title">Shop unavailable</h1>
         <Notice tone="orange">This shop isn’t taking orders right now.</Notice>
-        <Link href="/" className="mac-button mt-5">
+        <Link href="/shops" className="mac-button mt-5">
           Choose another shop
         </Link>
       </section>

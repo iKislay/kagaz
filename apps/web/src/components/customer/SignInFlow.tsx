@@ -143,7 +143,7 @@ export function SignInFlow() {
 
       {error && <Notice tone="red">{error}</Notice>}
       <p className="mt-6 text-center text-[13px] text-text-secondary">
-        <Link href="/" className="text-accent">
+        <Link href="/shops" className="text-accent">
           Back to shops
         </Link>
       </p>
