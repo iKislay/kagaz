@@ -45,10 +45,6 @@ export const EnvSchema = z.object({
   DEMO_PENDING_RESOLVE_SECONDS: int(10),
 
   SESSION_JWT_SECRET: secret('SESSION_JWT_SECRET'),
-  PICKUP_CODE_PEPPER: secret('PICKUP_CODE_PEPPER'),
-  PICKUP_CODE_ENC_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, {
-    message: 'PICKUP_CODE_ENC_KEY must be 32 random bytes, base64-encoded',
-  }),
 
   PRINTER_LEASE_TTL_SECONDS: int(60),
   DEVICE_ONLINE_THRESHOLD_SECONDS: int(45),
@@ -112,18 +108,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
 
   // Every shared environment (demo, staging, production) must use its own secrets (SEC H2).
   if (config.APP_ENV !== AppEnv.LOCAL) {
-    for (const key of [
-      'SESSION_JWT_SECRET',
-      'PICKUP_CODE_PEPPER',
-      'DEMO_WEBHOOK_SECRET',
-    ] as const) {
+    for (const key of ['SESSION_JWT_SECRET', 'DEMO_WEBHOOK_SECRET'] as const) {
       const value = config[key];
       if (value && PLACEHOLDER.test(value)) {
         throw new ConfigError(`Refusing to start: ${key} still has its placeholder value.`);
       }
-    }
-    if (PLACEHOLDER.test(Buffer.from(config.PICKUP_CODE_ENC_KEY, 'base64').toString('latin1'))) {
-      throw new ConfigError('Refusing to start: PICKUP_CODE_ENC_KEY is the local development key.');
     }
   }
 

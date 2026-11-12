@@ -46,11 +46,6 @@ export function fmtDuration(seconds: number | null | undefined): string {
   return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
 }
 
-/** Today's date (Asia/Kolkata) as YYYY-MM-DD. */
-export function istToday(): string {
-  return new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
-}
-
 /** Rupees with paise from integer paise (display only; never parsed back). */
 export function rupees(paise: number | null | undefined): string {
   if (paise === null || paise === undefined) return '—';

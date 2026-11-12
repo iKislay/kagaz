@@ -25,10 +25,6 @@ export const RealtimeEvent = {
 } as const;
 export type RealtimeEvent = (typeof RealtimeEvent)[keyof typeof RealtimeEvent];
 
-/** Handshake `auth` for `/shop`. */
-export interface ShopSocketAuth {
-  token: string;
-}
 /** Handshake `auth` for `/customer` (the tracking token may also come from the order cookie). */
 export interface CustomerSocketAuth {
   orderId: string;
@@ -41,23 +37,6 @@ export interface OrderStatusHint {
   status: OrderStatus;
   /** ISO-8601 UTC time of the transition. */
   at: string;
-}
-export interface ShopModeChangedHint {
-  approvalMode: 'MANUAL' | 'AUTO';
-  autoPaused: boolean;
-}
-export interface DeviceRevokedHint {
-  deviceId: string;
-}
-export interface DeviceStatusHint {
-  deviceId: string;
-  shopId: string;
-  online: boolean;
-}
-export interface PrinterStatusHint {
-  printerId: string;
-  shopId: string;
-  status: string;
 }
 
 /** `connect_error` messages for refused handshakes (the error also carries `data.code`). */

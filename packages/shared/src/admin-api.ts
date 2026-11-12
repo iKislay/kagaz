@@ -86,7 +86,6 @@ export const AdminDeviceSchema = z.object({
   online: z.boolean(),
   lastHeartbeatAt: z.string().nullable(),
 });
-export type AdminDevice = z.infer<typeof AdminDeviceSchema>;
 
 export const AdminPrinterSchema = z.object({
   id: z.uuid(),
@@ -106,7 +105,6 @@ export const AdminPrinterSchema = z.object({
     })
     .nullable(),
 });
-export type AdminPrinter = z.infer<typeof AdminPrinterSchema>;
 
 export const AdminShopSchema = z.object({
   id: z.uuid(),
@@ -141,7 +139,6 @@ export const AdminShopSchema = z.object({
 export type AdminShop = z.infer<typeof AdminShopSchema>;
 
 export const AdminShopsSchema = z.object({ shops: z.array(AdminShopSchema) });
-export type AdminShops = z.infer<typeof AdminShopsSchema>;
 
 // ─── Orders ───
 
@@ -160,7 +157,6 @@ export const AdminOrderListItemSchema = z.object({
   pickupDate: z.string().nullable(),
   createdAt: z.string(),
 });
-export type AdminOrderListItem = z.infer<typeof AdminOrderListItemSchema>;
 
 export const AdminOrderListSchema = z.object({
   items: z.array(AdminOrderListItemSchema),
@@ -168,7 +164,6 @@ export const AdminOrderListSchema = z.object({
   pageSize: z.int(),
   total: z.int(),
 });
-export type AdminOrderList = z.infer<typeof AdminOrderListSchema>;
 
 // ─── Order detail ───
 
@@ -181,7 +176,6 @@ export const AdminFileSchema = z.object({
   sha256: z.string().nullable(),
   createdAt: z.string(),
 });
-export type AdminFile = z.infer<typeof AdminFileSchema>;
 
 export const AdminPaymentSchema = z.object({
   id: z.uuid(),
@@ -193,7 +187,6 @@ export const AdminPaymentSchema = z.object({
   verifiedAt: z.string().nullable(),
   createdAt: z.string(),
 });
-export type AdminPayment = z.infer<typeof AdminPaymentSchema>;
 
 export const AdminRefundSchema = z.object({
   id: z.uuid(),
@@ -204,7 +197,6 @@ export const AdminRefundSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().nullable(),
 });
-export type AdminRefund = z.infer<typeof AdminRefundSchema>;
 
 export const AdminPrintJobSchema = z.object({
   id: z.uuid(),
@@ -216,7 +208,6 @@ export const AdminPrintJobSchema = z.object({
   error: z.string().nullable(),
   createdAt: z.string(),
 });
-export type AdminPrintJob = z.infer<typeof AdminPrintJobSchema>;
 
 export const AdminOrderEventSchema = z.object({
   id: z.uuid(),
@@ -229,7 +220,6 @@ export const AdminOrderEventSchema = z.object({
   reason: z.string().nullable(),
   createdAt: z.string(),
 });
-export type AdminOrderEvent = z.infer<typeof AdminOrderEventSchema>;
 
 export const AdminAuditEntrySchema = z.object({
   id: z.uuid(),
@@ -284,7 +274,6 @@ export const AdminAuditListSchema = z.object({
   pageSize: z.int(),
   total: z.int(),
 });
-export type AdminAuditList = z.infer<typeof AdminAuditListSchema>;
 
 // ─── Query validation ───
 
@@ -472,7 +461,6 @@ export const AdminDeviceDetailSchema = z.object({
 export type AdminDeviceDetail = z.infer<typeof AdminDeviceDetailSchema>;
 
 export const AdminDeviceListSchema = z.object({ devices: z.array(AdminDeviceDetailSchema) });
-export type AdminDeviceList = z.infer<typeof AdminDeviceListSchema>;
 
 export const AdminDeviceUpdateRequestSchema = z.strictObject({
   /** Only revocation is supported; a revoked device must be re-paired with a new code. */
@@ -494,7 +482,6 @@ export type AdminEnrollmentCode = z.infer<typeof AdminEnrollmentCodeSchema>;
 export const AdminEnrollmentCodeListSchema = z.object({
   codes: z.array(AdminEnrollmentCodeSchema),
 });
-export type AdminEnrollmentCodeList = z.infer<typeof AdminEnrollmentCodeListSchema>;
 
 /** The plaintext code is returned exactly once, here; only its hash is stored. */
 export const AdminEnrollmentCodeCreatedSchema = z.object({
@@ -525,7 +512,6 @@ export const AdminPrinterDetailSchema = z.object({
 export type AdminPrinterDetail = z.infer<typeof AdminPrinterDetailSchema>;
 
 export const AdminPrinterListSchema = z.object({ printers: z.array(AdminPrinterDetailSchema) });
-export type AdminPrinterList = z.infer<typeof AdminPrinterListSchema>;
 
 export const AdminPrinterUpdateRequestSchema = z.strictObject({
   enabled: z.boolean().optional(),
@@ -774,7 +760,6 @@ export const DemoOtpInboxItemSchema = z.object({
   sentAt: z.string(),
   expiresAt: z.string(),
 });
-export type DemoOtpInboxItem = z.infer<typeof DemoOtpInboxItemSchema>;
 
 /** GET /api/admin/demo/otp-inbox */
 export const DemoOtpInboxSchema = z.object({ items: z.array(DemoOtpInboxItemSchema) });
@@ -793,7 +778,6 @@ export const DemoPaymentOrderSchema = z.object({
   nextOutcome: DemoPaymentOutcomeSchema.nullable(),
   createdAt: z.string(),
 });
-export type DemoPaymentOrder = z.infer<typeof DemoPaymentOrderSchema>;
 
 /** GET /api/admin/demo/payments — recent orders with their simulated payment outcome. */
 export const DemoPaymentsSchema = z.object({

@@ -1,9 +1,7 @@
-/** 32 symbols without visually confusing O/0/I/1 — 8 chars ≈ 40 bits (PRD FR-PICK-01). */
+/** 32 symbols without visually confusing O/0/I/1 (enrollment codes, public refs). */
 export const PICKUP_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-export const PICKUP_CODE_LENGTH = 8;
 
 export const PAPER_SIZES = ['A4'] as const;
-export type PaperSize = (typeof PAPER_SIZES)[number];
 
 /** Payment.provider of pay-at-counter orders (ADR-003): no online payment, the shop collects. */
 export const COUNTER_PAYMENT_PROVIDER = 'counter';

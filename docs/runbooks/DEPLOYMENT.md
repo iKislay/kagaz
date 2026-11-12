@@ -25,26 +25,25 @@ docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.
 
 ## 2. Environment matrix
 
-| Variable                                                                                              | local (`.env`)              | demo                                 | staging                               | production                                  |
-| ----------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------ | ------------------------------------- | ------------------------------------------- |
-| `APP_ENV`                                                                                             | `local`                     | `demo`                               | `staging`                             | `production`                                |
-| `PAYMENT_PROVIDER`                                                                                    | `demo`                      | `demo` (banner always shown)         | gateway **sandbox** (P3.9)            | live gateway — **API refuses `demo`**       |
-| `OTP_PROVIDER`                                                                                        | `demo`                      | `demo`                               | `demo` until an SMS vendor            | real vendor — **API refuses `demo`**        |
-| `PUBLIC_WEB_URL`                                                                                      | `http://localhost:3000`     | `https://demo.kagaz.example`         | `https://staging…`                    | `https://kagaz.example`                     |
-| `NEXT_PUBLIC_API_URL` (web build arg)                                                                 | `http://localhost:4000/api` | `https://api.demo.kagaz.example/api` | `https://api.staging…/api`            | `https://api.kagaz.example/api`             |
-| `DATABASE_URL`                                                                                        | docker Postgres             | managed PG `kagaz_demo`              | managed PG `kagaz_staging`            | managed PG `kagaz_prod` (separate instance) |
-| `S3_ENDPOINT` / `S3_BUCKET`                                                                           | SeaweedFS / `kagaz-local`   | R2 / `kagaz-demo`                    | R2 / `kagaz-staging`                  | R2 / `kagaz-prod`                           |
-| `S3_FORCE_PATH_STYLE`                                                                                 | `true`                      | `true` (R2 accepts both)             | `true`                                | `true`                                      |
-| `SESSION_JWT_SECRET`, `PICKUP_CODE_PEPPER`, `PICKUP_CODE_ENC_KEY`, `DEMO_WEBHOOK_SECRET`, `S3_*` keys | `.env.example` placeholders | secret manager                       | secret manager (placeholders refused) | secret manager (placeholders refused)       |
-| `MIN_AGENT_VERSION`                                                                                   | unset                       | current agent                        | current agent                         | current agent                               |
-| `SENTRY_DSN`                                                                                          | empty                       | demo project                         | staging project                       | prod project                                |
-| `LOG_LEVEL`                                                                                           | `info`                      | `info`                               | `info`                                | `info`                                      |
+| Variable                                                 | local (`.env`)              | demo                                 | staging                               | production                                  |
+| -------------------------------------------------------- | --------------------------- | ------------------------------------ | ------------------------------------- | ------------------------------------------- |
+| `APP_ENV`                                                | `local`                     | `demo`                               | `staging`                             | `production`                                |
+| `PAYMENT_PROVIDER`                                       | `demo`                      | `demo` (banner always shown)         | gateway **sandbox** (P3.9)            | live gateway — **API refuses `demo`**       |
+| `OTP_PROVIDER`                                           | `demo`                      | `demo`                               | `demo` until an SMS vendor            | real vendor — **API refuses `demo`**        |
+| `PUBLIC_WEB_URL`                                         | `http://localhost:3000`     | `https://demo.kagaz.example`         | `https://staging…`                    | `https://kagaz.example`                     |
+| `NEXT_PUBLIC_API_URL` (web build arg)                    | `http://localhost:4000/api` | `https://api.demo.kagaz.example/api` | `https://api.staging…/api`            | `https://api.kagaz.example/api`             |
+| `DATABASE_URL`                                           | docker Postgres             | managed PG `kagaz_demo`              | managed PG `kagaz_staging`            | managed PG `kagaz_prod` (separate instance) |
+| `S3_ENDPOINT` / `S3_BUCKET`                              | SeaweedFS / `kagaz-local`   | R2 / `kagaz-demo`                    | R2 / `kagaz-staging`                  | R2 / `kagaz-prod`                           |
+| `S3_FORCE_PATH_STYLE`                                    | `true`                      | `true` (R2 accepts both)             | `true`                                | `true`                                      |
+| `SESSION_JWT_SECRET`, `DEMO_WEBHOOK_SECRET`, `S3_*` keys | `.env.example` placeholders | secret manager                       | secret manager (placeholders refused) | secret manager (placeholders refused)       |
+| `MIN_AGENT_VERSION`                                      | unset                       | current agent                        | current agent                         | current agent                               |
+| `SENTRY_DSN`                                             | empty                       | demo project                         | staging project                       | prod project                                |
+| `LOG_LEVEL`                                              | `info`                      | `info`                               | `info`                                | `info`                                      |
 
-Rules: every environment has its **own** database, bucket and secrets — never share a pepper or
-encryption key between environments (pickup codes would verify across them). Secrets live only in
-the platform's secret manager and are injected as environment variables; no `.env` file is baked
-into an image (`.dockerignore` excludes them). Rotating `PICKUP_CODE_ENC_KEY` makes outstanding
-pickup codes undisplayable: rotate only when no order is `READY_FOR_PICKUP`.
+Rules: every environment has its **own** database, bucket and secrets — never share a secret between
+environments (sessions would verify across them). Secrets live only in the platform's secret
+manager and are injected as environment variables; no `.env` file is baked into an image
+(`.dockerignore` excludes them). Rotating `SESSION_JWT_SECRET` signs everyone out.
 
 ## 3. Release procedure (one pipeline per environment)
 

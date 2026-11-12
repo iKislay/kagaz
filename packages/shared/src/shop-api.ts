@@ -162,8 +162,6 @@ export const ShopJobSchema = z.object({
 });
 export type ShopJob = z.infer<typeof ShopJobSchema>;
 
-export const ShopJobListSchema = z.object({ jobs: z.array(ShopJobSchema) });
-
 export const ShopJobDetailSchema = ShopJobSchema.extend({
   /** Short-lived signed URL of the customer's original PDF (for preview). */
   previewUrl: z.string().nullable(),

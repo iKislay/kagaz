@@ -86,7 +86,6 @@ async function main(): Promise<void> {
       await tx.refund.deleteMany({ where: { payment: where } });
       await tx.payment.deleteMany({ where });
       await tx.printJob.deleteMany({ where });
-      await tx.pickupCode.deleteMany({ where });
       await tx.orderEvent.deleteMany({ where });
       await tx.fileAsset.deleteMany({ where });
       // Audit rows are append-only history and are kept (order_id has no FK).

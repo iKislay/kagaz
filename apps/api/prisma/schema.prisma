@@ -327,7 +327,6 @@ model Order {
   files      FileAsset[]
   payments   Payment[]
   printJobs  PrintJob[]
-  pickupCode PickupCode?
 
   @@unique([shopId, pickupDate, pickupNumber])
   @@index([shopId, status])
@@ -478,26 +477,6 @@ model PickupCounter {
 
   @@id([shopId, businessDate])
   @@map("pickup_counters")
-}
-
-/// Retired by ADR-002 (random 8-char codes): kept for history, no longer written.
-model PickupCode {
-  id                    String    @id @default(uuid(7)) @db.Uuid
-  orderId               String    @unique @map("order_id") @db.Uuid
-  /// HMAC-SHA256(PICKUP_CODE_PEPPER, code). Plaintext is never stored.
-  codeHmac              String    @map("code_hmac")
-  /// AES-256-GCM(PICKUP_CODE_ENC_KEY, code) so the customer can see it again; cleared on collection.
-  encryptedDisplayValue String?   @map("encrypted_display_value")
-  expiresAt             DateTime? @map("expires_at")
-  consumedAt            DateTime? @map("consumed_at")
-  consumedByDeviceId    String?   @map("consumed_by_device_id") @db.Uuid
-  failedAttempts        Int       @default(0) @map("failed_attempts")
-  createdAt             DateTime  @default(now()) @map("created_at")
-
-  order Order @relation(fields: [orderId], references: [id])
-
-  @@index([codeHmac])
-  @@map("pickup_codes")
 }
 
 // ───────────────────────────── Customer identity (P2.2) ─────────────────────────────

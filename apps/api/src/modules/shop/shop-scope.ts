@@ -54,8 +54,3 @@ export async function findShopPrintJob(client: Tx, shopId: string, printJobId: s
   if (!job) throw printJobNotFound();
   return job;
 }
-
-/** A printer of this shop (optionally a specific one), or null. */
-export function shopPrinterWhere(shopId: string, printerId?: string): Prisma.PrinterWhereInput {
-  return { shopId: requireShopId(shopId), ...(printerId ? { id: printerId } : {}) };
-}

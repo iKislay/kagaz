@@ -660,8 +660,6 @@ verify(shopId, input):
 | `DEMO_WEBHOOK_SECRET`                       | —                                               | Mock webhook signing                                     |
 | `OTP_PROVIDER`                              | `demo`                                          | `demo` forbidden in production                           |
 | `SESSION_JWT_SECRET`                        | —                                               | Secret                                                   |
-| `PICKUP_CODE_PEPPER`                        | —                                               | Secret, 32+ bytes                                        |
-| `PICKUP_CODE_ENC_KEY`                       | —                                               | Secret, 32 bytes base64                                  |
 | `PRINTER_LEASE_TTL_SECONDS`                 | `60`                                            |                                                          |
 | `DEVICE_ONLINE_THRESHOLD_SECONDS`           | `45`                                            |                                                          |
 | `RETENTION_AFTER_COLLECTED_HOURS`           | `24`                                            |                                                          |

@@ -63,7 +63,11 @@ export async function SiteHeader() {
   );
 }
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const signInOn = await getPublicConfig().then(
+    (c) => c.otpMode !== 'OFF',
+    () => false,
+  );
   return (
     <footer className="relative isolate overflow-hidden border-t border-line bg-cream">
       <div className="relative z-10 mx-auto max-w-6xl px-4 pt-16 pb-12 md:px-6">
@@ -89,8 +93,12 @@ export function SiteFooter() {
             title="Customers"
             links={[
               ['Print a file', '/shops'],
-              ['My orders', '/orders'],
-              ['Sign in', '/signin'],
+              ...(signInOn
+                ? ([
+                    ['My orders', '/orders'],
+                    ['Sign in', '/signin'],
+                  ] as [string, string][])
+                : []),
             ]}
           />
           <FooterCol

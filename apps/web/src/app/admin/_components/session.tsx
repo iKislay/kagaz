@@ -17,5 +17,3 @@ export function useAdminSession(): AdminSession {
   if (!ctx) throw new Error('useAdminSession must be used inside the admin shell');
   return ctx;
 }
-
-export const isAdmin = (me: AdminMe) => me.role === 'ADMIN';

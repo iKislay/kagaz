@@ -22,8 +22,6 @@ const env = {
   OTP_PROVIDER: 'demo',
   DEMO_WEBHOOK_SECRET: 'w'.repeat(40),
   SESSION_JWT_SECRET: 'x'.repeat(40),
-  PICKUP_CODE_PEPPER: 'y'.repeat(40),
-  PICKUP_CODE_ENC_KEY: Buffer.alloc(32, 7).toString('base64'),
 };
 
 function boot(overrides: Record<string, string>) {
