@@ -112,6 +112,7 @@ public sealed partial class PrintersViewModel : ObservableObject
 
         Printers.Clear();
         foreach (var p in installed.OrderByDescending(p => p.IsUsed).ThenBy(p => p.PrinterName)) Printers.Add(p);
+        OnPropertyChanged(nameof(SeatsText));
     }
 
     [RelayCommand]
@@ -154,6 +155,12 @@ public sealed partial class PrintersViewModel : ObservableObject
             ShowMessage(used.Count == 1 ? $"Saved. Orders will print on {used[0].PrinterName}." : $"Saved {used.Count} printers.", error: false);
             _status.ShowToast("Printers saved", used.FirstOrDefault(p => p.IsDefault)?.PrinterName);
         }
+        catch (ApiException ex) when (ex.Code == ApiErrorCodes.PrinterLimitReached)
+        {
+            // The plan covers fewer printers: put the toggles back to what's saved, then explain.
+            await LoadAsync();
+            ShowMessage(ex.Message, error: true);
+        }
         catch (ApiException ex)
         {
             ShowMessage(ex.Message, error: true);
@@ -161,8 +168,14 @@ public sealed partial class PrintersViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            OnPropertyChanged(nameof(SeatsText));
         }
     }
+
+    /// <summary>"1 of 2 printers in use" when the plan's seats are known (connected printers, not models).</summary>
+    public string? SeatsText => _status.Subscription?.PrinterSeats is int seats
+        ? $"{Printers.Count(p => p.IsUsed)} of {seats} printer{(seats == 1 ? "" : "s")} in use"
+        : null;
 
     private void ShowMessage(string text, bool error)
     {

@@ -94,18 +94,40 @@ public class OperatorSessionTests
     }
 
     [Fact]
-    public void Expired_operator_token_is_not_used()
+    public void Signed_in_operator_survives_a_restart_until_sign_out()
     {
-        var now = DateTimeOffset.Parse("2026-11-07T10:00:00Z");
-        var session = new AgentSession(() => now);
-        session.SignIn(new OperatorLoginResponse("tok", "2026-11-07T22:00:00Z", new OperatorInfo("u", "Asha", "SHOP_OWNER")));
-        Assert.Equal("tok", session.OperatorToken);
+        var store = new FakeSecureStore();
+        var first = new AgentSession(store);
+        first.SignIn(new OperatorLoginResponse("tok", "2026-11-07T22:00:00Z", new OperatorInfo("u", "Asha", "SHOP_OWNER")));
 
-        now = now.AddHours(13);
+        // A new process (app restart) restores the same operator; the old expiresAt is ignored
+        // because the server slides the session.
+        var restarted = new AgentSession(store);
+        Assert.Equal("tok", restarted.OperatorToken);
+        Assert.Equal("Asha", restarted.Operator?.Name);
+        Assert.Equal("SHOP_OWNER", restarted.Operator?.Role);
 
-        Assert.Null(session.OperatorToken);
-        Assert.True(session.ExpireIfDue());
-        Assert.Null(session.Operator);
+        restarted.SignOut();
+        Assert.Null(store.Load());
+        Assert.Null(new AgentSession(store).OperatorToken);
+    }
+
+    [Fact]
+    public void Unreadable_saved_operator_is_discarded()
+    {
+        var store = new FakeSecureStore("not json");
+        Assert.Null(new AgentSession(store).OperatorToken);
+        Assert.Null(store.Load());
+    }
+
+    [Fact]
+    public void Server_login_required_clears_the_saved_operator()
+    {
+        var store = new FakeSecureStore();
+        var session = new AgentSession(store);
+        session.SignIn(new OperatorLoginResponse("tok", "x", new OperatorInfo("u", "Asha", "SHOP_OPERATOR")));
+        session.NotifyOperatorLoginRequired();
+        Assert.Null(store.Load());
     }
 
     [Fact]
