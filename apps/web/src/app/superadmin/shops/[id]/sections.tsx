@@ -835,8 +835,8 @@ export function MembersSection({
             Save login
           </Button>
           <span className="text-[12px] text-text-secondary">
-            Operators sign in to the Kaggaz Shop app on the shop PC; owners can also open this
-            dashboard. Adding an existing number again resets its password.
+            They sign in to the Kaggaz Shop app on the shop PC with this mobile number. Adding an
+            existing number again resets its password.
           </span>
         </div>
         {saved && <p className="mt-3 text-[13px] text-green">{saved}</p>}

@@ -30,7 +30,7 @@ afterAll(async () => {
 });
 
 describe('shop logins by phone', () => {
-  it('admin adds an owner by mobile number; the owner signs in with it; owners cannot add owners', async () => {
+  it('admin adds shop logins by mobile number only; they cannot open /superadmin', async () => {
     const shop = await createShop(h.prisma);
     const mobile = randomMobile();
     const added = await h
@@ -43,26 +43,19 @@ describe('shop logins by phone', () => {
       expect.objectContaining({ phone: `+91${mobile}`, role: 'SHOP_OWNER' }),
     ]);
 
-    // Typed with spaces, without +91.
-    const owner = await login(`${mobile.slice(0, 5)} ${mobile.slice(5)}`, 'owner-pass-1');
+    // Shop logins never open /superadmin (shops use the app).
     await h
       .http()
-      .post(`/api/admin/shops/${shop.id}/members`)
-      .set(owner)
-      .send({
-        phone: randomMobile(),
-        name: 'Owner Two',
-        role: 'SHOP_OWNER',
-        password: 'x-pass-123',
-      })
-      .expect(403);
+      .post('/api/admin/auth/login')
+      .send({ login: `${mobile.slice(0, 5)} ${mobile.slice(5)}`, password: 'owner-pass-1' })
+      .expect(401);
 
-    // Owners can add operators to their shop; email logins are rejected.
+    // Operators are added by phone; email logins are rejected.
     const operator = randomMobile();
     await h
       .http()
       .post(`/api/admin/shops/${shop.id}/members`)
-      .set(owner)
+      .set(admin)
       .send({ phone: operator, name: 'Op', role: 'SHOP_OPERATOR', password: 'op-pass-123' })
       .expect(200);
     await h
