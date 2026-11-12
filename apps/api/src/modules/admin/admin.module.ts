@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { BillingController } from '../billing/billing.controller.js';
+import { BillingService } from '../billing/billing.service.js';
 import { AdminAuthModule } from './auth/auth.module.js';
 import { ShopsController } from './shops.controller.js';
 import { ShopsService } from './shops.service.js';
@@ -25,6 +27,7 @@ import { OverviewService } from './overview.service.js';
     OrdersController,
     AuditController,
     InsightsController,
+    BillingController,
   ],
   providers: [
     ShopsService,
@@ -37,6 +40,7 @@ import { OverviewService } from './overview.service.js';
     PrinterUptimeSampler,
     ReconciliationService,
     OverviewService,
+    BillingService,
   ],
 })
 export class AdminModule {}

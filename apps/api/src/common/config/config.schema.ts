@@ -54,6 +54,10 @@ export const EnvSchema = z.object({
 
   PRINTER_LEASE_TTL_SECONDS: int(60),
   DEVICE_ONLINE_THRESHOLD_SECONDS: int(45),
+
+  // ── Subscriptions (ADR-004) ──
+  /** true: shops need a current subscription to take new orders, and printers ≤ seats. */
+  BILLING_ENFORCED: bool.default(false),
   /**
    * Express `trust proxy` (hop count like "1", or a CIDR/IP list). Unset = trust nothing (direct
    * exposure). Set it behind a reverse proxy so per-IP rate limits see real client IPs.

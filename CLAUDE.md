@@ -173,3 +173,4 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 - Remaining: hardware drills and rehearsal (P1.11, P2.8–P2.10, P4.6, P5.1), P4.2 three devices, deployment (P5.3), installer test (P5.4), docs (P5.5), investor assets (P5.7).
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
 - 2026-11-12: production at kaggaz.in / api.kaggaz.in runs pay-at-counter (ADR-003). Live gateway still gated by **D6** (merchant of record).
+- 2026-11-12: shop subscriptions per connected printer, manual payment ledger in /superadmin → Billing ([ADR-004](docs/decisions/ADR-004-subscriptions.md)); enforcement behind `BILLING_ENFORCED`.
