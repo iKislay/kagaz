@@ -214,6 +214,57 @@ public sealed class ShopApiClient
         return await ReadAsync<ShopJob>(response, ct);
     }
 
+    // ─── Counter payments (ADR-003: pay at the counter) ───
+
+    /// <summary>
+    /// <c>GET /shop/counter-payments</c> (device token only): the customers waiting to pay at the
+    /// counter, oldest first, each with their pickup number and the amount to collect.
+    /// </summary>
+    public async Task<List<CounterPaymentRequest>> ListCounterPaymentsAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/counter-payments", null, ct);
+        var wrapper = await ReadAsync<CounterPaymentsWrapper>(response, ct);
+        return wrapper.Requests ?? new();
+    }
+
+    /// <summary>
+    /// <c>POST /shop/counter-payments/lookup</c> (operator): the waiting order with the pickup number
+    /// the customer shows. <c>404 COUNTER_PAYMENT_NOT_FOUND</c> when nobody is waiting with it.
+    /// </summary>
+    public async Task<CounterPaymentRequest> LookupCounterPaymentAsync(int pickupNumber, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, "/shop/counter-payments/lookup",
+            new CounterNumberRequest(pickupNumber), ct, auth: Auth.Operator);
+        return await ReadAsync<CounterPaymentRequest>(response, ct);
+    }
+
+    /// <summary>
+    /// <c>POST /shop/counter-payments/:orderId/approve</c> (operator): the customer paid at the
+    /// counter, so the server marks the order paid (it keeps its pickup number). The server re-checks
+    /// <paramref name="pickupNumber"/> against the order (<c>422 PICKUP_NUMBER_MISMATCH</c>). A new
+    /// idempotency key per click.
+    /// </summary>
+    public async Task<ShopJob> ApproveCounterPaymentAsync(string orderId, int pickupNumber, string? idempotencyKey = null,
+        CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post,
+            $"/shop/counter-payments/{Uri.EscapeDataString(orderId)}/approve",
+            new CounterNumberRequest(pickupNumber), ct, auth: Auth.Operator, idempotencyKey: idempotencyKey);
+        return await ReadAsync<ShopJob>(response, ct);
+    }
+
+    /// <summary>
+    /// <c>POST /shop/counter-payments/:orderId/cancel</c> (operator): the customer left without
+    /// paying. Nothing is charged.
+    /// </summary>
+    public async Task CancelCounterPaymentAsync(string orderId, string? idempotencyKey = null, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post,
+            $"/shop/counter-payments/{Uri.EscapeDataString(orderId)}/cancel",
+            null, ct, auth: Auth.Operator, idempotencyKey: idempotencyKey);
+        await EnsureSuccess(response);
+    }
+
     // ─── Helpers ───
 
     private enum Auth
@@ -367,5 +418,10 @@ public sealed class ShopApiClient
     private sealed class JobsWrapper
     {
         public List<ShopJob>? Jobs { get; init; }
+    }
+
+    private sealed class CounterPaymentsWrapper
+    {
+        public List<CounterPaymentRequest>? Requests { get; init; }
     }
 }

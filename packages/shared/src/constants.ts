@@ -8,3 +8,6 @@ export type PaperSize = (typeof PAPER_SIZES)[number];
 /** Shown on every customer page while payments are simulated (PRD FR-CUST-09). */
 export const DEMO_PAYMENT_BANNER = 'DEMO PAYMENT — NO MONEY CHARGED';
 export const DEMO_REFUND_NOTICE = 'Demo refund — no money moved';
+
+/** Payment.provider value for pay-at-counter payments (ADR-003). Not a gateway. */
+export const COUNTER_PAYMENT_PROVIDER = 'counter';

@@ -3,6 +3,8 @@ import {
   ApiErrorSchema,
   type CreateOrderResponse,
   CreateOrderResponseSchema,
+  type PayAtCounterResponse,
+  PayAtCounterResponseSchema,
   type PayResponse,
   PayResponseSchema,
   type PrintOptions,
@@ -129,6 +131,10 @@ export const completeUpload = (id: string, fileId: string, token: string): Promi
 /** No body: the server decides the amount (FR-CUST-08). */
 export const payOrder = (id: string, token: string): Promise<PayResponse> =>
   apiFetch(`/orders/${id}/pay`, PayResponseSchema, { method: 'POST', token });
+
+/** ADR-003: pay at the shop counter. The response carries the code to show at the counter. */
+export const payAtCounter = (id: string, token: string): Promise<PayAtCounterResponse> =>
+  apiFetch(`/orders/${id}/pay-at-counter`, PayAtCounterResponseSchema, { method: 'POST', token });
 
 /** Blank page range means "all pages" — don't send an empty string. */
 function cleanOptions(options: PrintOptions): PrintOptions {

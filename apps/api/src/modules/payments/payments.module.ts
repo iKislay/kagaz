@@ -8,8 +8,10 @@ import { PricingModule } from '../pricing/pricing.module.js';
 import { ShopsModule } from '../shops/shops.module.js';
 import { AdminOrderActionsService } from './admin-order-actions.service.js';
 import { AdminPaymentsController, DemoPaymentsController } from './admin-payments.controller.js';
+import { CounterPaymentsService } from './counter-payments.service.js';
 import { DemoControlsService } from './demo-controls.service.js';
 import { DemoMockProvider } from './demo-mock.provider.js';
+import { DisabledPaymentProvider } from './disabled.provider.js';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.js';
 import { PaymentsController } from './payments.controller.js';
 import { PaymentsService } from './payments.service.js';
@@ -27,6 +29,7 @@ import { WebhooksService } from './webhooks.service.js';
   ],
   providers: [
     PaymentsService,
+    CounterPaymentsService,
     RefundsService,
     WebhooksService,
     DemoControlsService,
@@ -36,6 +39,9 @@ import { WebhooksService } from './webhooks.service.js';
       inject: [APP_CONFIG],
       useFactory: (config: AppConfig): PaymentProvider => {
         switch (config.PAYMENT_PROVIDER) {
+          case 'none':
+            // ADR-003: no online gateway; customers pay at the counter.
+            return new DisabledPaymentProvider();
           case 'demo':
             // loadConfig already refuses demo payments in production.
             return new DemoMockProvider({
@@ -50,6 +56,6 @@ import { WebhooksService } from './webhooks.service.js';
       },
     },
   ],
-  exports: [PaymentsService, RefundsService, PAYMENT_PROVIDER],
+  exports: [PaymentsService, CounterPaymentsService, RefundsService, PAYMENT_PROVIDER],
 })
 export class PaymentsModule {}

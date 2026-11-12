@@ -24,6 +24,7 @@ public sealed record NavigationItem(string Title, string Icon, string Subtitle, 
 public sealed partial class ShellViewModel : ObservableObject
 {
     private readonly ShopApiClient _api;
+    private readonly CounterPaymentsViewModel _counter;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentPage))]
@@ -36,12 +37,14 @@ public sealed partial class ShellViewModel : ObservableObject
         OperatorLoginViewModel login,
         PrintersViewModel printers,
         JobsViewModel jobs,
+        CounterPaymentsViewModel counter,
         TodaysPickupsViewModel pickups,
         SettingsViewModel settings,
         ShopModeViewModel mode,
         UpdateViewModel update)
     {
         _api = api;
+        _counter = counter;
         Status = status;
         Login = login;
         Mode = mode;
@@ -52,15 +55,17 @@ public sealed partial class ShellViewModel : ObservableObject
         NavigationItems =
         [
             new NavigationItem("Jobs", "", "Paid orders to accept, print and hand over.", jobs, RequiresOperator: true),
+            new NavigationItem("Counter", "", "Customers paying cash at the counter.", counter, RequiresOperator: true),
             new NavigationItem("Today's pickups", "", "Today's paid orders by pickup number.", pickups, RequiresOperator: true),
             new NavigationItem("Printers", "", "Printers on this PC and what they can do.", printers, RequiresOperator: true),
             new NavigationItem("Pairing", "", "Connect this PC to your Kagaz shop.", pairing),
             new NavigationItem("Settings", "", "Order approval, connection and app details.", settings),
         ];
         Jobs = NavigationItems[0];
-        Printers = NavigationItems[2];
-        Pairing = NavigationItems[3];
-        Settings = NavigationItems[4];
+        Counter = NavigationItems[1];
+        Printers = NavigationItems[3];
+        Pairing = NavigationItems[4];
+        Settings = NavigationItems[5];
 
         SelectedNavigation = status.IsPaired ? Jobs : Pairing;
 
@@ -79,6 +84,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public IReadOnlyList<NavigationItem> NavigationItems { get; }
 
     private NavigationItem Jobs { get; }
+    private NavigationItem Counter { get; }
     private NavigationItem Printers { get; }
     private NavigationItem Pairing { get; }
     private NavigationItem Settings { get; }
@@ -87,6 +93,9 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         // Show the server's approval mode as soon as Settings opens (never PATCHes).
         if (value is not null && ReferenceEquals(value, Settings)) _ = Mode.LoadAsync();
+        // The waiting list is refreshed by the jobs poll too, but the operator should see the
+        // current queue the moment they open the page.
+        if (value is not null && ReferenceEquals(value, Counter)) _ = _counter.RefreshCommand.ExecuteAsync(null);
     }
 
     /// <summary>

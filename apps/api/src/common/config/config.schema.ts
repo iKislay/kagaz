@@ -34,7 +34,11 @@ export const EnvSchema = z.object({
   MAX_COPIES: int(20),
   MAX_SIDES: int(1000),
 
-  PAYMENT_PROVIDER: z.enum(['demo', 'razorpay', 'cashfree']),
+  /**
+   * Online payment gateway. `none` (default, ADR-003): online payments are off and customers pay
+   * at the counter. `demo` is the simulated gateway, kept only for automated tests/tooling.
+   */
+  PAYMENT_PROVIDER: z.enum(['none', 'demo', 'razorpay', 'cashfree']).default('none'),
   OTP_PROVIDER: z.enum(['demo']),
   DEMO_WEBHOOK_SECRET: z.string().optional(),
   /** Demo gateway only: delay before simulated webhooks are delivered (P3.5). */
@@ -181,7 +185,13 @@ export function demoControlsEnabled(config: AppConfig): boolean {
 export function startupSummary(config: AppConfig): string {
   return [
     `APP_ENV=${config.APP_ENV}`,
-    `PAYMENT=${paymentModeOf(config) === PaymentMode.DEMO ? 'DEMO (SIMULATED)' : 'LIVE'}`,
+    `PAYMENT=${
+      paymentModeOf(config) === PaymentMode.DEMO
+        ? 'DEMO (SIMULATED)'
+        : onlinePaymentsEnabled(config)
+          ? `LIVE (${config.PAYMENT_PROVIDER}) + COUNTER`
+          : 'COUNTER ONLY'
+    }`,
     `OTP=${config.OTP_PROVIDER === 'demo' ? 'DEMO (NO SMS)' : 'LIVE'}`,
     `DEMO_CONTROLS=${demoControlsEnabled(config) ? 'ON' : 'OFF'}`,
   ].join(' | ');
@@ -191,10 +201,19 @@ export function paymentModeOf(config: AppConfig): PaymentMode {
   return config.PAYMENT_PROVIDER === 'demo' ? PaymentMode.DEMO : PaymentMode.LIVE;
 }
 
+/**
+ * True when customers can pay online through a live gateway. The simulated demo gateway never
+ * counts: customers always see "Pay online" disabled unless a real provider is configured.
+ */
+export function onlinePaymentsEnabled(config: AppConfig): boolean {
+  return config.PAYMENT_PROVIDER === 'razorpay' || config.PAYMENT_PROVIDER === 'cashfree';
+}
+
 export function toPublicConfig(config: AppConfig): PublicConfig {
   return {
     appEnv: config.APP_ENV,
     paymentMode: paymentModeOf(config),
+    onlinePayments: onlinePaymentsEnabled(config),
     otpMode: config.OTP_PROVIDER === 'demo' ? PaymentMode.DEMO : PaymentMode.LIVE,
     demoControls: demoControlsEnabled(config),
     limits: {

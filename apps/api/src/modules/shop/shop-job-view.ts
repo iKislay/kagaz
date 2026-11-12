@@ -1,6 +1,6 @@
 import { type ShopJob } from '@kagaz/shared';
 import { type Prisma } from '../../generated/prisma/client.js';
-import { parseOptions, parseQuote } from '../orders/order-view.js';
+import { parseOptions, parseQuote, paymentMethodOf } from '../orders/order-view.js';
 import { pickupDateString } from '../pickup/pickup-number.service.js';
 
 /** Everything needed to render an operator's view of an order. */
@@ -25,6 +25,7 @@ export function toShopJob(order: OrderWithShopView): ShopJob {
     printedSides: quote?.printedSides ?? null,
     amountPaise: order.amountPaise,
     simulatedPayment: order.payments[0]?.isSimulated ?? false,
+    paymentMethod: order.payments[0] ? paymentMethodOf(order.payments[0].provider) : null,
     createdAt: order.createdAt.toISOString(),
     paidAt: order.paidAt?.toISOString() ?? null,
     pickupNumber: order.pickupNumber,

@@ -109,7 +109,31 @@ public record ShopJob(
     ShopRejection? Rejection,
     string? PreviewUrl,
     int? PickupNumber = null,
-    string? PickupDate = null);
+    string? PickupDate = null,
+    /// <summary>How the customer paid: <c>ONLINE</c>, <c>COUNTER</c> (cash at the counter) or null.</summary>
+    string? PaymentMethod = null);
+
+// ─── Pay at counter (ADR-003) ───
+
+/// <summary>
+/// A customer waiting to pay at the counter (ADR-003). <see cref="PickupNumber"/> is their daily
+/// pickup number ("#7"), assigned when they chose pay at counter; the same number collects the
+/// prints. <see cref="AmountPaise"/> is the order's immutable price snapshot in integer paise —
+/// exactly what the operator collects.
+/// </summary>
+public record CounterPaymentRequest(
+    string OrderId,
+    string PublicRef,
+    int PickupNumber,
+    string PickupDate,
+    int AmountPaise,
+    ShopPrintOptions Options,
+    int? PageCount,
+    int? PrintedSides,
+    string RequestedAt);
+
+/// <summary>Body of the counter lookup and approve calls: the pickup number the customer shows.</summary>
+public record CounterNumberRequest(int PickupNumber);
 
 // ─── Actions ───
 

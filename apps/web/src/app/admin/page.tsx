@@ -88,7 +88,8 @@ function ShopCard({ shop }: { shop: AdminShop }) {
   const online = shop.devices.some((d) => d.online);
   const mode =
     shop.approvalMode === 'AUTO' ? (shop.autoPaused ? 'Auto · paused' : 'Auto') : 'Manual';
-  const printer = shop.printers[0] ?? null;
+  /** The job the shop's printer is working on, if any. */
+  const activeJob = shop.printers.find((p) => p.activeJob)?.activeJob ?? null;
   const simulated = shop.todaySimulatedRevenuePaise > 0;
 
   return (
@@ -126,33 +127,33 @@ function ShopCard({ shop }: { shop: AdminShop }) {
             </dd>
           </div>
           <div className="flex items-center gap-1.5">
-            <dt className="text-text-secondary">Printer</dt>
-            <dd className="inline-flex items-center gap-1.5 font-medium">
-              {printer ? (
-                <>
-                  <Dot tone={printerTone(printer.status)} />
-                  {printer.displayName}
-                  <span className="font-normal text-text-secondary">
-                    ({humanize(printer.status)})
-                  </span>
-                </>
-              ) : (
+            <dt className="text-text-secondary">Printers</dt>
+            <dd className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
+              {shop.printers.length === 0 ? (
                 <span className="text-text-secondary">None</span>
+              ) : (
+                shop.printers.map((p) => (
+                  <span key={p.id} className="inline-flex items-center gap-1.5">
+                    <Dot tone={printerTone(p.status)} />
+                    {p.displayName}
+                    <span className="font-normal text-text-secondary">({humanize(p.status)})</span>
+                  </span>
+                ))
               )}
             </dd>
           </div>
         </dl>
 
-        {printer?.activeJob && (
+        {activeJob && (
           <p className="mt-2 text-[12px] text-text-secondary">
-            Printing{' '}
+            Printer job{' '}
             <Link
-              href={`/admin/orders/${printer.activeJob.orderId}`}
+              href={`/admin/orders/${activeJob.orderId}`}
               className="text-accent hover:underline"
             >
-              {printer.activeJob.publicRef}
+              {activeJob.publicRef}
             </Link>{' '}
-            (attempt {printer.activeJob.attempt})
+            · {humanize(activeJob.status)} (attempt {activeJob.attempt})
           </p>
         )}
 

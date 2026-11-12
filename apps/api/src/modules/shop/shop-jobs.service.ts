@@ -69,6 +69,11 @@ export class ShopJobsService {
     return orders.map(toShopJob);
   }
 
+  /** One order of this shop, without the signed preview URL (safe to store for idempotent replay). */
+  async get(device: DeviceContext, orderId: string): Promise<ShopJob> {
+    return toShopJob(await this.findScoped(device, orderId));
+  }
+
   async detail(device: DeviceContext, orderId: string): Promise<ShopJobDetail> {
     const order = await this.findScoped(device, orderId);
     const original = order.files[0];

@@ -162,9 +162,14 @@
                                 <Run Text="{Binding DisplayMode, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding DisplaySides, Mode=OneWay}" /><Run Text=" · A4" />
                             </TextBlock>
                             <TextBlock Grid.Row="3" Text="Charged" Style="{StaticResource SecondaryText}" Margin="0,0,0,8" />
-                            <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource BodyText}">
-                                <Run Text="{Binding DisplayAmount, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding DisplayPrintedSides, Mode=OneWay}" />
-                            </TextBlock>
+                            <StackPanel Grid.Row="3" Grid.Column="1">
+                                <TextBlock Style="{StaticResource BodyText}">
+                                    <Run Text="{Binding DisplayAmount, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding DisplayPrintedSides, Mode=OneWay}" />
+                                </TextBlock>
+                                <TextBlock Text="Paid in cash at the counter" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           Visibility="{Binding IsCounterPayment, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
                             <TextBlock Grid.Row="4" Text="Payment" Style="{StaticResource SecondaryText}" Margin="0,0,0,8"
                                        Visibility="{Binding IsDemoPayment, Converter={StaticResource BoolToVisibility}}" />
                             <TextBlock Grid.Row="4" Grid.Column="1" Text="Demo payment — no money charged" Style="{StaticResource BodyText}"
@@ -220,10 +225,15 @@
             <Border Style="{StaticResource Sheet}">
                 <StackPanel>
                     <TextBlock Text="Reject this order?" Style="{StaticResource TitleText}" FontSize="20" />
-                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,16">
+                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,0" TextWrapping="Wrap">
                         <Run Text="{Binding SelectedJob.PublicRef, Mode=OneWay}" FontWeight="SemiBold" />
                         <Run Text="will be cancelled and the customer refunded." />
                     </TextBlock>
+                    <!-- ADR-003: money taken at the counter goes back in cash, right now. -->
+                    <TextBlock Text="{Binding SelectedJob.RefundNotice}" Style="{StaticResource BodyText}" FontWeight="SemiBold"
+                               Foreground="{StaticResource RedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Visibility="{Binding SelectedJob.IsCounterPayment, Converter={StaticResource BoolToVisibility}}" />
+                    <Border Height="16" />
                     <TextBlock Text="Reason" Style="{StaticResource FieldLabel}" />
                     <Border BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1" CornerRadius="8" Padding="4">
                         <ListBox ItemsSource="{Binding RejectReasons}" SelectedItem="{Binding RejectReason}" DisplayMemberPath="Label"
@@ -315,7 +325,11 @@
                         <Run Text="Mark" /> <Run Text="{Binding SelectedJob.PublicRef, Mode=OneWay}" /> <Run Text="failed?" />
                     </TextBlock>
                     <TextBlock Text="The order is cancelled and the customer refunded. Nothing is printed."
-                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,16" />
+                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding SelectedJob.RefundNotice}" Style="{StaticResource BodyText}" FontWeight="SemiBold"
+                               Foreground="{StaticResource RedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Visibility="{Binding SelectedJob.IsCounterPayment, Converter={StaticResource BoolToVisibility}}" />
+                    <Border Height="16" />
                     <TextBlock Text="Note (optional)" Style="{StaticResource FieldLabel}" Margin="0,0,0,6" />
                     <TextBox Text="{Binding ResolveNote, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextField}"
                              MaxLength="500" TextWrapping="Wrap" AcceptsReturn="True" Height="64" />

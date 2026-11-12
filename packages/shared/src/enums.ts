@@ -46,6 +46,17 @@ export const PaymentStatus = {
 } as const;
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
 
+/**
+ * How the customer pays (ADR-003). COUNTER = cash/UPI handed over at the shop counter and
+ * approved by a signed-in operator for the customer's pickup number. ONLINE = a payment
+ * gateway behind PaymentProvider (Razorpay later; disabled while PAYMENT_PROVIDER=none).
+ */
+export const PaymentMethod = {
+  ONLINE: 'ONLINE',
+  COUNTER: 'COUNTER',
+} as const;
+export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
+
 export const PrintJobStatus = {
   PREPARING: 'PREPARING',
   READY: 'READY',

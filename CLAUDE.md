@@ -4,9 +4,9 @@ Guidance for Claude Code (and humans) working in this repository.
 
 ## What we are building
 
-**Kagaz** is a multi-shop **print-order orchestration platform** for Mandya, Karnataka. Customers upload a PDF on a website, pick a shop, see a server-calculated price, pay (mock in demo), and track the order. The shop's **Windows app** receives the paid job, prints **one combined PDF (customer pages + one pickup slip)** on a local printer, the operator marks it ready, and the customer collects it with an **8-character one-time pickup code**.
+**Kagaz** is a multi-shop **print-order orchestration platform** for Mandya, Karnataka. Customers upload a PDF on a website, pick a shop, see a server-calculated price, pay at the shop counter (online payment via Razorpay later — [ADR-003](docs/decisions/ADR-003-pay-at-counter.md)), and track the order. The shop's **Windows app** receives the paid job, prints **one combined PDF (customer pages + one pickup slip)** on a local printer, the operator marks it ready, and the customer collects it with an **8-character one-time pickup code**.
 
-Current target: an **investor-ready working prototype** — 3 shop tenants, 100–200 controlled orders, mock payments clearly labelled. Not a public launch.
+Current target: an **investor-ready working prototype** — 3 shop tenants, 100–200 controlled orders, now being prepared for production with real pay-at-counter payments (no simulated payments for customers).
 
 **Read before non-trivial work:**
 
@@ -59,6 +59,7 @@ dotnet test  apps/shop-agent/tests/Kagaz.ShopAgent.Tests/Kagaz.ShopAgent.Tests.c
 ```
 
 Scripts default to `http://localhost:$API_PORT/api` (4000 = the live printer server): pass `--api` when testing elsewhere.
+`PAYMENT_PROVIDER=none` (default) = counter payments only. `demo:order`, `load:orders` and the e2e suites pay through the simulated gateway, so run those against an API with `PAYMENT_PROVIDER=demo` (never in production).
 Shop app `appsettings.json` keys: `ApiBaseUrl`, `SafetyPollSeconds`, `TokenRotationDays`, `RealtimeEnabled`, `UpdateFeedUrl`.
 
 Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/SeaweedFS aren't running), `GET /api/config` (drives the web DEMO banner).
@@ -81,9 +82,9 @@ Environment: copy `.env.example` → `.env`. Never commit `.env*` files other th
 These come straight from the PRD. Breaking any of them is a bug, regardless of what a task description says — flag the conflict instead.
 
 1. **Server decides money.** Prices are computed server-side from shop pricing; the client never sends an amount. All money is **integer paise** — no floats anywhere in pricing/payments. Store an immutable `price_snapshot` on the order at payment creation.
-2. **Payment is verified by the backend only.** A browser redirect is never proof. Paid transition only after verified webhook (signature over the exact **raw body**) and/or server-to-server status fetch.
-3. **Payments go through `PaymentProvider`.** `orders/` and other modules must never import provider implementations or contain Razorpay/Cashfree-specific code.
-4. **Mock is never production.** The API must fail to start if `APP_ENV=production` with `PAYMENT_PROVIDER=demo` or `OTP_PROVIDER=demo`. In demo, every page shows **"DEMO PAYMENT — NO MONEY CHARGED"**; refunds show "Demo refund — no money moved".
+2. **Payment is verified by the backend only.** A browser redirect is never proof. Paid transition only after verified webhook (signature over the exact **raw body**) and/or server-to-server status fetch — or, for **pay at counter** ([ADR-003](docs/decisions/ADR-003-pay-at-counter.md)), a signed-in operator's approval of the waiting order with the customer's matching pickup number (audited).
+3. **Payments go through `PaymentProvider`.** `orders/` and other modules must never import provider implementations or contain Razorpay/Cashfree-specific code. Counter payments are not a gateway: they live in `payments/counter-payments.service.ts` (Payment `provider = "counter"`).
+4. **Mock is never production.** The API must fail to start if `APP_ENV=production` with `PAYMENT_PROVIDER=demo` or `OTP_PROVIDER=demo`. Customers never see simulated payments: `PAYMENT_PROVIDER=none` (default) means counter only, with "Pay online" disabled until a live gateway exists. The simulated `demo` gateway is a test double only; when it is configured, every page shows **"DEMO PAYMENT — NO MONEY CHARGED"** and refunds show "Demo refund — no money moved".
 5. **All order status changes go through `OrderStateMachine.transition()`** — transition table check, optimistic `version` check, `OrderEvent` row, audit row for human actions, all in one DB transaction; realtime events emitted **after commit**. No direct `status` updates elsewhere.
 6. **Payment status ≠ order status.** They are stored separately and never merged.
 7. **One packet, one job.** Customer pages × copies + spacers + exactly **one** pickup slip at the end, in **one PDF**, submitted as **one** spooler job with driver copies = 1. Never print the slip as a separate job.
@@ -91,7 +92,7 @@ These come straight from the PRD. Breaking any of them is a bug, regardless of w
 9. **Printing finished = ready** ([ADR-002](docs/decisions/ADR-002-daily-pickup-number.md)). `SPOOLER_COMPLETE` with no printer error moves `PRINTING → READY_FOR_PICKUP` (actor SYSTEM); there is no Mark Ready and no pickup verification. Failed/uncertain attempts or printer errors go to `NEEDS_OPERATOR_CHECK`, never READY; reprint still needs explicit operator confirmation.
 10. **Tenant isolation.** Every shop/device query is scoped by `shopId` derived from the authenticated device/staff identity — never from a path/body parameter. Cross-tenant access returns 404.
 11. **Files are private.** Private bucket only; short-lived signed URLs (upload ≤ 10 min, download ≤ 5 min); never log signed URLs; validate PDFs by content (magic bytes, parse, encryption, page count, size), never by filename/MIME.
-12. **Pickup code = daily number** ([ADR-002](docs/decisions/ADR-002-daily-pickup-number.md)): per shop, #1, #2, … from midnight Asia/Kolkata, assigned atomically when payment is verified, unique per `(shop, business date)`, never reused or changed for an order (reprints keep it). Slip and customer page show it large with the date (`#7 · 7 Nov`). Call it "pickup code" everywhere. Never print the customer's full phone number on the slip.
+12. **Pickup code = daily number** ([ADR-002](docs/decisions/ADR-002-daily-pickup-number.md)): per shop, #1, #2, … from midnight Asia/Kolkata, assigned atomically when payment is verified (pay at counter: when the customer chooses it — the same number is used to pay and to collect, [ADR-003](docs/decisions/ADR-003-pay-at-counter.md)), unique per `(shop, business date)`, never reused or changed for an order (reprints keep it). Slip and customer page show it large with the date (`#7 · 7 Nov`). Call it "pickup code" everywhere. Never print the customer's full phone number on the slip.
 13. **REST for commands, WebSocket for hints.** Anything delivered by socket must also be recoverable via REST polling.
 14. **Secrets stay on the server.** No gateway secrets in `apps/web` or `apps/shop-agent`. Device token is stored with DPAPI on Windows and hashed server-side.
 
@@ -146,7 +147,7 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 - **Layout:** toolbar/title bar with blur on web, source-list sidebar with rounded selection pills and small line icons, generous spacing (16/20/24), content max ~720px for customer flows.
 - **Controls:** segmented controls for small option sets (B/W | Colour, Single | Double-sided), pill primary button in `accent`, quiet secondary buttons, toggle switches, inline status dots.
 - **Windows app:** apply the look inside the window; don't fake macOS chrome (no traffic lights). Icons: Segoe Fluent Icons line glyphs.
-- **DEMO banner** stays always visible (invariant 4) but styled as a calm amber notice bar, not an alarm.
+- **DEMO banner** (only while `PAYMENT_PROVIDER=demo`, invariant 4) stays always visible but styled as a calm amber notice bar, not an alarm.
 
 ## Testing expectations
 
@@ -171,4 +172,6 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 - 2026-11-11: `phase-1-vertical-slice` merged to `main` (PR #3); CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit, API e2e and shop-agent tests. P4.1, P4.8, P5.2 done.
 - Remaining: hardware drills and rehearsal (P1.11, P2.8–P2.10, P4.6, P5.1), P4.2 three devices, deployment (P5.3), installer test (P5.4), docs (P5.5), investor assets (P5.7).
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
-- Payments: **DEMO only**; live gateway gated by **D6** (merchant of record).
+- 2026-11-11: **Pay at counter** ([ADR-003](docs/decisions/ADR-003-pay-at-counter.md)); demo payments removed from the customer flow; YouPI/UPI branch dropped.
+- 2026-11-12: Customer home lists **shops near you** (browser location sorts the list; the customer still picks — not auto-routing). **Scan QR** in the header. Each shop has a QR (`/s/<slug>`, API `GET /api/shops/:slug/qr.png|svg`) and a printable A4 poster (`/s/<slug>/poster`). Shop owners set their own prices (`PUT /api/shop/pricing`) and map location from the shop app.
+- Payments: **counter only** (`PAYMENT_PROVIDER=none`); Razorpay gated by **D6** (merchant of record). Production also needs a real `OTP_PROVIDER`.

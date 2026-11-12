@@ -1,9 +1,17 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { OrderStatus, type PayResponse, QuoteSchema } from '@kagaz/shared';
-import { SYSTEM_ACTOR } from '../../common/actor.js';
+import {
+  COUNTER_PAYMENT_PROVIDER,
+  OrderStatus,
+  type PayAtCounterResponse,
+  type PayResponse,
+  QuoteSchema,
+} from '@kagaz/shared';
+import { type Actor, SYSTEM_ACTOR } from '../../common/actor.js';
+import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
-import { type Payment } from '../../generated/prisma/client.js';
+import { tenantWhere } from '../../common/prisma/tenant-scope.js';
+import { type Order, type Payment } from '../../generated/prisma/client.js';
 import { ApprovalService } from '../approval/approval.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
@@ -12,6 +20,7 @@ import { PickupNumberService, pickupDateValue } from '../pickup/pickup-number.se
 import { PricingService } from '../pricing/pricing.service.js';
 import { calculateQuote } from '../pricing/quote.js';
 import { ShopsService } from '../shops/shops.service.js';
+import { isOnlinePaymentDisabled, onlinePaymentsUnavailable } from './disabled.provider.js';
 import {
   PAYMENT_PROVIDER,
   type PaymentProvider,
@@ -26,6 +35,14 @@ export interface ProviderPaymentUpdate {
   providerPaymentId: string | null;
   amountPaise: number | null;
   source: 'WEBHOOK' | 'STATUS_FETCH';
+}
+
+/** How a verified payment is recorded on the paid transition. */
+export interface MarkPaidOptions {
+  /** Who verified it: SYSTEM for gateways, the operator for counter payments (audited). */
+  actor: Actor;
+  reason: string;
+  auditAction?: string;
 }
 
 /** What applying an update did — recorded on the webhook event. */
@@ -51,6 +68,7 @@ export class PaymentsService {
     private readonly approval: ApprovalService,
     private readonly shops: ShopsService,
     private readonly pickupNumbers: PickupNumberService,
+    private readonly events: DomainEventBus,
   ) {}
 
   /**
@@ -61,6 +79,9 @@ export class PaymentsService {
    * A browser redirect is never proof of payment: only a verified webhook or status fetch is.
    */
   async pay(orderId: string): Promise<PayResponse> {
+    // ADR-003: with PAYMENT_PROVIDER=none customers pay at the counter; refuse before any
+    // payment row is created so nothing is left half-open.
+    if (isOnlinePaymentDisabled(this.provider)) throw onlinePaymentsUnavailable();
     const before = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { payments: { select: { status: true } } },
@@ -82,30 +103,10 @@ export class PaymentsService {
       });
 
       const existing = order.payments.find((p) => p.status !== 'FAILED');
+      if (existing?.provider === COUNTER_PAYMENT_PROVIDER) throw counterPaymentChosen();
       if (existing) return existing;
 
-      if (order.status !== OrderStatus.AWAITING_PAYMENT || !order.quote || !order.amountPaise) {
-        throw new AppError(
-          'ORDER_NOT_PAYABLE',
-          'This order is not ready for payment',
-          HttpStatus.CONFLICT,
-          { status: order.status },
-        );
-      }
-
-      // Immutable price snapshot (FR-PRICE-04), taken at the first payment attempt; a retry
-      // after a failed payment charges exactly the same snapshot.
-      let total: number;
-      if (order.priceSnapshot) {
-        total = QuoteSchema.parse(order.priceSnapshot).totalPaise;
-      } else {
-        const quote = QuoteSchema.parse(order.quote);
-        await this.stateMachine.updateFields(tx, order, [OrderStatus.AWAITING_PAYMENT], {
-          priceSnapshot: { ...quote, snapshotAt: new Date().toISOString() },
-          amountPaise: quote.totalPaise,
-        });
-        total = quote.totalPaise;
-      }
+      const total = await this.snapshotTotal(tx, order);
       return tx.payment.create({
         data: {
           orderId,
@@ -145,6 +146,95 @@ export class PaymentsService {
     }
 
     return { order: await this.orders.getPublic(orderId), mode };
+  }
+
+  /**
+   * POST /api/orders/:id/pay-at-counter (ADR-003). Opens a PENDING counter payment for the
+   * server's price snapshot and gives the order its ADR-002 daily pickup number now: the customer
+   * shows that number at the counter to pay, and the same number later to collect the prints. A
+   * signed-in operator approves the payment (CounterPaymentsService). Idempotent: a repeat
+   * returns the same waiting payment and number. Refused while an online payment is in flight.
+   * Nothing is marked paid here — only the operator's approval does that.
+   */
+  async payAtCounter(orderId: string): Promise<PayAtCounterResponse> {
+    const before = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payments: { select: { status: true } } },
+    });
+    if (!before) throw new AppError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND);
+    const startsNewAttempt = !before.payments.some((p) => p.status !== 'FAILED');
+    if (startsNewAttempt && before.status === OrderStatus.AWAITING_PAYMENT) {
+      await this.shops.requireOrderableShop(before.shopId);
+      await this.ensureQuoteCurrent(orderId);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { payments: { orderBy: { createdAt: 'desc' } } },
+      });
+      const existing = order.payments.find((p) => p.status !== 'FAILED');
+      if (existing?.provider === COUNTER_PAYMENT_PROVIDER) return; // idempotent
+      if (existing) {
+        throw new AppError(
+          'PAYMENT_IN_PROGRESS',
+          'An online payment for this order is already in progress',
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const total = await this.snapshotTotal(tx, order);
+      // The number is taken now (not at approval) and never changes; if the customer leaves
+      // without paying it is simply not used again (ADR-003: gaps are accepted).
+      if (order.pickupNumber === null) {
+        const pickup = await this.pickupNumbers.next(tx, order.shopId);
+        const current = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+        await this.stateMachine.updateFields(tx, current, [OrderStatus.AWAITING_PAYMENT], {
+          pickupNumber: pickup.pickupNumber,
+          pickupDate: pickupDateValue(pickup.pickupDate),
+        });
+      }
+      const payment = await tx.payment.create({
+        data: {
+          orderId,
+          provider: COUNTER_PAYMENT_PROVIDER,
+          amountPaise: total,
+          currency: 'INR',
+          status: 'PENDING',
+          isSimulated: false,
+        },
+      });
+      this.events.publish(tx, DomainEvent.COUNTER_PAYMENT_CHANGED, {
+        orderId,
+        shopId: order.shopId,
+        orderStatus: OrderStatus.AWAITING_PAYMENT,
+        at: payment.createdAt.toISOString(),
+      });
+    });
+    return { order: await this.orders.getPublic(orderId) };
+  }
+
+  /**
+   * Total to charge, in paise. The immutable price snapshot (FR-PRICE-04) is taken at the first
+   * payment attempt (online or counter); a later attempt charges exactly the same snapshot.
+   */
+  private async snapshotTotal(tx: Tx, order: Order): Promise<number> {
+    if (order.status !== OrderStatus.AWAITING_PAYMENT || !order.quote || !order.amountPaise) {
+      throw new AppError(
+        'ORDER_NOT_PAYABLE',
+        'This order is not ready for payment',
+        HttpStatus.CONFLICT,
+        { status: order.status },
+      );
+    }
+    if (order.priceSnapshot) return QuoteSchema.parse(order.priceSnapshot).totalPaise;
+    const quote = QuoteSchema.parse(order.quote);
+    await this.stateMachine.updateFields(tx, order, [OrderStatus.AWAITING_PAYMENT], {
+      priceSnapshot: { ...quote, snapshotAt: new Date().toISOString() },
+      amountPaise: quote.totalPaise,
+    });
+    return quote.totalPaise;
   }
 
   /**
@@ -190,7 +280,7 @@ export class PaymentsService {
    */
   async confirmFromProvider(paymentId: string): Promise<ApplyOutcome | null> {
     const payment = await this.prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
-    if (!payment.providerOrderId) return null;
+    if (!payment.providerOrderId || payment.provider === COUNTER_PAYMENT_PROVIDER) return null;
     const status = await this.provider.fetchPaymentStatus(payment.providerOrderId);
     const { outcome, paidOrderId } = await this.prisma.$transaction((tx) =>
       this.applyProviderUpdate(tx, payment.id, {
@@ -232,7 +322,12 @@ export class PaymentsService {
           );
           return { outcome: 'AMOUNT_MISMATCH', paidOrderId: null };
         }
-        return this.markPaid(tx, payment, update.providerPaymentId);
+        return this.markPaid(tx, payment, update.providerPaymentId, {
+          actor: SYSTEM_ACTOR,
+          reason: payment.isSimulated
+            ? 'Demo payment verified (no money moved)'
+            : 'Payment verified',
+        });
       }
       case 'PENDING': {
         const moved = await tx.payment.updateMany({
@@ -265,10 +360,11 @@ export class PaymentsService {
    * (cancelled, already paid by another attempt) it is flagged for refund, never transitioned.
    * The ADR-002 daily pickup number is taken here, in the same transaction, exactly once.
    */
-  private async markPaid(
+  async markPaid(
     tx: Tx,
     payment: Payment,
     providerPaymentId: string | null,
+    opts: MarkPaidOptions,
   ): Promise<{ outcome: ApplyOutcome; paidOrderId: string | null }> {
     const updated = await tx.payment.updateMany({
       where: { id: payment.id, status: { in: [...OPEN_PAYMENT, 'FAILED'] } },
@@ -280,7 +376,9 @@ export class PaymentsService {
     });
     if (updated.count !== 1) return { outcome: 'ALREADY_PAID', paidOrderId: null };
 
-    const order = await tx.order.findUniqueOrThrow({ where: { id: payment.orderId } });
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: payment.orderId, ...tenantWhere() },
+    });
     if (order.status !== OrderStatus.AWAITING_PAYMENT) {
       this.logger.error(
         { paymentId: payment.id, orderId: order.id, status: order.status },
@@ -305,8 +403,14 @@ export class PaymentsService {
       orderId: payment.orderId,
       to: OrderStatus.PENDING_REVIEW,
       from: OrderStatus.AWAITING_PAYMENT,
-      actor: SYSTEM_ACTOR,
-      reason: payment.isSimulated ? 'Demo payment verified (no money moved)' : 'Payment verified',
+      actor: opts.actor,
+      reason: opts.reason,
+      ...(opts.auditAction
+        ? {
+            auditAction: opts.auditAction,
+            auditMetadata: { paymentId: payment.id, amountPaise: payment.amountPaise },
+          }
+        : {}),
       metadata: {
         paymentId: payment.id,
         provider: payment.provider,
@@ -323,4 +427,12 @@ export class PaymentsService {
     });
     return { outcome: 'PAID', paidOrderId: payment.orderId };
   }
+}
+
+function counterPaymentChosen(): AppError {
+  return new AppError(
+    'COUNTER_PAYMENT_PENDING',
+    'You chose to pay at the counter. Show your code at the shop counter to pay.',
+    HttpStatus.CONFLICT,
+  );
 }

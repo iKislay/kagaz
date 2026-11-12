@@ -18,7 +18,8 @@ export default async function NewOrderPage({
     listShops().catch(() => null),
     getPublicConfig().catch(() => null),
   ]);
-  const shop = shops?.find((s) => s.id === shopId);
+  // A shop's QR code may link with its slug (e.g. ?shop=sri-ganesh-xerox) or its id.
+  const shop = shops?.find((s) => s.id === shopId || s.slug === shopId);
 
   if (!shops || !config) {
     return <Notice tone="red">Can’t reach Kagaz right now. Please try again in a moment.</Notice>;

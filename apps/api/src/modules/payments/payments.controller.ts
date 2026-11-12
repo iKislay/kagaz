@@ -1,5 +1,5 @@
 import { Controller, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { type PayResponse } from '@kagaz/shared';
+import { type PayAtCounterResponse, type PayResponse } from '@kagaz/shared';
 import { TrackingGuard } from '../orders/tracking.guard.js';
 import { DemoControlsService } from './demo-controls.service.js';
 import { PaymentsService } from './payments.service.js';
@@ -25,5 +25,16 @@ export class PaymentsController {
   ): Promise<PayResponse> {
     await this.demo.applyPayFlag(id, demoOutcome);
     return this.payments.pay(id);
+  }
+
+  /**
+   * ADR-003: pay at the shop counter. Takes no body; the amount is the server's price snapshot.
+   * Returns the order with its daily `pickupNumber` — what the customer shows at the counter.
+   */
+  @Post(':id/pay-at-counter')
+  @HttpCode(200)
+  @UseGuards(TrackingGuard)
+  payAtCounter(@Param('id') id: string): Promise<PayAtCounterResponse> {
+    return this.payments.payAtCounter(id);
   }
 }

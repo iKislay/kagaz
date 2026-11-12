@@ -14,6 +14,10 @@ import { z } from 'zod';
 import {
   type AcceptJobRequest,
   AcceptJobRequestSchema,
+  type CounterNumberRequest,
+  CounterNumberRequestSchema,
+  type CounterPaymentList,
+  type CounterPaymentRequest,
   type LeaseResponse,
   type OrderStatus,
   OrderStatusSchema,
@@ -27,13 +31,20 @@ import {
   ResolveJobRequestSchema,
   type ShopJob,
   type ShopJobDetail,
+  type ShopPricing,
   type ShopPrinter,
+  type ShopProfile,
+  type UpdateShopLocationRequest,
+  UpdateShopLocationRequestSchema,
+  type UpdateShopPricingRequest,
+  UpdateShopPricingRequestSchema,
 } from '@kagaz/shared';
 import { AgentVersionGuard } from '../../common/auth/agent-version.guard.js';
 import {
   CurrentDevice,
   DeviceAuthGuard,
   type DeviceContext,
+  deviceActor,
 } from '../../common/auth/device-auth.guard.js';
 import {
   IdempotencyInterceptor,
@@ -43,7 +54,9 @@ import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
 import { PrintJobsService } from './print-jobs.service.js';
 import { ShopJobsService } from './shop-jobs.service.js';
 import { ShopPrintersService } from './shop-printers.service.js';
+import { ShopSettingsService } from './shop-settings.service.js';
 import { RequireOperator } from '../identity/operator-auth.guard.js';
+import { CounterPaymentsService } from '../payments/counter-payments.service.js';
 
 const Uuid = new ZodValidationPipe(z.uuid());
 const StatusList = new ZodValidationPipe(
@@ -67,7 +80,88 @@ export class ShopController {
     private readonly jobs: ShopJobsService,
     private readonly printJobs: PrintJobsService,
     private readonly printers: ShopPrintersService,
+    private readonly counter: CounterPaymentsService,
+    private readonly settings: ShopSettingsService,
   ) {}
+
+  // ─── The shop's own prices and profile ───
+
+  /** Current price per printed side for every configuration, plus what the printers can do. */
+  @Get('pricing')
+  getPricing(@CurrentDevice() device: DeviceContext): Promise<ShopPricing> {
+    return this.settings.getPricing(device);
+  }
+
+  /** Shop owner sets new prices (effective now). Operators get 403 OWNER_REQUIRED. */
+  @Put('pricing')
+  @RequireOperator()
+  updatePricing(
+    @CurrentDevice() device: DeviceContext,
+    @Body(new ZodValidationPipe(UpdateShopPricingRequestSchema)) body: UpdateShopPricingRequest,
+  ): Promise<ShopPricing> {
+    return this.settings.updatePricing(device, body);
+  }
+
+  /** The shop's QR link, poster link and map position. */
+  @Get('profile')
+  getProfile(@CurrentDevice() device: DeviceContext): Promise<ShopProfile> {
+    return this.settings.getProfile(device);
+  }
+
+  /** Shop owner sets the shop's map position (for "shops near you"). */
+  @Put('profile/location')
+  @RequireOperator()
+  updateLocation(
+    @CurrentDevice() device: DeviceContext,
+    @Body(new ZodValidationPipe(UpdateShopLocationRequestSchema)) body: UpdateShopLocationRequest,
+  ): Promise<ShopProfile> {
+    return this.settings.updateLocation(device, body);
+  }
+
+  // ─── Pay at counter (ADR-003) ───
+
+  /** Customers waiting to pay at this shop's counter (pickup number + amount), oldest first. */
+  @Get('counter-payments')
+  async listCounterPayments(@CurrentDevice() device: DeviceContext): Promise<CounterPaymentList> {
+    return { requests: await this.counter.list(device.shopId) };
+  }
+
+  /** Find the waiting order for the pickup number the customer shows. */
+  @Post('counter-payments/lookup')
+  @RequireOperator()
+  @HttpCode(200)
+  @SkipIdempotency()
+  lookupCounterPayment(
+    @CurrentDevice() device: DeviceContext,
+    @Body(new ZodValidationPipe(CounterNumberRequestSchema)) body: CounterNumberRequest,
+  ): Promise<CounterPaymentRequest> {
+    return this.counter.lookup(device.shopId, body.pickupNumber);
+  }
+
+  /** The operator collected the amount: re-check the pickup number and mark the order paid. */
+  @Post('counter-payments/:orderId/approve')
+  @RequireOperator()
+  @HttpCode(200)
+  async approveCounterPayment(
+    @CurrentDevice() device: DeviceContext,
+    @Param('orderId', Uuid) orderId: string,
+    @Body(new ZodValidationPipe(CounterNumberRequestSchema)) body: CounterNumberRequest,
+  ): Promise<ShopJob> {
+    await this.counter.approve(device.shopId, orderId, body.pickupNumber, deviceActor(device));
+    return this.jobs.get(device, orderId);
+  }
+
+  /** The customer left without paying: cancel the waiting order. */
+  @Post('counter-payments/:orderId/cancel')
+  @RequireOperator()
+  @HttpCode(200)
+  async cancelCounterPayment(
+    @CurrentDevice() device: DeviceContext,
+    @Param('orderId', Uuid) orderId: string,
+  ): Promise<{ ok: true }> {
+    await this.counter.cancel(device.shopId, orderId, deviceActor(device));
+    return { ok: true };
+  }
 
   @Get('jobs')
   async listJobs(

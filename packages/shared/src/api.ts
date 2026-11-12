@@ -3,7 +3,7 @@
  * Shared by apps/api (validation) and apps/web (typed client).
  */
 import { z } from 'zod';
-import { PaymentStatus, ShopStatus } from './enums.js';
+import { PaymentMethod, PaymentStatus, ShopStatus } from './enums.js';
 import { OrderStatusSchema, PrintOptionsSchema, QuoteSchema } from './schemas.js';
 
 const enumValues = <T extends Record<string, string>>(obj: T) =>
@@ -25,6 +25,8 @@ export const ShopSummarySchema = z.object({
   /** True when new orders can be placed right now. */
   acceptingOrders: z.boolean(),
   isDemo: z.boolean(),
+  /** Map position for "shops near you"; null until the owner sets it. */
+  location: z.object({ latitude: z.number(), longitude: z.number() }).nullable().default(null),
   capabilities: z.object({ colour: z.boolean(), duplex: z.boolean() }),
   pricing: z
     .object({
@@ -88,11 +90,16 @@ export const PublicOrderSchema = z.object({
   payment: z
     .object({
       status: z.enum(enumValues(PaymentStatus)),
+      method: z.enum(enumValues(PaymentMethod)),
       isSimulated: z.boolean(),
       reference: z.string().nullable(),
     })
     .nullable(),
-  /** ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified. */
+  /**
+   * ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified — or,
+   * for pay at counter (ADR-003), until the customer chooses it: the same number is then shown
+   * at the counter to pay and later to collect the prints.
+   */
   pickupNumber: z.int().nullable(),
   /** Business date (YYYY-MM-DD, Asia/Kolkata) the pickup number belongs to. */
   pickupDate: z.string().nullable(),
@@ -127,6 +134,14 @@ export const PayResponseSchema = z.object({
   mode: z.enum(['DEMO_AUTO_APPROVED', 'PROVIDER_CHECKOUT']),
 });
 export type PayResponse = z.infer<typeof PayResponseSchema>;
+
+/**
+ * POST /api/orders/:id/pay-at-counter (ADR-003): no body. Idempotent — repeated calls return the
+ * same waiting counter payment. `order.pickupNumber` / `pickupDate` is what the customer shows at
+ * the counter (and later uses to collect the prints).
+ */
+export const PayAtCounterResponseSchema = z.object({ order: PublicOrderSchema });
+export type PayAtCounterResponse = z.infer<typeof PayAtCounterResponseSchema>;
 
 /** Header carrying the order tracking token when a cookie isn't available. */
 export const TRACKING_TOKEN_HEADER = 'x-tracking-token';

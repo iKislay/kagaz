@@ -118,3 +118,20 @@ body {
     outline-offset: 2px;
   }
 }
+
+/* Printing (shop QR poster): one A4 sheet, no site chrome, exact poster colours. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .poster-sheet {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    break-inside: avoid;
+  }
+}

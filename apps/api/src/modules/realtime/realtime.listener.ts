@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { RealtimeEvent } from '@kagaz/shared';
 import {
+  type CounterPaymentChangedEvent,
   DomainEvent,
   type DeviceRevokedEvent,
   type DeviceStatusChangedEvent,
@@ -23,6 +24,20 @@ export class RealtimeListener {
   @OnEvent(DomainEvent.ORDER_STATUS_CHANGED, { suppressErrors: true })
   onOrderTransitioned(e: OrderStatusChangedEvent): void {
     for (const m of emissionsFor(e)) this.publisher.emit(m.namespace, m.room, m.event, m.payload);
+  }
+
+  /**
+   * ADR-003: the shop's counter list changed. Sent as the existing `job.updated` hint so shop apps
+   * refresh (jobs + counter list) without a new event type; GET /api/shop/counter-payments is the
+   * REST source of truth (invariant 13).
+   */
+  @OnEvent(DomainEvent.COUNTER_PAYMENT_CHANGED, { suppressErrors: true })
+  onCounterPaymentChanged(e: CounterPaymentChangedEvent): void {
+    this.publisher.publishToShop(e.shopId, RealtimeEvent.JOB_UPDATED, {
+      orderId: e.orderId,
+      status: e.orderStatus,
+      at: e.at,
+    });
   }
 
   @OnEvent(DomainEvent.SHOP_MODE_CHANGED, { suppressErrors: true })

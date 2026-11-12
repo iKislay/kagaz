@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  DEMO_PAYMENT_BANNER,
   type PrintOptions,
   type PublicConfig,
   type PublicOrder,
@@ -26,6 +25,7 @@ import {
   completeUpload,
   createOrder,
   getOrder,
+  payAtCounter,
   payOrder,
   requestUploadUrl,
   updateOptions,
@@ -34,6 +34,7 @@ import {
 import { saveTrackingToken } from '@/lib/tracking';
 
 type Phase = 'idle' | 'uploading' | 'validating' | 'ready' | 'paying';
+type PayMethod = 'counter' | 'online';
 
 const DEFAULT_OPTIONS: PrintOptions = {
   copies: 1,
@@ -58,8 +59,10 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
   const [error, setError] = useState<string | null>(null);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [requoting, setRequoting] = useState(false);
+  const [paying, setPaying] = useState<PayMethod | null>(null);
   const requestSeq = useRef(0);
-  const isDemo = config.paymentMode === 'DEMO';
+  // ADR-003: online payment (Razorpay, later) only when the server has a live gateway.
+  const onlineEnabled = config.onlinePayments;
   const maxMb = Math.floor(config.limits.maxUploadBytes / 1024 / 1024);
 
   // ─── Upload ───
@@ -143,12 +146,16 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
   }, [options]);
 
   // ─── Pay ───
-  const pay = async () => {
+  const pay = async (method: PayMethod) => {
     if (!order || !token) return;
     setPhase('paying');
+    setPaying(method);
     setError(null);
     try {
-      const res = await payOrder(order.id, token);
+      const res =
+        method === 'counter'
+          ? await payAtCounter(order.id, token)
+          : await payOrder(order.id, token);
       router.push(`/order/${res.order.id}#t=${encodeURIComponent(token)}`);
     } catch (err) {
       setError(messageOf(err));
@@ -157,6 +164,7 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
         await getOrder(order.id, token).then(setOrder, () => undefined);
       }
       setPhase('ready');
+      setPaying(null);
     }
   };
 
@@ -236,10 +244,7 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
         </Row>
       </Group>
 
-      <Group
-        title="Price"
-        footer={isDemo ? `${DEMO_PAYMENT_BANNER}. This is a demo — no money moves.` : undefined}
-      >
+      <Group title="Price">
         {quote ? (
           <>
             <Row
@@ -266,23 +271,97 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
         )}
       </Group>
 
-      <div className="mt-6 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <button
-          type="button"
-          className="mac-button disabled:opacity-40"
-          disabled={!canPay}
-          onClick={pay}
-        >
-          {phase === 'paying' ? (
-            <>
-              <Spinner /> Processing…
-            </>
-          ) : quote ? (
-            `Pay ${formatPaise(quote.totalPaise)}${isDemo ? ' (demo)' : ''}`
-          ) : (
-            'Pay'
-          )}
-        </button>
+      <PaymentChoice
+        amount={quote ? formatPaise(quote.totalPaise) : null}
+        canPay={canPay}
+        paying={paying}
+        onlineEnabled={onlineEnabled}
+        onPay={(method) => void pay(method)}
+      />
+    </section>
+  );
+}
+
+/**
+ * ADR-003: two ways to pay. "Pay at counter" gives the customer a 6-digit code to show at the
+ * shop; the shop confirms the payment and printing starts. "Pay online" stays disabled until a
+ * live gateway (Razorpay) is configured on the server.
+ */
+function PaymentChoice({
+  amount,
+  canPay,
+  paying,
+  onlineEnabled,
+  onPay,
+}: {
+  amount: string | null;
+  canPay: boolean;
+  paying: PayMethod | null;
+  onlineEnabled: boolean;
+  onPay: (method: PayMethod) => void;
+}) {
+  return (
+    <section className="mt-6">
+      <h2 className="mb-1.5 px-4 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">
+        Payment
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="mac-card flex flex-col p-4">
+          <div className="text-[15px] font-semibold">Pay at counter</div>
+          <p className="mt-1 flex-1 text-[13px] text-text-secondary">
+            Pay cash or UPI at the shop. You get your pickup number right away — show it at the
+            counter. Printing starts once the shop confirms your payment.
+          </p>
+          <button
+            type="button"
+            className="mac-button mt-4 w-full disabled:opacity-40"
+            disabled={!canPay}
+            onClick={() => onPay('counter')}
+          >
+            {paying === 'counter' ? (
+              <>
+                <Spinner /> Getting your number…
+              </>
+            ) : amount ? (
+              `Pay ${amount} at counter`
+            ) : (
+              'Pay at counter'
+            )}
+          </button>
+        </div>
+
+        <div className={cx('mac-card flex flex-col p-4', !onlineEnabled && 'opacity-60')}>
+          <div className="flex items-center gap-2 text-[15px] font-semibold">
+            Pay online
+            {!onlineEnabled && (
+              <span className="rounded-full bg-selection px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
+                Coming soon
+              </span>
+            )}
+          </div>
+          <p className="mt-1 flex-1 text-[13px] text-text-secondary">
+            {onlineEnabled
+              ? 'Pay now with UPI or card. Your order goes to the shop right away.'
+              : 'UPI and card payments are coming soon. For now, please pay at the counter.'}
+          </p>
+          <button
+            type="button"
+            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-separator bg-surface px-5 py-[9px] text-[15px] font-semibold text-accent transition-colors hover:bg-selection disabled:cursor-not-allowed disabled:text-text-secondary disabled:hover:bg-surface"
+            disabled={!onlineEnabled || !canPay}
+            aria-disabled={!onlineEnabled || !canPay}
+            onClick={() => onPay('online')}
+          >
+            {paying === 'online' ? (
+              <>
+                <Spinner /> Processing…
+              </>
+            ) : amount ? (
+              `Pay ${amount} online`
+            ) : (
+              'Pay online'
+            )}
+          </button>
+        </div>
       </div>
     </section>
   );

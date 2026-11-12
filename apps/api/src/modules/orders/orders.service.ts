@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  COUNTER_PAYMENT_PROVIDER,
   type CreateOrderRequest,
   OrderStatus,
   PageRangeError,
@@ -14,6 +15,7 @@ import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
 import { generateToken, randomCode, sha256Hex } from '../../common/crypto/tokens.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
+import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PdfValidationError, validatePdf } from '../files/pdf-validator.js';
@@ -24,7 +26,7 @@ import { ShopsService } from '../shops/shops.service.js';
 import { OrderStateMachine } from './order-state-machine.js';
 import {
   ORDER_VIEW_INCLUDE,
-  PAYMENT_IN_FLIGHT,
+  paymentBlocksCancel,
   canCustomerCancel,
   parseOptions,
   toPublicOrder,
@@ -45,6 +47,7 @@ export class OrdersService {
     private readonly pricing: PricingService,
     private readonly shops: ShopsService,
     private readonly stateMachine: OrderStateMachine,
+    private readonly events: DomainEventBus,
   ) {}
 
   // ─── Queries ───
@@ -271,11 +274,11 @@ export class OrdersService {
       await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        include: { payments: { select: { status: true } } },
+        include: { payments: { select: { id: true, status: true, provider: true } } },
       });
       if (!order) throw notFound();
       if (order.status === OrderStatus.CANCELLED) return; // idempotent
-      if (order.payments.some((p) => (PAYMENT_IN_FLIGHT as readonly string[]).includes(p.status))) {
+      if (order.payments.some(paymentBlocksCancel)) {
         throw new AppError(
           'PAYMENT_IN_PROGRESS',
           'This order has a payment in progress or completed; it can no longer be cancelled here',
@@ -290,13 +293,26 @@ export class OrdersService {
           { status: order.status },
         );
       }
-      await this.stateMachine.transition(tx, {
+      // ADR-003: a waiting counter payment is simply abandoned (no money moved).
+      const counter = await tx.payment.updateMany({
+        where: { orderId, provider: COUNTER_PAYMENT_PROVIDER, status: 'PENDING' },
+        data: { status: 'FAILED' },
+      });
+      const cancelled = await this.stateMachine.transition(tx, {
         orderId,
         to: OrderStatus.CANCELLED,
         from: [OrderStatus.DRAFT, OrderStatus.AWAITING_PAYMENT],
         actor,
         reason: 'Cancelled by customer',
       });
+      if (counter.count > 0) {
+        this.events.publish(tx, DomainEvent.COUNTER_PAYMENT_CHANGED, {
+          orderId,
+          shopId: order.shopId,
+          orderStatus: OrderStatus.CANCELLED,
+          at: cancelled.updatedAt.toISOString(),
+        });
+      }
     });
     return this.getPublic(orderId);
   }

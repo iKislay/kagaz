@@ -3,7 +3,7 @@
  * The shop is always derived from the device token — never sent by the client.
  */
 import { z } from 'zod';
-import { PrintJobStatus, RejectReasonCode } from './enums.js';
+import { PaymentMethod, PrintJobStatus, RejectReasonCode } from './enums.js';
 import { OrderStatusSchema, PrintOptionsSchema } from './schemas.js';
 
 const enumValues = <T extends Record<string, string>>(obj: T) =>
@@ -149,6 +149,8 @@ export const ShopJobSchema = z.object({
   printedSides: z.int().nullable(),
   amountPaise: z.int().nullable(),
   simulatedPayment: z.boolean(),
+  /** ADR-003: how the order was (or is being) paid; null before any payment. */
+  paymentMethod: z.enum(enumValues(PaymentMethod)).nullable(),
   createdAt: z.string(),
   paidAt: z.string().nullable(),
   /** ADR-002 daily pickup code: #1, #2 … per shop per day. Null until payment is verified. */
@@ -225,6 +227,41 @@ export const ResolveJobRequestSchema = z.strictObject({
 });
 export type ResolveJobRequest = z.infer<typeof ResolveJobRequestSchema>;
 
+// ─── Pay at counter (ADR-003) ───
+
+/** A customer waiting to pay at the counter, identified by their daily pickup number (ADR-003). */
+export const CounterPaymentRequestSchema = z.object({
+  orderId: z.uuid(),
+  publicRef: z.string(),
+  /** The number the customer shows ("#7"); the same number collects the prints. */
+  pickupNumber: z.int(),
+  /** Business date (YYYY-MM-DD, Asia/Kolkata) of the number. */
+  pickupDate: z.string(),
+  /** Exactly what to collect (the order's immutable price snapshot), integer paise. */
+  amountPaise: z.int(),
+  options: PrintOptionsSchema,
+  pageCount: z.int().nullable(),
+  printedSides: z.int().nullable(),
+  requestedAt: z.string(),
+});
+export type CounterPaymentRequest = z.infer<typeof CounterPaymentRequestSchema>;
+
+/** GET /api/shop/counter-payments — oldest first. */
+export const CounterPaymentListSchema = z.object({
+  requests: z.array(CounterPaymentRequestSchema),
+});
+export type CounterPaymentList = z.infer<typeof CounterPaymentListSchema>;
+
+/**
+ * Body of POST /api/shop/counter-payments/lookup and /:orderId/approve: the pickup number the
+ * customer shows. Approve re-checks it against the order so a stale selection can't approve the
+ * wrong customer.
+ */
+export const CounterNumberRequestSchema = z.strictObject({
+  pickupNumber: z.int().min(1).max(99_999),
+});
+export type CounterNumberRequest = z.infer<typeof CounterNumberRequestSchema>;
+
 export const printDocumentName = (publicRef: string, attempt: number) =>
   `KAGAZ-${publicRef}-A${attempt}`;
 
@@ -267,3 +304,55 @@ export const UpdateShopModeRequestSchema = z.strictObject({
   autoPaused: z.boolean().optional(),
 });
 export type UpdateShopModeRequest = z.infer<typeof UpdateShopModeRequestSchema>;
+
+// ─── Shop's own pricing, profile and QR (shop app Pricing / Shop QR pages) ───
+
+const RatePaise = z.int().min(1).max(100_000);
+
+/** GET/PUT /api/shop/pricing — what customers pay per printed side, integer paise. */
+export const ShopPricingSchema = z.object({
+  monoRatePaise: z.int(),
+  monoDuplexRatePaise: z.int(),
+  colourRatePaise: z.int(),
+  colourDuplexRatePaise: z.int(),
+  minimumChargePaise: z.int(),
+  effectiveFrom: z.string(),
+  /** False when no enabled printer can print colour (customers can't choose it). */
+  colourAvailable: z.boolean(),
+  /** False when no enabled printer can print double-sided. */
+  duplexAvailable: z.boolean(),
+});
+export type ShopPricing = z.infer<typeof ShopPricingSchema>;
+
+/** PUT /api/shop/pricing (shop owner only). Effective immediately as a new pricing version. */
+export const UpdateShopPricingRequestSchema = z.strictObject({
+  monoRatePaise: RatePaise,
+  monoDuplexRatePaise: RatePaise,
+  colourRatePaise: RatePaise,
+  colourDuplexRatePaise: RatePaise,
+  minimumChargePaise: z.int().min(0).max(100_000),
+});
+export type UpdateShopPricingRequest = z.infer<typeof UpdateShopPricingRequestSchema>;
+
+export const GeoPointSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+
+/** GET /api/shop/profile — the shop's public identity, QR link and poster link. */
+export const ShopProfileSchema = z.object({
+  shopId: z.uuid(),
+  slug: z.string(),
+  name: z.string(),
+  address: z.string(),
+  location: GeoPointSchema.nullable(),
+  /** What the shop's QR code encodes: `<web>/s/<slug>`. */
+  orderUrl: z.string(),
+  /** Printable A4 poster with the QR code. */
+  posterUrl: z.string(),
+});
+export type ShopProfile = z.infer<typeof ShopProfileSchema>;
+
+/** PUT /api/shop/profile/location (shop owner only). */
+export const UpdateShopLocationRequestSchema = GeoPointSchema.strict();
+export type UpdateShopLocationRequest = z.infer<typeof UpdateShopLocationRequestSchema>;

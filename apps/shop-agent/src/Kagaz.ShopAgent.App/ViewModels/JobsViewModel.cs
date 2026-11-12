@@ -36,6 +36,19 @@ public sealed partial class JobItem : ObservableObject
     public ShopPrintJob? PrintJob => ShopJob.PrintJob;
     public bool IsDemoPayment => ShopJob.SimulatedPayment;
 
+    /// <summary>True when the customer paid in cash at the counter (ADR-003).</summary>
+    public bool IsCounterPayment => ShopJob.PaymentMethod == "COUNTER";
+
+    /// <summary>
+    /// What happens to the money when this order is rejected or marked failed. Counter payments are
+    /// refunded in cash by the operator right away (ADR-003); online ones by the gateway.
+    /// </summary>
+    public string RefundNotice => IsDemoPayment
+        ? "Demo refund — no money moved"
+        : IsCounterPayment
+            ? $"Give {DisplayAmount} back to the customer in cash now."
+            : "The customer will be refunded.";
+
     public string DisplayAmount => ShopJob.AmountPaise is int paise
         ? (paise / 100m).ToString("C", India)
         : "—";
@@ -396,7 +409,7 @@ public sealed partial class JobsViewModel : ObservableObject
         {
             await _api.RejectJobAsync(job.OrderId, new RejectJobRequest(RejectReason!.Code, note));
             IsRejectOpen = false;
-            _status.ShowToast($"Rejected {job.PublicRef}", job.IsDemoPayment ? "Demo refund — no money moved" : "The customer will be refunded.");
+            _status.ShowToast($"Rejected {job.PublicRef}", job.RefundNotice);
         });
     }
 
@@ -487,7 +500,7 @@ public sealed partial class JobsViewModel : ObservableObject
                     _signals.Jobs.Pulse();
                     break;
                 default:
-                    _status.ShowToast($"{job.PublicRef} marked failed", job.IsDemoPayment ? "Demo refund — no money moved" : "The customer will be refunded.");
+                    _status.ShowToast($"{job.PublicRef} marked failed", job.RefundNotice);
                     break;
             }
         });

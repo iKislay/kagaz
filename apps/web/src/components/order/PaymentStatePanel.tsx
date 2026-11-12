@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { DEMO_REFUND_NOTICE, OrderStatus, type PublicOrder, formatPaise } from '@kagaz/shared';
+import {
+  DEMO_REFUND_NOTICE,
+  OrderStatus,
+  type PublicOrder,
+  formatPaise,
+  formatPickupDate,
+} from '@kagaz/shared';
 import { Notice, Spinner } from '@/components/ui';
 import { ApiRequestError } from '@/lib/api';
 import { cancelOrder, retryPayment } from '@/lib/customer-api';
@@ -24,6 +30,7 @@ export function PaymentStatePanel({
   const [error, setError] = useState<string | null>(null);
   const payment = order.payment;
   const awaiting = order.status === OrderStatus.AWAITING_PAYMENT;
+  const counter = payment?.method === 'COUNTER';
 
   const run = async (kind: 'pay' | 'cancel') => {
     setBusy(kind);
@@ -68,7 +75,20 @@ export function PaymentStatePanel({
         </Notice>
       )}
 
-      {awaiting && (payment?.status === 'PENDING' || payment?.status === 'CREATED') && (
+      {awaiting &&
+        counter &&
+        payment?.status === 'PENDING' &&
+        order.pickupNumber !== null &&
+        order.pickupDate && (
+          <CounterNumberCard
+            pickupNumber={order.pickupNumber}
+            pickupDate={order.pickupDate}
+            amountPaise={order.amountPaise}
+            shopName={order.shop.name}
+          />
+        )}
+
+      {awaiting && !counter && (payment?.status === 'PENDING' || payment?.status === 'CREATED') && (
         <Notice tone="orange">
           <div className="flex items-center gap-2 font-semibold">
             <Spinner /> Waiting for payment confirmation
@@ -95,6 +115,9 @@ export function PaymentStatePanel({
               ? `Refunded ${formatPaise(refund.amountPaise)}`
               : `Refund of ${formatPaise(refund.amountPaise)} in progress`}
           </div>
+          {counter && (
+            <div className="mt-0.5">You paid at the counter, so the shop returns it in cash.</div>
+          )}
           {refund.isSimulated && <div className="mt-0.5">{DEMO_REFUND_NOTICE}</div>}
         </Notice>
       )}
@@ -106,7 +129,13 @@ export function PaymentStatePanel({
             className="rounded-full border border-separator px-4 py-1.5 text-[14px] font-semibold text-red hover:bg-selection disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => {
-              if (window.confirm('Cancel this order? You haven’t been charged.'))
+              if (
+                window.confirm(
+                  counter
+                    ? 'Cancel this order? Only do this if you haven’t paid at the counter.'
+                    : 'Cancel this order? You haven’t been charged.',
+                )
+              )
                 void run('cancel');
             }}
           >
@@ -117,5 +146,54 @@ export function PaymentStatePanel({
 
       {error && <Notice tone="red">{error}</Notice>}
     </>
+  );
+}
+
+/**
+ * ADR-003: the customer's daily pickup number, shown at the counter to pay — and later to collect
+ * the prints — with the exact amount. The shop approves the payment; this page then moves on.
+ */
+function CounterNumberCard({
+  pickupNumber,
+  pickupDate,
+  amountPaise,
+  shopName,
+}: {
+  pickupNumber: number;
+  pickupDate: string;
+  amountPaise: number | null;
+  shopName: string;
+}) {
+  const date = formatPickupDate(pickupDate);
+  return (
+    <div
+      className="mac-card mt-5 px-5 pt-4 pb-5 text-center"
+      role="group"
+      aria-label={`Pickup code number ${pickupNumber}, ${date}`}
+    >
+      <div className="text-[12px] font-semibold uppercase tracking-wide text-text-secondary">
+        Your pickup code
+      </div>
+      <div className="mt-1 flex items-baseline justify-center gap-3">
+        <span className="text-[72px] leading-none font-bold tracking-[-0.03em] tabular-nums sm:text-[88px]">
+          #{pickupNumber}
+        </span>
+        <span className="text-[22px] font-semibold text-text-secondary sm:text-[26px]">
+          · {date}
+        </span>
+      </div>
+      {amountPaise !== null && (
+        <div className="mt-3 text-[17px]">
+          Show it at <span className="font-semibold">{shopName}</span> and pay{' '}
+          <span className="font-semibold tabular-nums">{formatPaise(amountPaise)}</span>
+        </div>
+      )}
+      <p className="mt-1 text-[13px] text-text-secondary">
+        Use the same number to collect your prints.
+      </p>
+      <div className="mt-3 flex items-center justify-center gap-2 text-[13px] text-text-secondary">
+        <Spinner /> Waiting for the shop to confirm your payment…
+      </div>
+    </div>
   );
 }

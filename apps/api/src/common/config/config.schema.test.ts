@@ -136,10 +136,35 @@ describe('loadConfig', () => {
     expect(toPublicConfig(loadConfig(base))).toEqual({
       appEnv: 'local',
       paymentMode: 'DEMO',
+      onlinePayments: false,
       otpMode: 'DEMO',
       demoControls: true,
       limits: { maxUploadBytes: 26_214_400, maxPages: 300, maxCopies: 20, maxSides: 1000 },
     });
+  });
+
+  it('ADR-003: PAYMENT_PROVIDER defaults to none (counter only, online off, no DEMO banner)', () => {
+    const { PAYMENT_PROVIDER: _omit, ...rest } = base;
+    const config = loadConfig(rest);
+    expect(config.PAYMENT_PROVIDER).toBe('none');
+    const pub = toPublicConfig(config);
+    expect(pub.paymentMode).toBe('LIVE');
+    expect(pub.onlinePayments).toBe(false);
+    expect(startupSummary(config)).toContain('PAYMENT=COUNTER ONLY');
+  });
+
+  it('ADR-003: production accepts PAYMENT_PROVIDER=none (only demo payments are refused)', () => {
+    const prod = {
+      ...base,
+      APP_ENV: 'production',
+      PAYMENT_PROVIDER: 'none',
+      PICKUP_CODE_ENC_KEY: Buffer.alloc(32, 7).toString('base64'),
+    };
+    // The payment guard passes; the demo OTP guard is what still refuses.
+    expect(() => loadConfig(prod)).toThrow(/OTP_PROVIDER=demo/);
+    expect(() => loadConfig({ ...prod, PAYMENT_PROVIDER: 'demo' })).toThrow(
+      /PAYMENT_PROVIDER=demo/,
+    );
   });
 
   it('MIN_AGENT_VERSION is optional; empty means no minimum', () => {

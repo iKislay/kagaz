@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { OrderStatus } from '@kagaz/shared';
+import { COUNTER_PAYMENT_PROVIDER, OrderStatus } from '@kagaz/shared';
 import { SYSTEM_ACTOR } from '../../common/actor.js';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
@@ -88,15 +88,20 @@ export class RetentionService {
     let expired = 0;
     for (const { id } of orders) {
       try {
-        await this.prisma.$transaction((tx) =>
-          this.stateMachine.transition(tx, {
+        await this.prisma.$transaction(async (tx) => {
+          // ADR-003: a counter payment nobody approved is abandoned with its order.
+          await tx.payment.updateMany({
+            where: { orderId: id, provider: COUNTER_PAYMENT_PROVIDER, status: 'PENDING' },
+            data: { status: 'FAILED' },
+          });
+          await this.stateMachine.transition(tx, {
             orderId: id,
             to: OrderStatus.CANCELLED,
             from: unpaid,
             actor: SYSTEM_ACTOR,
             reason: 'Unpaid order expired',
-          }),
-        );
+          });
+        });
         expired++;
       } catch (err) {
         // Raced with payment/cancel: the next run re-evaluates.

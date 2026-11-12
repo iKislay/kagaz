@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { OrderStatus } from '@kagaz/shared';
+import { COUNTER_PAYMENT_PROVIDER, OrderStatus } from '@kagaz/shared';
 import { type Actor, SYSTEM_ACTOR } from '../../common/actor.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
@@ -133,7 +133,16 @@ export class RefundsService {
       where: { id: refundId },
       include: { payment: true },
     });
-    if (refund.status !== 'PENDING' || !refund.payment.providerPaymentId) return;
+    if (refund.status !== 'PENDING') return;
+    // ADR-003: money taken at the counter goes back as cash at the counter. The operator who
+    // rejects a counter-paid order hands it back (the shop app says so), so it completes here.
+    if (refund.payment.provider === COUNTER_PAYMENT_PROVIDER) {
+      await this.prisma.$transaction((tx) =>
+        this.applyProviderRefundState(tx, refund.id, 'SUCCEEDED', `counter-cash:${refund.id}`),
+      );
+      return;
+    }
+    if (!refund.payment.providerPaymentId) return;
 
     let result;
     try {
@@ -199,7 +208,11 @@ export class RefundsService {
         to: OrderStatus.REFUNDED,
         from: OrderStatus.REFUND_PENDING,
         actor: SYSTEM_ACTOR,
-        reason: refund.isSimulated ? 'Demo refund — no money moved' : 'Refund confirmed',
+        reason: refund.isSimulated
+          ? 'Demo refund — no money moved'
+          : refund.payment.provider === COUNTER_PAYMENT_PROVIDER
+            ? 'Cash refunded at the counter'
+            : 'Refund confirmed',
         metadata: { refundId: refund.id, providerRefundId, simulated: refund.isSimulated },
       });
     }

@@ -22,6 +22,8 @@ export const DomainEvent = {
   SHOP_MODE_CHANGED: 'shop.mode_changed',
   /** A device token was revoked; live sockets of that device must be dropped. */
   DEVICE_REVOKED: 'device.revoked',
+  /** ADR-003: a counter payment was requested, approved or abandoned (shop list changed). */
+  COUNTER_PAYMENT_CHANGED: 'counter_payment.changed',
 } as const;
 export type DomainEventName = (typeof DomainEvent)[keyof typeof DomainEvent];
 
@@ -74,6 +76,14 @@ export interface DeviceRevokedEvent {
   deviceId: string;
 }
 
+export interface CounterPaymentChangedEvent {
+  orderId: string;
+  shopId: string;
+  /** Order status after the change (AWAITING_PAYMENT while waiting, CANCELLED when abandoned). */
+  orderStatus: OrderStatus;
+  at: string;
+}
+
 export interface DomainEventPayloads {
   [DomainEvent.ORDER_STATUS_CHANGED]: OrderStatusChangedEvent;
   [DomainEvent.PRINT_JOB_STATUS_CHANGED]: PrintJobStatusChangedEvent;
@@ -81,6 +91,7 @@ export interface DomainEventPayloads {
   [DomainEvent.PRINTER_STATUS_CHANGED]: PrinterStatusChangedEvent;
   [DomainEvent.SHOP_MODE_CHANGED]: ShopModeChangedEvent;
   [DomainEvent.DEVICE_REVOKED]: DeviceRevokedEvent;
+  [DomainEvent.COUNTER_PAYMENT_CHANGED]: CounterPaymentChangedEvent;
 }
 
 interface QueuedEvent {

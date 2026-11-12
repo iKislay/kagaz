@@ -42,8 +42,20 @@ export function OrderTracker({ orderId }: { orderId: string }) {
     );
   }
 
-  const copy = STATUS_COPY[order.status];
   const quote = order.quote;
+  // ADR-003: while the customer still has to pay at the counter, say so in the header.
+  const atCounter =
+    order.status === OrderStatus.AWAITING_PAYMENT &&
+    order.payment?.method === 'COUNTER' &&
+    order.payment.status === 'PENDING';
+  const copy = atCounter
+    ? {
+        label: 'Pay at the counter',
+        detail:
+          'Show your pickup code at the shop and pay. Printing starts once the shop confirms.',
+        tone: 'orange' as const,
+      }
+    : STATUS_COPY[order.status];
 
   return (
     <section>
@@ -105,8 +117,21 @@ export function OrderTracker({ orderId }: { orderId: string }) {
         </Row>
         {order.amountPaise !== null && (
           <Row
-            label={order.status === OrderStatus.AWAITING_PAYMENT ? 'Total' : 'Paid'}
-            hint={order.payment?.isSimulated ? 'Demo payment — no money was charged' : undefined}
+            label={
+              atCounter
+                ? 'To pay at counter'
+                : order.status === OrderStatus.AWAITING_PAYMENT
+                  ? 'Total'
+                  : 'Paid'
+            }
+            hint={
+              order.payment?.isSimulated
+                ? 'Demo payment — no money was charged'
+                : order.payment?.method === 'COUNTER' &&
+                    ['PAID', 'REFUND_PENDING', 'REFUNDED'].includes(order.payment.status)
+                  ? 'Paid at the counter'
+                  : undefined
+            }
           >
             <span className="text-[15px] font-semibold tabular-nums">
               {formatPaise(order.amountPaise)}

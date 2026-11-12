@@ -1,5 +1,7 @@
 import {
+  COUNTER_PAYMENT_PROVIDER,
   OrderStatus,
+  type PaymentMethod,
   type PrintOptions,
   PrintOptionsSchema,
   type PublicOrder,
@@ -37,20 +39,34 @@ export function parseQuote(value: unknown): Quote | null {
 /** Payment statuses that block a customer cancel: money may be (or is) on its way. */
 export const PAYMENT_IN_FLIGHT = ['CREATED', 'PENDING', 'PAID'] as const;
 
+export function paymentMethodOf(provider: string): PaymentMethod {
+  return provider === COUNTER_PAYMENT_PROVIDER ? 'COUNTER' : 'ONLINE';
+}
+
+/**
+ * True when a payment blocks a customer cancel. A counter payment that is still waiting does
+ * not: no money has moved until the operator approves it (ADR-003).
+ */
+export function paymentBlocksCancel(p: { status: string; provider: string }): boolean {
+  if (p.provider === COUNTER_PAYMENT_PROVIDER && p.status === 'PENDING') return false;
+  return (PAYMENT_IN_FLIGHT as readonly string[]).includes(p.status);
+}
+
 /** FR-CUST-12 / P3.6: cancel only before payment, with no payment in flight. */
 export function canCustomerCancel(order: {
   status: string;
-  payments: readonly { status: string }[];
+  payments: readonly { status: string; provider: string }[];
 }): boolean {
   return (
     (order.status === OrderStatus.DRAFT || order.status === OrderStatus.AWAITING_PAYMENT) &&
-    !order.payments.some((p) => (PAYMENT_IN_FLIGHT as readonly string[]).includes(p.status))
+    !order.payments.some(paymentBlocksCancel)
   );
 }
 
 /**
  * Customer-safe projection (PRD §11.1). The ADR-002 pickup code (daily number + date) is
- * shown from payment verified onward; no staff, device or printer internals are exposed.
+ * shown from payment verified onward — for pay at counter from the moment the customer chooses
+ * it (ADR-003); no staff, device or printer internals are exposed.
  */
 export function toPublicOrder(order: OrderWithView): PublicOrder {
   const file = order.files[0];
@@ -69,6 +85,7 @@ export function toPublicOrder(order: OrderWithView): PublicOrder {
     payment: payment
       ? {
           status: payment.status,
+          method: paymentMethodOf(payment.provider),
           isSimulated: payment.isSimulated,
           reference: payment.providerPaymentId,
         }

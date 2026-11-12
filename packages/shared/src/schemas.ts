@@ -45,6 +45,8 @@ export type Limits = z.infer<typeof LimitsSchema>;
 export const PublicConfigSchema = z.object({
   appEnv: AppEnvSchema,
   paymentMode: PaymentModeSchema,
+  /** ADR-003: "Pay online" is enabled only when a live gateway is configured. */
+  onlinePayments: z.boolean().default(false),
   /** DEMO: sign-in codes go to the demo OTP inbox instead of SMS (P2.2). */
   otpMode: PaymentModeSchema,
   /** True when admin demo controls (OTP inbox, payment outcomes) are available (P3.2/P3.5). */

@@ -47,12 +47,15 @@ const SHOPS = [
     slug: 'demo-shop-a',
     name: 'Kagaz Demo Shop A — College Road',
     address: 'College Road, Mandya, Karnataka',
+    // Approximate map positions (owners correct them in the shop app → Shop QR).
+    location: { latitude: 12.5236, longitude: 76.8964 },
     pricing: { monoRatePaise: 200, colourRatePaise: 1000, minimumChargePaise: 500 },
   },
   {
     slug: 'demo-shop-b',
     name: 'Kagaz Demo Shop B — Bus Stand',
     address: 'Near KSRTC Bus Stand, Mandya, Karnataka',
+    location: { latitude: 12.5209, longitude: 76.8946 },
     pricing: {
       monoRatePaise: 150,
       colourRatePaise: 800,
@@ -66,6 +69,7 @@ const SHOPS = [
     slug: 'demo-shop-c',
     name: 'Kagaz Demo Shop C — VV Nagar',
     address: 'VV Nagar, Mandya, Karnataka',
+    location: { latitude: 12.5301, longitude: 76.8875 },
     pricing: { monoRatePaise: 200, colourRatePaise: 1200, minimumChargePaise: 500 },
   },
 ];
@@ -130,6 +134,7 @@ async function main() {
         slug: def.slug,
         name: def.name,
         address: def.address,
+        ...def.location,
         status: 'OPEN',
         approvalMode: 'MANUAL',
         autoLimits: DEFAULT_AUTO_LIMITS,

@@ -143,6 +143,9 @@ model Shop {
   name             String
   address          String
   contactPhone     String?      @map("contact_phone")
+  /// Map position (WGS84) for the website's "shops near you" list; set by the shop owner.
+  latitude         Float?
+  longitude        Float?
   status           ShopStatus   @default(CLOSED)
   approvalMode     ApprovalMode @default(MANUAL) @map("approval_mode")
   autoPaused       Boolean      @default(false) @map("auto_paused")

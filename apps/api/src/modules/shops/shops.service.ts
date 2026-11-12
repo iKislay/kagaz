@@ -36,6 +36,10 @@ export class ShopsService {
         status: shop.status,
         acceptingOrders: this.unavailableReason(shop) === null && pricing !== null,
         isDemo: shop.isDemo,
+        location:
+          shop.latitude !== null && shop.longitude !== null
+            ? { latitude: shop.latitude, longitude: shop.longitude }
+            : null,
         capabilities: {
           colour: shop.printers.some((p) => p.colourCapable),
           duplex: shop.printers.some((p) => p.duplexCapable),
@@ -50,6 +54,15 @@ export class ShopsService {
         },
       };
     });
+  }
+
+  /** A shop by its public slug (QR codes, posters), or 404. */
+  async requireBySlug(slug: string) {
+    const shop = /^[a-z0-9][a-z0-9-]{0,62}$/.test(slug)
+      ? await this.prisma.shop.findUnique({ where: { slug } })
+      : null;
+    if (!shop) throw new AppError('SHOP_NOT_FOUND', 'Shop not found', HttpStatus.NOT_FOUND);
+    return shop;
   }
 
   /**

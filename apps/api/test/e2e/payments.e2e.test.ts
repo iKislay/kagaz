@@ -40,6 +40,7 @@ describe('demo payment (T04)', () => {
     expect(body.order.amountPaise).toBe(4800);
     expect(body.order.payment).toEqual({
       status: 'PAID',
+      method: 'ONLINE',
       isSimulated: true,
       reference: `DEMO-PAY-${created.order.publicRef}`,
     });
