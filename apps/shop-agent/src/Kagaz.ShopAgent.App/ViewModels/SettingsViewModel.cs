@@ -36,9 +36,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     private string? _startupMessage;
 
     public SettingsViewModel(AgentSettings settings, AgentPaths paths, AppStatus status, TokenRotationService rotation,
-        StartupRegistration startup, UpdateViewModel update, ShopModeViewModel mode)
+        StartupRegistration startup, UpdateViewModel update, ShopModeViewModel mode, SupportViewModel? support = null)
     {
         Mode = mode;
+        Support = support ?? new SupportViewModel();
         _paths = paths;
         _rotation = rotation;
         _startup = startup;
@@ -49,11 +50,19 @@ public sealed partial class SettingsViewModel : ObservableObject
         finally { _loadingStartup = false; }
         Settings = settings;
         Status = status;
+        status.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(AppStatus.Subscription)) OnPropertyChanged(nameof(PlanText));
+        };
         Version = typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
         RefreshLastRotated();
     }
 
     public UpdateViewModel Update { get; }
+    public SupportViewModel Support { get; }
+
+    /// <summary>Plan line, e.g. "Active · 2 printers · until 1 Jan 2027" (billed per connected printer).</summary>
+    public string PlanText => BillingText.Plan(Status.Subscription);
 
     /// <summary>Order approval (Manual | Auto, pause auto-accept) — a shop setting since ADR-002.</summary>
     public ShopModeViewModel Mode { get; }
@@ -64,8 +73,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string LogPath => _paths.LogsDirectory;
     public string PrintToPdfPath => Path.Combine(_paths.RootDirectory, "print-to-pdf");
     public string RotationPolicy => Settings.TokenRotationDays > 0
-        ? $"Rotated automatically every {Settings.TokenRotationDays} days."
-        : "Automatic rotation is off.";
+        ? $"Renewed automatically every {Settings.TokenRotationDays} days."
+        : "Automatic renewal is off.";
 
     partial void OnStartWithWindowsChanged(bool value)
     {
@@ -97,8 +106,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         try
         {
             string? error = await _rotation.RotateAsync();
-            RotationMessage = error ?? "Device token rotated. The old token no longer works.";
-            if (error is null) Status.ShowToast("Device token rotated");
+            RotationMessage = error ?? "Access key renewed. The old key no longer works.";
+            if (error is null) Status.ShowToast("Access key renewed");
             RefreshLastRotated();
         }
         finally

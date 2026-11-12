@@ -51,8 +51,6 @@ public sealed class HeartbeatService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            // Operator tokens are 12 h JWTs: back to the sign-in screen when it lapses (P2.3).
-            _status.Session.ExpireIfDue();
             bool healthy = _status.IsPaired ? await BeatAsync(stoppingToken) : await CheckHealthAsync(stoppingToken);
 
             // Retry quickly while disconnected or unpaired so the indicator recovers fast.
@@ -83,6 +81,7 @@ public sealed class HeartbeatService : BackgroundService
             {
                 _status.ApplyShopState(shop.ApprovalMode, shop.AutoPaused, shop.Status);
             }
+            _status.ApplySubscription(response.Subscription);
             var problems = health.Where(h => h.Health.IsProblem).Select(h => $"{h.Printer.DisplayName}: {h.Health.LastError}").ToList();
             _status.SetPrinterAlert(problems.Count == 0 ? null : string.Join(" · ", problems));
 
@@ -98,7 +97,7 @@ public sealed class HeartbeatService : BackgroundService
         }
         catch (ApiException ex) when (ex.Code == ApiErrorCodes.DeviceUnauthorized)
         {
-            _status.SetConnection(ConnectionState.Unauthorized, "This PC is no longer paired — pair again");
+            _status.SetConnection(ConnectionState.Unauthorized, "This PC was disconnected — connect it again");
             MarkConnected(false);
             return false;
         }
@@ -137,7 +136,7 @@ public sealed class HeartbeatService : BackgroundService
             var result = await _health.GetHealthAsync(ct);
             if (_status.RevokedNotice is null)
             {
-                _status.SetConnection(ConnectionState.NotPaired, result.IsSuccess ? "Server reachable · not paired" : "Not paired · server unreachable");
+                _status.SetConnection(ConnectionState.NotPaired, result.IsSuccess ? "Not connected to a shop yet" : "Offline · not connected to a shop");
             }
             return result.IsSuccess;
         }

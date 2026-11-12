@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type CreateOrderResponse } from '@kagaz/shared';
+import { OperatorSessionService } from '../../src/modules/identity/operator-session.service.js';
 import { makePdf } from '../fixtures/pdfs.js';
 import {
   E2E_STAFF_PASSWORD,
@@ -67,7 +68,7 @@ describe('operator sessions (P2.3, contract §4)', () => {
       .send({ login: opA.email.toUpperCase(), password: E2E_STAFF_PASSWORD })
       .expect(200);
     expect(ok.body.operator).toMatchObject({ id: opA.userId, role: 'SHOP_OPERATOR' });
-    expect(Date.parse(ok.body.expiresAt) - Date.now()).toBeGreaterThan(11 * 3600_000);
+    expect(Date.parse(ok.body.expiresAt) - Date.now()).toBeGreaterThan(89 * 86_400_000);
 
     const failed = await h.prisma.auditLog.findFirst({
       where: { shopId: b.shop.id, action: 'operator.login_failed' },
@@ -165,6 +166,28 @@ describe('operator sessions (P2.3, contract §4)', () => {
         where: { actorId: one.operatorId, action: 'operator.logout' },
       }),
     ).toBe(1);
+  });
+
+  it('operator sessions slide on use (staff stay signed in) but revocation still ends them', async () => {
+    const shop = await createShop(h.prisma, { printer: true });
+    const paired = await pairDevice(h, shop.id);
+    const device = { deviceId: paired.deviceId, shopId: shop.id, name: 'E2E PC' };
+    const sessions = h.app.get(OperatorSessionService);
+    const where = { deviceId: paired.deviceId, userId: paired.operatorId };
+
+    // Nearly expired session (last renewed long ago) is pushed forward on use.
+    await h.prisma.operatorSession.updateMany({
+      where,
+      data: { expiresAt: new Date(Date.now() + 3_600_000) },
+    });
+    await sessions.verify(device, paired.operatorToken);
+    const renewed = await h.prisma.operatorSession.findFirstOrThrow({ where });
+    expect(renewed.expiresAt.getTime() - Date.now()).toBeGreaterThan(89 * 86_400_000);
+
+    await h.prisma.operatorSession.updateMany({ where, data: { revokedAt: new Date() } });
+    await expect(sessions.verify(device, paired.operatorToken)).rejects.toMatchObject({
+      code: 'OPERATOR_LOGIN_REQUIRED',
+    });
   });
 
   it('a removed shop membership ends the operator session', async () => {

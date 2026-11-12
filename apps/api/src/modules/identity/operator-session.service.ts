@@ -13,13 +13,16 @@ import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { LoginRateLimiter } from './login-rate-limiter.js';
 import { loginWhere, verifyPassword } from './passwords.js';
 
-export const OPERATOR_SESSION_HOURS = 12;
+/** Sliding: a session ends after this many days without use (shop staff shouldn't re-sign in). */
+export const OPERATOR_SESSION_DAYS = 90;
+const DAY_MS = 86_400_000;
 
 /**
  * Operator sessions on a paired device (contract §4, P2.3). The token is a signed JWT bound to
- * the device; its `jti` is an `operator_sessions` row so logout and device revocation take
- * effect immediately. Only members (OWNER/OPERATOR) of the device's own shop can sign in —
- * anyone else gets the same 401 INVALID_CREDENTIALS as a wrong password.
+ * the device; its `jti` is an `operator_sessions` row, which is the only expiry: it slides to
+ * OPERATOR_SESSION_DAYS from last use (renewed at most once a day), and logout, device revocation
+ * and member removal still end it immediately. Only members (OWNER/OPERATOR) of the device's own
+ * shop can sign in — anyone else gets the same 401 INVALID_CREDENTIALS as a wrong password.
  */
 @Injectable()
 export class OperatorSessionService {
@@ -79,16 +82,16 @@ export class OperatorSessionService {
     this.limiter.reset(key);
 
     const role: OperatorRole = membership.role === 'OWNER' ? 'SHOP_OWNER' : 'SHOP_OPERATOR';
-    const expiresAt = new Date(Date.now() + OPERATOR_SESSION_HOURS * 3_600_000);
+    const expiresAt = new Date(Date.now() + OPERATOR_SESSION_DAYS * DAY_MS);
     const session = await this.prisma.operatorSession.create({
       data: { userId: user.id, deviceId: device.deviceId, shopId: device.shopId, expiresAt },
     });
+    // No JWT `exp`: the session row's sliding expiresAt is authoritative (checked on every use).
     const operatorToken = await new SignJWT({ typ: 'operator', did: device.deviceId })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject(user.id)
       .setJti(session.id)
       .setIssuedAt()
-      .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
       .sign(this.key());
 
     const name = displayName(user);
@@ -151,6 +154,14 @@ export class OperatorSessionService {
       select: { role: true, user: { select: { name: true, email: true, phone: true } } },
     });
     if (!member) throw operatorLoginRequired();
+    // Slide the expiry on use, at most once a day (one cheap UPDATE per active PC per day).
+    const renewed = new Date(Date.now() + OPERATOR_SESSION_DAYS * DAY_MS);
+    if (renewed.getTime() - session.expiresAt.getTime() > DAY_MS) {
+      await this.prisma.operatorSession.updateMany({
+        where: { id: session.id, revokedAt: null },
+        data: { expiresAt: renewed },
+      });
+    }
     return {
       userId: sub,
       name: displayName(member.user),

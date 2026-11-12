@@ -1,4 +1,5 @@
-using System.Globalization;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Kagaz.ShopAgent.Core;
 
@@ -7,23 +8,30 @@ namespace Kagaz.ShopAgent.Core;
 /// so signals can't live on the client): the signed-in operator (P2.3) and the server signals the
 /// app must react to wherever they surface — device revoked (P2.4), operator login required,
 /// agent upgrade required (P4.4).
-/// <para>The operator token is <b>never persisted</b>: it lives only in this object and is cleared on
-/// sign-out, on <c>401 OPERATOR_LOGIN_REQUIRED</c>, on expiry and when the process exits.</para>
+/// <para>The operator stays signed in across restarts: the session is kept DPAPI-encrypted in the
+/// optional operator store (<c>%LOCALAPPDATA%Kagazoperator.token</c>) and ends only on sign-out, on
+/// <c>401 OPERATOR_LOGIN_REQUIRED</c> (server-side expiry, logout elsewhere, member removed) or device
+/// revocation. There is no local expiry: the server slides the session on use.</para>
 /// Events may be raised on any thread; subscribers marshal to the UI themselves.
 /// </summary>
 public sealed class AgentSession
 {
     private readonly object _gate = new();
-    private readonly Func<DateTimeOffset> _clock;
+    private readonly ISecureStore? _operatorStore;
     private string? _operatorToken;
-    private DateTimeOffset _operatorExpiresAt;
     private OperatorInfo? _operator;
     private bool _upgradeRequired;
     private string? _minAgentVersion;
 
-    public AgentSession(Func<DateTimeOffset>? clock = null)
+    /// <param name="operatorStore">Where the signed-in operator survives restarts; null = memory only (tests).</param>
+    public AgentSession(ISecureStore? operatorStore = null)
     {
-        _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _operatorStore = operatorStore;
+        if (TryRestore() is { } saved)
+        {
+            _operatorToken = saved.OperatorToken;
+            _operator = saved.Operator;
+        }
     }
 
     /// <summary>Raised after sign-in or sign-out (including forced sign-out).</summary>
@@ -38,9 +46,14 @@ public sealed class AgentSession
     /// <summary>Raised when the upgrade-required state changes (heartbeat flag or a 426).</summary>
     public event Action? UpgradeStateChanged;
 
+    /// <summary>Raised when any call answered <c>409 SUBSCRIPTION_INACTIVE</c> (the shop isn't subscribed).</summary>
+    public event Action? SubscriptionInactive;
+
+    public void NotifySubscriptionInactive() => SubscriptionInactive?.Invoke();
+
     // ─── Operator ───
 
-    /// <summary>The signed-in operator, or null (also null once the token has expired).</summary>
+    /// <summary>The signed-in operator, or null.</summary>
     public OperatorInfo? Operator
     {
         get
@@ -49,7 +62,7 @@ public sealed class AgentSession
         }
     }
 
-    /// <summary>Token for <c>X-Operator-Token</c>, or null when nobody is signed in / it expired.</summary>
+    /// <summary>Token for <c>X-Operator-Token</c>, or null when nobody is signed in.</summary>
     public string? OperatorToken
     {
         get
@@ -68,17 +81,12 @@ public sealed class AgentSession
             throw new ArgumentException("Operator token is required.", nameof(response));
         }
 
-        var expires = DateTimeOffset.TryParse(response.ExpiresAt, CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal, out var parsed)
-            ? parsed
-            : _clock().AddHours(12); // contract: 12 h JWT
-
         lock (_gate)
         {
             _operatorToken = response.OperatorToken;
-            _operatorExpiresAt = expires;
             _operator = response.Operator;
         }
+        Persist(() => _operatorStore?.Save(JsonSerializer.Serialize(response, JsonOptions.Request)));
         OperatorChanged?.Invoke();
     }
 
@@ -91,20 +99,9 @@ public sealed class AgentSession
             changed = _operatorToken is not null;
             _operatorToken = null;
             _operator = null;
-            _operatorExpiresAt = default;
         }
+        Persist(() => _operatorStore?.Delete());
         if (changed) OperatorChanged?.Invoke();
-    }
-
-    /// <summary>Signs out if the token has expired. Returns true if that happened.</summary>
-    public bool ExpireIfDue()
-    {
-        lock (_gate)
-        {
-            if (_operatorToken is null || IsValidLocked()) return false;
-        }
-        SignOut();
-        return true;
     }
 
     /// <summary>The server rejected a human action: back to the login screen.</summary>
@@ -152,5 +149,27 @@ public sealed class AgentSession
         if (changed) UpgradeStateChanged?.Invoke();
     }
 
-    private bool IsValidLocked() => _operatorToken is not null && _clock() < _operatorExpiresAt;
+    private bool IsValidLocked() => _operatorToken is not null;
+
+    private OperatorLoginResponse? TryRestore()
+    {
+        try
+        {
+            var json = _operatorStore?.Load();
+            var saved = json is null ? null : JsonSerializer.Deserialize<OperatorLoginResponse>(json, JsonOptions.Response);
+            return string.IsNullOrWhiteSpace(saved?.OperatorToken) || saved.Operator is null ? null : saved;
+        }
+        catch (Exception ex) when (ex is JsonException or CryptographicException or FormatException or IOException)
+        {
+            Persist(() => _operatorStore?.Delete()); // unreadable (other Windows user, corrupt): sign in again
+            return null;
+        }
+    }
+
+    /// <summary>Disk trouble never breaks sign-in; the worst case is signing in again after a restart.</summary>
+    private static void Persist(Action write)
+    {
+        try { write(); }
+        catch (Exception ex) when (ex is CryptographicException or IOException or UnauthorizedAccessException) { }
+    }
 }
