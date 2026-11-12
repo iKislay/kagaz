@@ -61,7 +61,7 @@ public sealed class TokenRotationService : BackgroundService
     /// <summary>Rotate now. Returns null on success, else a message for the operator.</summary>
     public async Task<string?> RotateAsync(CancellationToken ct = default)
     {
-        if (!await _gate.WaitAsync(0, ct)) return "A rotation is already in progress.";
+        if (!await _gate.WaitAsync(0, ct)) return "A renewal is already in progress.";
         try
         {
             await _api.RotateTokenAsync(ct);
@@ -78,7 +78,7 @@ public sealed class TokenRotationService : BackgroundService
         {
             // The server already issued a new token; failing to store it means re-pairing.
             _log.LogError(ex, "Could not store the rotated device token");
-            return "The new device token could not be saved. Re-pair this PC if it stops connecting.";
+            return "The new security key could not be saved. Reconnect this PC if it stops working.";
         }
         finally
         {

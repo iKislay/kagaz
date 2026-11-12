@@ -86,7 +86,7 @@
 
                 <StackPanel>
                     <TextBlock Text="SHOP" Style="{StaticResource SidebarHeading}" Margin="10,0,0,6" />
-                    <ListBox ItemsSource="{Binding NavigationItems}"
+                    <ListBox ItemsSource="{Binding VisibleNavigationItems}"
                              SelectedItem="{Binding SelectedNavigation, Mode=TwoWay}"
                              Background="Transparent" BorderThickness="0" Padding="0"
                              ItemContainerStyle="{StaticResource SidebarItem}"
@@ -114,13 +114,16 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- DEMO notice (invariant 4): always visible for demo shops, calm amber bar. -->
+            <!-- Subscription / activation (calm amber bar): stays while the shop can't take orders. -->
             <Border Grid.Row="0" Style="{StaticResource NoticeBar}"
-                    Visibility="{Binding Status.ShopIsDemo, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="13" Foreground="{StaticResource OrangeBrush}" Margin="0,0,8,0" />
-                    <TextBlock Text="DEMO PAYMENT — NO MONEY CHARGED" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AmberTextBrush}" />
-                </StackPanel>
+                    Visibility="{Binding BillingNotice, Converter={StaticResource NullToVisibility}}">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Contact Kaggaz" Style="{StaticResource LinkButton}" FontSize="12"
+                            Command="{Binding OpenSubscriptionCommand}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                    <TextBlock Text="&#xE946;" Style="{StaticResource IconText}" FontSize="13" Foreground="{StaticResource OrangeBrush}" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding BillingNotice}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AmberTextBrush}"
+                               TextWrapping="Wrap" />
+                </DockPanel>
             </Border>
 
             <!-- Printer problems on this PC (P2.10): paper out, offline, error… -->
@@ -149,6 +152,12 @@
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:TodaysPickupsViewModel}">
                         <views:TodaysPickupsView />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:StaffViewModel}">
+                        <views:StaffView />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:PricesViewModel}">
+                        <views:PricesView />
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:ShopQrViewModel}">
                         <views:ShopQrView />
@@ -189,6 +198,49 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </Grid>
+
+        <!-- "Get a Kaggaz subscription": opens when the shop isn't (or is no longer) subscribed. -->
+        <Border Grid.ColumnSpan="2" Background="{StaticResource ScrimBrush}" DataContext="{Binding Subscription}"
+                Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource Sheet}" Width="480">
+                <StackPanel>
+                    <TextBlock Text="&#xE946;" Style="{StaticResource IconText}" FontSize="28" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Left" />
+                    <TextBlock Text="{Binding Title}" Style="{StaticResource TitleText}" FontSize="22" Margin="0,10,0,0" />
+                    <TextBlock Text="{Binding EndedText}" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Visibility="{Binding EndedText, Converter={StaticResource NullToVisibility}}" />
+                    <TextBlock Text="{Binding Body}" Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                    <!-- Contact (from the server config) -->
+                    <StackPanel DataContext="{Binding Support}" Margin="0,18,0,0">
+                        <StackPanel Visibility="{Binding DisplayPhone, Converter={StaticResource NullToVisibility}}">
+                            <TextBlock Text="Call or WhatsApp Kaggaz" Style="{StaticResource FieldLabel}" />
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Copy" Style="{StaticResource QuietButton}" Command="{Binding CopyPhoneCommand}"
+                                        VerticalAlignment="Center" />
+                                <TextBox Text="{Binding DisplayPhone, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                         FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Foreground="{StaticResource TextBrush}"
+                                         AutomationProperties.Name="Kaggaz phone number" />
+                            </DockPanel>
+                            <WrapPanel Margin="0,10,0,0">
+                                <Button Style="{StaticResource PrimaryButton}" Command="{Binding CallCommand}" Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding CallText}" />
+                                </Button>
+                                <Button Content="WhatsApp us" Style="{StaticResource QuietButton}" Command="{Binding OpenWhatsAppCommand}" Margin="0,0,8,8"
+                                        Visibility="{Binding WhatsAppUrl, Converter={StaticResource NullToVisibility}}" />
+                            </WrapPanel>
+                        </StackPanel>
+                        <Button Content="Visit kaggaz.in" Style="{StaticResource LinkButton}" Command="{Binding OpenWebsiteCommand}"
+                                HorizontalAlignment="Left" Margin="0,6,0,0" />
+                    </StackPanel>
+
+                    <!-- Future: "Buy online" (Razorpay) when CanPurchaseOnline -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                        <Button Content="Close" Style="{StaticResource QuietButton}" Command="{Binding DismissCommand}" Margin="0,0,8,0" />
+                        <Button Content="I've contacted Kaggaz" Style="{StaticResource PrimaryButton}" Command="{Binding DismissCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
 
         <!-- "Update required" (P4.4): blocks the whole window while the server says this version is too old. -->
         <Border Grid.ColumnSpan="2" Background="{StaticResource ScrimBrush}" DataContext="{Binding Update}"

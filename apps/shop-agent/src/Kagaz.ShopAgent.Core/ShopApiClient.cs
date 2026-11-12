@@ -107,7 +107,7 @@ public sealed class ShopApiClient
         }
         catch (ApiException)
         {
-            // The token expires on its own (12 h); signing out locally is what matters.
+            // Signing out locally is what matters; the server session also ends on its own.
         }
         finally
         {
@@ -128,6 +128,59 @@ public sealed class ShopApiClient
     {
         using var response = await SendAsync(HttpMethod.Patch, "/shop/mode", request, ct, auth: Auth.Operator, idempotencyKey: idempotencyKey);
         return await ReadAsync<ShopModeResponse>(response, ct);
+    }
+
+    /// <summary><c>POST /shop/enroll-with-login</c> (no token): pair this PC with the owner's mobile number.</summary>
+    public async Task<EnrollDeviceResponse> EnrollWithLoginAsync(EnrollWithLoginRequest request, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, "/shop/enroll-with-login", request, ct, auth: Auth.None);
+        return await ReadAsync<EnrollDeviceResponse>(response, ct);
+    }
+
+    /// <summary><c>POST /shop/signup</c> (no token): new shop + owner login, and this PC paired to it.</summary>
+    public async Task<EnrollDeviceResponse> SignupAsync(ShopSignupRequest request, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, "/shop/signup", request, ct, auth: Auth.None);
+        return await ReadAsync<EnrollDeviceResponse>(response, ct);
+    }
+
+    // ─── Owner pages ───
+
+    public async Task<List<ShopMember>> GetMembersAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/members", null, ct, auth: Auth.Operator);
+        return await ReadAsync<List<ShopMember>>(response, ct);
+    }
+
+    public async Task AddMemberAsync(AddShopMemberRequest request, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, "/shop/members", request, ct, auth: Auth.Operator);
+        await EnsureSuccess(response);
+    }
+
+    public async Task RemoveMemberAsync(string userId, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Delete, $"/shop/members/{Uri.EscapeDataString(userId)}", null, ct, auth: Auth.Operator);
+        await EnsureSuccess(response);
+    }
+
+    public async Task<ShopPricing> GetPricingAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/pricing", null, ct, auth: Auth.Operator);
+        return await ReadAsync<ShopPricing>(response, ct);
+    }
+
+    public async Task<ShopPricing> SetPricingAsync(UpdateShopPricingRequest request, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Put, "/shop/pricing", request, ct, auth: Auth.Operator);
+        return await ReadAsync<ShopPricing>(response, ct);
+    }
+
+    /// <summary><c>GET /config</c> (public, no token): Kaggaz support contact, or null if not set.</summary>
+    public async Task<SupportContact?> GetSupportAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/config", null, ct, auth: Auth.None);
+        return (await ReadAsync<PublicConfigResponse>(response, ct)).Support;
     }
 
     /// <summary><c>GET /shop/poster</c>: the shop's "scan to print" QR target (kaggaz.in/s/&lt;slug&gt;).</summary>
@@ -315,12 +368,14 @@ public sealed class ShopApiClient
         string code;
         string message;
         string? minAgentVersion = null;
+        JsonElement? errorDetails = null;
         try
         {
             string body = await response.Content.ReadAsStringAsync();
             var error = JsonSerializer.Deserialize<ApiErrorEnvelope>(body, JsonOptions.Response);
             code = string.IsNullOrEmpty(error?.Error?.Code) ? response.StatusCode.ToString() : error.Error.Code;
             message = string.IsNullOrEmpty(error?.Error?.Message) ? $"HTTP {status}" : error.Error.Message;
+            errorDetails = error?.Error?.Details?.Clone();
             if (error?.Error?.Details is { ValueKind: JsonValueKind.Object } details
                 && details.TryGetProperty("minAgentVersion", out var min) && min.ValueKind == JsonValueKind.String)
             {
@@ -344,11 +399,16 @@ public sealed class ShopApiClient
                     _session.NotifyOperatorLoginRequired();
                     break;
                 case ApiErrorCodes.InvalidCredentials:
+                case ApiErrorCodes.LoginFailed:
                     break;
                 default:
                     code = ApiErrorCodes.DeviceUnauthorized;
                     break;
             }
+        }
+        else if (code == ApiErrorCodes.SubscriptionInactive)
+        {
+            _session.NotifySubscriptionInactive();
         }
         else if (status == 426)
         {
@@ -356,7 +416,7 @@ public sealed class ShopApiClient
             _session.SetUpgradeRequired(true, minAgentVersion);
         }
 
-        throw new ApiException(code, message, status);
+        throw new ApiException(code, message, status, errorDetails);
     }
 
     private sealed class ApiErrorEnvelope

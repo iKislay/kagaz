@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
              xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             xmlns:views="clr-namespace:Kagaz.ShopAgent.App.Views"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
              d:DesignHeight="600" d:DesignWidth="800">
@@ -104,18 +105,32 @@
             <Border Style="{StaticResource Card}" Margin="0,16,0,0"
                     Visibility="{Binding Status.IsPaired, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
-                    <TextBlock Text="Device token" Style="{StaticResource HeadlineText}" />
+                    <TextBlock Text="Security key" Style="{StaticResource HeadlineText}" />
                     <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,14" TextWrapping="Wrap">
                         <Run Text="{Binding RotationPolicy, Mode=OneWay}" />
-                        <Run Text="Last rotated:" />
+                        <Run Text="Last renewed:" />
                         <Run Text="{Binding LastRotated, Mode=OneWay}" />
                     </TextBlock>
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="Rotate now" Style="{StaticResource QuietButton}" Command="{Binding RotateTokenCommand}" />
+                        <Button Content="Renew now" Style="{StaticResource QuietButton}" Command="{Binding RotateTokenCommand}" />
                         <TextBlock Text="{Binding RotationMessage}" Style="{StaticResource SecondaryText}" VerticalAlignment="Center"
                                    Margin="12,0,0,0" TextWrapping="Wrap" MaxWidth="380"
                                    Visibility="{Binding RotationMessage, Converter={StaticResource NullToVisibility}}" />
                     </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="Subscription" Style="{StaticResource HeadlineText}" />
+                    <TextBlock Text="{Binding PlanText}" Style="{StaticResource BodyText}" Margin="0,4,0,2" />
+                    <TextBlock Text="Kaggaz is billed per connected printer. To change your plan, contact Kaggaz support."
+                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" />
+                    <Border Style="{StaticResource Hairline}" />
+                    <TextBlock Text="Help &amp; support" Style="{StaticResource HeadlineText}" />
+                    <TextBlock Text="Questions about your account, logins, printers or billing? We're here to help."
+                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,14" />
+                    <views:SupportCard DataContext="{Binding Support}" />
                 </StackPanel>
             </Border>
 

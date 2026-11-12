@@ -11,10 +11,36 @@ public sealed class ApiException : Exception
     /// <summary>HTTP status of the response, or null for network errors.</summary>
     public int? HttpStatus { get; }
 
-    public ApiException(string code, string message, int? httpStatus = null) : base(message)
+    /// <summary>The envelope's <c>details</c> (e.g. <c>shops</c> for <c>409 MULTIPLE_SHOPS</c>), if any.</summary>
+    public System.Text.Json.JsonElement? Details { get; }
+
+    public ApiException(string code, string message, int? httpStatus = null, System.Text.Json.JsonElement? details = null)
+        : base(message)
     {
         Code = code;
         HttpStatus = httpStatus;
+        Details = details;
+    }
+
+    /// <summary><c>details.shops</c> of <c>409 MULTIPLE_SHOPS</c>: the shops this login manages.</summary>
+    public List<ShopChoice> DetailShops()
+    {
+        var shops = new List<ShopChoice>();
+        if (Details is { ValueKind: System.Text.Json.JsonValueKind.Object } d
+            && d.TryGetProperty("shops", out var list) && list.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var s in list.EnumerateArray())
+            {
+                if (s.ValueKind == System.Text.Json.JsonValueKind.Object
+                    && s.TryGetProperty("id", out var id) && id.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    string name = s.TryGetProperty("name", out var n) && n.ValueKind == System.Text.Json.JsonValueKind.String
+                        ? n.GetString()! : id.GetString()!;
+                    shops.Add(new ShopChoice(id.GetString()!, name));
+                }
+            }
+        }
+        return shops;
     }
 }
 
@@ -41,4 +67,14 @@ public static class ApiErrorCodes
     public const string InvalidTransition = "INVALID_TRANSITION";
     public const string ReprintConfirmRequired = "REPRINT_CONFIRM_REQUIRED";
     public const string RateLimited = "RATE_LIMITED";
+    /// <summary>401 from sign-in / enroll-with-login: wrong mobile number or password.</summary>
+    public const string LoginFailed = "LOGIN_FAILED";
+    /// <summary>409 enroll-with-login: the login manages several shops — pick one (details.shops).</summary>
+    public const string MultipleShops = "MULTIPLE_SHOPS";
+    /// <summary>409 sign-up: this mobile number already has an account.</summary>
+    public const string PhoneInUse = "PHONE_IN_USE";
+    /// <summary>409 PUT /shop/printers: more printers than the plan's seats.</summary>
+    public const string PrinterLimitReached = "PRINTER_LIMIT_REACHED";
+    /// <summary>409 on order/printer calls: the shop has no active subscription.</summary>
+    public const string SubscriptionInactive = "SUBSCRIPTION_INACTIVE";
 }

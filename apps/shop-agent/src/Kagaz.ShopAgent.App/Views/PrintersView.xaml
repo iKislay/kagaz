@@ -76,6 +76,8 @@
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,16,0,0">
             <Button Content="Save printers" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" />
             <Button Content="Refresh list" Style="{StaticResource QuietButton}" Command="{Binding LoadCommand}" Margin="10,0,0,0" />
+            <TextBlock Text="{Binding SeatsText}" Style="{StaticResource SecondaryText}" FontSize="13" VerticalAlignment="Center" Margin="14,0,0,0"
+                       Visibility="{Binding SeatsText, Converter={StaticResource NullToVisibility}}" />
             <TextBlock Text="{Binding Message}" VerticalAlignment="Center" Margin="14,0,0,0" FontSize="13" TextWrapping="Wrap" MaxWidth="420">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryText}">
