@@ -17,6 +17,10 @@ import {
 
 const QUEUE_STATES = ['PENDING_REVIEW', 'QUEUED', 'PRINTING', 'NEEDS_OPERATOR_CHECK'];
 
+/** Recently self-registered and not yet activated: needs a Kaggaz admin to review it. */
+const isNewSignup = (s: { status: string; createdAt: string }) =>
+  s.status === 'CLOSED' && Date.now() - Date.parse(s.createdAt) < 14 * 24 * 3600_000;
+
 /** Shop list (P2.13, FR-ADMIN-02): status, mode, device online, queue depth, today. */
 export default function ShopsPage() {
   const { data, error, loading } = useLoad(() => adminApi.shops(), []);
@@ -50,7 +54,10 @@ export default function ShopsPage() {
                         <div className="text-[12px] text-text-secondary">{s.address}</div>
                       </Td>
                       <Td>
-                        <Pill tone={shopStatusTone(s.status)}>{humanize(s.status)}</Pill>
+                        <span className="inline-flex flex-wrap gap-1.5">
+                          <Pill tone={shopStatusTone(s.status)}>{humanize(s.status)}</Pill>
+                          {isNewSignup(s) && <Pill tone="accent">New</Pill>}
+                        </span>
                       </Td>
                       <Td>
                         {s.approvalMode === 'AUTO'

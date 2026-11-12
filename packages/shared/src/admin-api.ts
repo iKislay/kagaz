@@ -111,6 +111,8 @@ export const AdminShopSchema = z.object({
   slug: z.string(),
   name: z.string(),
   address: z.string(),
+  /** ISO-8601; self-registered shops show as "New" while CLOSED and recent. */
+  createdAt: z.string(),
   status: ShopStatusSchema,
   approvalMode: ApprovalModeSchema,
   autoPaused: z.boolean(),
@@ -442,11 +444,22 @@ export function normalizePhone(input: string): string {
  * POST /api/admin/shops/:id/members — add a shop owner/operator login (phone + password), or
  * reset the password and role of an existing member with that phone.
  */
+/**
+ * Display form of an Indian mobile: "+919876543210" → "98765 43210". Anything else is returned
+ * unchanged. (The Kaggaz Shop app has a C# copy with the same examples.)
+ */
+export function formatIndianPhone(e164: string): string {
+  return /^\+91\d{10}$/.test(e164) ? `${e164.slice(3, 8)} ${e164.slice(8)}` : e164;
+}
+
+/** A mobile number as typed (normalizePhone) → E.164. Shop logins are phone-only. */
+export const MobileSchema = z
+  .string()
+  .transform(normalizePhone)
+  .pipe(z.string().regex(/^\+[1-9]\d{7,14}$/, 'Enter a 10-digit mobile number'));
+
 export const AdminShopMemberRequestSchema = z.strictObject({
-  phone: z
-    .string()
-    .transform(normalizePhone)
-    .pipe(z.string().regex(/^\+[1-9]\d{7,14}$/, 'Enter a 10-digit mobile number')),
+  phone: MobileSchema,
   name: z.string().trim().min(2).max(80),
   role: z.enum(['SHOP_OWNER', 'SHOP_OPERATOR']),
   password: z.string().min(8, 'At least 8 characters').max(200),

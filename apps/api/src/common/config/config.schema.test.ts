@@ -135,7 +135,24 @@ describe('loadConfig', () => {
       otpMode: 'DEMO',
       demoControls: true,
       limits: { maxUploadBytes: 26_214_400, maxPages: 300, maxCopies: 20, maxSides: 1000 },
+      support: { phone: null, whatsapp: null, email: null },
     });
+  });
+
+  it('support contact is optional, normalized, and validated', () => {
+    const c = loadConfig({
+      ...base,
+      SUPPORT_PHONE: '98765 43210',
+      SUPPORT_WHATSAPP: '',
+      SUPPORT_EMAIL: 'help@kaggaz.in',
+    });
+    expect(toPublicConfig(c).support).toEqual({
+      phone: '+919876543210',
+      whatsapp: null,
+      email: 'help@kaggaz.in',
+    });
+    expect(() => loadConfig({ ...base, SUPPORT_PHONE: 'call us' })).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, SUPPORT_EMAIL: 'nope' })).toThrow(ConfigError);
   });
 
   it('MIN_AGENT_VERSION is optional; empty means no minimum', () => {

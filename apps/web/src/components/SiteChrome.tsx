@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { DemoBanner } from '@/components/DemoBanner';
 import { AccountLink } from '@/components/customer/AccountLink';
+import { SupportContact } from '@/components/SupportContact';
 import { getPublicConfig } from '@/lib/api';
 
 /** Shared header/footer and type styles for every customer-facing page. */
@@ -64,10 +65,8 @@ export async function SiteHeader() {
 }
 
 export async function SiteFooter() {
-  const signInOn = await getPublicConfig().then(
-    (c) => c.otpMode !== 'OFF',
-    () => false,
-  );
+  const config = await getPublicConfig().catch(() => null);
+  const signInOn = !!config && config.otpMode !== 'OFF';
   return (
     <footer className="relative isolate overflow-hidden border-t border-line bg-cream">
       <div className="relative z-10 mx-auto max-w-6xl px-4 pt-16 pb-12 md:px-6">
@@ -110,7 +109,8 @@ export async function SiteFooter() {
           />
         </div>
         <div className="mt-12 flex flex-wrap justify-between gap-2 text-[12px] text-ink-soft">
-          <span>© 2026 Kagaz. Mandya, Karnataka.</span>
+          <span>© 2026 Kaggaz. Mandya, Karnataka.</span>
+          <SupportContact support={config?.support} label="Contact:" />
           <span>Pay at the shop counter when you collect your prints.</span>
         </div>
       </div>

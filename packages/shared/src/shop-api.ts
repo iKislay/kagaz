@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 import { PrintJobStatus, RejectReasonCode } from './enums.js';
+import { CreatePricingVersionSchema, MobileSchema } from './admin-api.js';
 import { OrderStatusSchema, PrintOptionsSchema } from './schemas.js';
 
 const enumValues = <T extends Record<string, string>>(obj: T) =>
@@ -28,6 +29,70 @@ export const EnrollDeviceResponseSchema = z.object({
   shop: z.object({ id: z.uuid(), name: z.string(), isDemo: z.boolean() }),
 });
 export type EnrollDeviceResponse = z.infer<typeof EnrollDeviceResponseSchema>;
+
+/**
+ * POST /api/shop/signup (public, from the Kaggaz Shop app): creates the shop (CLOSED until Kaggaz
+ * activates it), the owner login (mobile + password) and enrolls this PC. Returns the same shape
+ * as POST /api/devices/enroll.
+ */
+export const ShopSignupRequestSchema = z.strictObject({
+  shopName: z.string().trim().min(2).max(120),
+  address: z.string().trim().min(2).max(300),
+  ownerName: z.string().trim().min(2).max(80),
+  phone: MobileSchema,
+  password: z.string().min(8, 'At least 8 characters').max(200),
+  deviceName: z.string().trim().min(1).max(80),
+  appVersion: z.string().max(40).optional(),
+});
+export type ShopSignupRequest = z.infer<typeof ShopSignupRequestSchema>;
+
+/**
+ * POST /api/shop/enroll-with-login (public): the shop owner connects a new PC with their mobile
+ * number + password instead of a pairing code. `shopId` picks the shop when they own several.
+ */
+export const EnrollWithLoginRequestSchema = z.strictObject({
+  login: MobileSchema,
+  password: z.string().min(1).max(200),
+  deviceName: z.string().trim().min(1).max(80),
+  appVersion: z.string().max(40).optional(),
+  shopId: z.uuid().optional(),
+});
+export type EnrollWithLoginRequest = z.infer<typeof EnrollWithLoginRequestSchema>;
+
+/** GET/POST/DELETE /api/shop/members (owner signed in on the shop PC). */
+export const ShopMemberSchema = z.object({
+  userId: z.uuid(),
+  name: z.string().nullable(),
+  phone: z.string().nullable(),
+  role: z.enum(['OWNER', 'OPERATOR']),
+});
+export type ShopMember = z.infer<typeof ShopMemberSchema>;
+export const ShopMemberListSchema = z.object({ members: z.array(ShopMemberSchema) });
+export type ShopMemberList = z.infer<typeof ShopMemberListSchema>;
+
+/** POST /api/shop/members: add an operator login, or reset an operator's password. */
+export const ShopMemberRequestSchema = z.strictObject({
+  phone: MobileSchema,
+  name: z.string().trim().min(2).max(80),
+  password: z.string().min(8, 'At least 8 characters').max(200),
+});
+export type ShopMemberRequest = z.infer<typeof ShopMemberRequestSchema>;
+
+/** GET /api/shop/pricing: the shop's pricing in effect now (null before the first version). */
+export const ShopPricingSchema = z.object({
+  monoRatePaise: z.int(),
+  colourRatePaise: z.int(),
+  monoDuplexRatePaise: z.int().nullable(),
+  colourDuplexRatePaise: z.int().nullable(),
+  duplexRule: z.enum(['SAME_AS_SIMPLEX', 'DISCOUNTED_SIDE_RATE']),
+  minimumChargePaise: z.int(),
+  effectiveFrom: z.string(),
+});
+export type ShopPricing = z.infer<typeof ShopPricingSchema>;
+
+/** PUT /api/shop/pricing (owner): a new pricing version effective now; same rules as admin. */
+export const UpdateShopPricingSchema = CreatePricingVersionSchema;
+export type UpdateShopPricing = z.infer<typeof UpdateShopPricingSchema>;
 
 export const HeartbeatRequestSchema = z.strictObject({
   appVersion: z.string().max(40).optional(),

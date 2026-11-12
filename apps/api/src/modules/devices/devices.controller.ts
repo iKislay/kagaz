@@ -1,8 +1,13 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { type Request } from 'express';
 import {
   type EnrollDeviceRequest,
   EnrollDeviceRequestSchema,
   type EnrollDeviceResponse,
+  type EnrollWithLoginRequest,
+  EnrollWithLoginRequestSchema,
+  type ShopSignupRequest,
+  ShopSignupRequestSchema,
   type HeartbeatRequest,
   HeartbeatRequestSchema,
   type HeartbeatResponse,
@@ -13,8 +18,11 @@ import {
   DeviceAuthGuard,
   type DeviceContext,
 } from '../../common/auth/device-auth.guard.js';
+import { AppError } from '../../common/http/api-exception.filter.js';
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
+import { LoginRateLimiter } from '../identity/login-rate-limiter.js';
 import { DevicesService } from './devices.service.js';
+import { signupSlug } from './shop-signup.js';
 
 @Controller('devices')
 export class DevicesController {
@@ -64,5 +72,44 @@ export class ShopHeartbeatController {
     @Body(new ZodValidationPipe(HeartbeatRequestSchema)) body: HeartbeatRequest,
   ): Promise<HeartbeatResponse> {
     return this.devices.heartbeat(device, body);
+  }
+}
+
+/**
+ * Public shop account endpoints used by the Kaggaz Shop app before it has a device token:
+ * create a shop (and connect this PC), or connect a PC with the owner's mobile + password.
+ */
+@Controller('shop')
+export class ShopAccountController {
+  /** shortcut: in-memory per-IP limit (one API instance on Render), move to Postgres when scaled out. */
+  private readonly signupLimiter = new LoginRateLimiter(5, 60 * 60 * 1000);
+
+  constructor(private readonly devices: DevicesService) {}
+
+  @Post('signup')
+  @HttpCode(201)
+  signup(
+    @Body(new ZodValidationPipe(ShopSignupRequestSchema)) body: ShopSignupRequest,
+    @Req() req: Request,
+  ): Promise<EnrollDeviceResponse> {
+    const ip = req.ip ?? req.socket?.remoteAddress ?? '';
+    if (this.signupLimiter.isBlocked(ip)) {
+      throw new AppError(
+        'RATE_LIMITED',
+        'Too many sign-ups from this network. Try again in an hour.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    this.signupLimiter.fail(ip); // every attempt counts
+    return this.devices.signup(body, signupSlug(body.shopName), ip);
+  }
+
+  @Post('enroll-with-login')
+  @HttpCode(201)
+  enrollWithLogin(
+    @Body(new ZodValidationPipe(EnrollWithLoginRequestSchema)) body: EnrollWithLoginRequest,
+    @Req() req: Request,
+  ): Promise<EnrollDeviceResponse> {
+    return this.devices.enrollWithLogin(body, req.ip ?? req.socket?.remoteAddress ?? '');
   }
 }

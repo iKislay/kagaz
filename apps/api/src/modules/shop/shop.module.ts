@@ -7,14 +7,23 @@ import { FilesModule } from '../files/files.module.js';
 import { OrdersModule } from '../orders/orders.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { PrintPreparationService } from '../printing/print-preparation.service.js';
+import { PricingModule } from '../pricing/pricing.module.js';
 import { PrintingModule } from '../printing/printing.module.js';
 import { PrintJobsService } from './print-jobs.service.js';
 import { ShopController } from './shop.controller.js';
+import { ShopAccountService } from './shop-account.service.js';
 import { ShopJobsService } from './shop-jobs.service.js';
 import { ShopPrintersService } from './shop-printers.service.js';
 
 @Module({
-  imports: [FilesModule, OrdersModule, PaymentsModule, PrintingModule, ApprovalModule],
+  imports: [
+    FilesModule,
+    OrdersModule,
+    PaymentsModule,
+    PrintingModule,
+    ApprovalModule,
+    PricingModule,
+  ],
   controllers: [ShopController],
   providers: [
     DeviceAuthGuard,
@@ -23,6 +32,7 @@ import { ShopPrintersService } from './shop-printers.service.js';
     ShopJobsService,
     PrintJobsService,
     ShopPrintersService,
+    ShopAccountService,
     PrintPreparationService,
   ],
 })

@@ -50,6 +50,14 @@ export const PublicConfigSchema = z.object({
   /** True when admin demo controls (OTP inbox, payment outcomes) are available (P3.2/P3.5). */
   demoControls: z.boolean(),
   limits: LimitsSchema,
+  /** Kaggaz support contact (SUPPORT_* env); each null when not configured — never invented. */
+  support: z
+    .object({
+      phone: z.string().nullable(),
+      whatsapp: z.string().nullable(),
+      email: z.string().nullable(),
+    })
+    .default({ phone: null, whatsapp: null, email: null }),
 });
 export type PublicConfig = z.infer<typeof PublicConfigSchema>;
 

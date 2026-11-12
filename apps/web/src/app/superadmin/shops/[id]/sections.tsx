@@ -214,7 +214,7 @@ export function SettingsSection({
         {saved && !error && <span className="text-[13px] text-green">Saved</span>}
         {!admin && (
           <span className="text-[12px] text-text-secondary">
-            Name, address, status and limits are managed by Kagaz.
+            Name, address, status and limits are managed by Kaggaz.
           </span>
         )}
       </div>

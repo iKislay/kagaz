@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Inject,
@@ -28,7 +29,13 @@ import {
   ResolveJobRequestSchema,
   type ShopJob,
   type ShopJobDetail,
+  type ShopMemberList,
+  type ShopMemberRequest,
+  ShopMemberRequestSchema,
+  type ShopPricing,
   type ShopPrinter,
+  type UpdateShopPricing,
+  UpdateShopPricingSchema,
 } from '@kagaz/shared';
 import { AgentVersionGuard } from '../../common/auth/agent-version.guard.js';
 import {
@@ -43,6 +50,7 @@ import {
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
 import { PrintJobsService } from './print-jobs.service.js';
 import { ShopJobsService } from './shop-jobs.service.js';
+import { ShopAccountService, requireOwner } from './shop-account.service.js';
 import { ShopPrintersService } from './shop-printers.service.js';
 import { RequireOperator } from '../identity/operator-auth.guard.js';
 import { APP_CONFIG } from '../../common/config/config.module.js';
@@ -73,7 +81,50 @@ export class ShopController {
     private readonly printers: ShopPrintersService,
     private readonly prisma: PrismaService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly account: ShopAccountService,
   ) {}
+
+  // ─── Shop logins and prices, managed by the owner from the app ───
+
+  @Get('members')
+  @RequireOperator()
+  members(@CurrentDevice() device: DeviceContext): Promise<ShopMemberList> {
+    requireOwner(device);
+    return this.account.members(device);
+  }
+
+  @Post('members')
+  @RequireOperator()
+  @HttpCode(200)
+  addMember(
+    @CurrentDevice() device: DeviceContext,
+    @Body(new ZodValidationPipe(ShopMemberRequestSchema)) body: ShopMemberRequest,
+  ): Promise<ShopMemberList> {
+    return this.account.addOperator(device, body);
+  }
+
+  @Delete('members/:userId')
+  @RequireOperator()
+  removeMember(
+    @CurrentDevice() device: DeviceContext,
+    @Param('userId', Uuid) userId: string,
+  ): Promise<ShopMemberList> {
+    return this.account.removeOperator(device, userId);
+  }
+
+  @Get('pricing')
+  async pricing(@CurrentDevice() device: DeviceContext): Promise<ShopPricing | null> {
+    return this.account.currentPricing(device);
+  }
+
+  @Put('pricing')
+  @RequireOperator()
+  setPricing(
+    @CurrentDevice() device: DeviceContext,
+    @Body(new ZodValidationPipe(UpdateShopPricingSchema)) body: UpdateShopPricing,
+  ): Promise<ShopPricing | null> {
+    return this.account.setPricing(device, body);
+  }
 
   /** The in-shop "scan to print" QR target: <web>/s/<slug> opens a new order at this shop. */
   @Get('poster')
