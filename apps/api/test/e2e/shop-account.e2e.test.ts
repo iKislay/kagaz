@@ -217,7 +217,7 @@ describe('owner flows from the app', () => {
       .http()
       .post('/api/shop/members')
       .set(o.ownerAuth)
-      .send({ phone: o.mobile, name: 'X', password: 'xxxx-xxxx' })
+      .send({ phone: o.mobile, name: 'Someone', password: 'xxxx-xxxx' })
       .expect(403);
 
     const removed = await app
