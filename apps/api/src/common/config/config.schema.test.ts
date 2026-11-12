@@ -32,6 +32,15 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ APP_ENV: 'local' })).toThrow(/DATABASE_URL[\s\S]*S3_BUCKET/);
   });
 
+  it('needs ADMIN_EMAIL and ADMIN_PASSWORD together, password ≥ 12 chars', () => {
+    expect(() => loadConfig({ ...base, ADMIN_EMAIL: 'a@kaggaz.in' })).toThrow(/both/);
+    expect(() =>
+      loadConfig({ ...base, ADMIN_EMAIL: 'a@kaggaz.in', ADMIN_PASSWORD: 'short' }),
+    ).toThrow(/12 characters/);
+    const c = loadConfig({ ...base, ADMIN_EMAIL: 'A@Kaggaz.in', ADMIN_PASSWORD: 'x'.repeat(12) });
+    expect(c.ADMIN_EMAIL).toBe('a@kaggaz.in');
+  });
+
   it('rejects short secrets', () => {
     expect(() => loadConfig({ ...base, SESSION_JWT_SECRET: 'short' })).toThrow(
       /SESSION_JWT_SECRET/,

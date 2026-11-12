@@ -45,6 +45,12 @@ export const EnvSchema = z.object({
   DEMO_PENDING_RESOLVE_SECONDS: int(10),
 
   SESSION_JWT_SECRET: secret('SESSION_JWT_SECRET'),
+  /** /admin login kept in sync on boot (AdminBootstrapService). Both or neither. */
+  ADMIN_EMAIL: z
+    .email()
+    .transform((v) => v.toLowerCase())
+    .optional(),
+  ADMIN_PASSWORD: z.string().min(12, 'ADMIN_PASSWORD must be at least 12 characters').optional(),
 
   PRINTER_LEASE_TTL_SECONDS: int(60),
   DEVICE_ONLINE_THRESHOLD_SECONDS: int(45),
@@ -92,6 +98,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     throw new ConfigError(`Invalid environment configuration:\n${issues}`);
   }
   const config = parsed.data;
+
+  if (!config.ADMIN_EMAIL !== !config.ADMIN_PASSWORD) {
+    throw new ConfigError('Set both ADMIN_EMAIL and ADMIN_PASSWORD, or neither.');
+  }
 
   if (config.APP_ENV === AppEnv.PRODUCTION) {
     if (config.PAYMENT_PROVIDER === 'demo') {
