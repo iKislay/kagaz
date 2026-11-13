@@ -89,6 +89,9 @@
                                Visibility="{Binding StartupMessage, Converter={StaticResource NullToVisibility}}" />
                     <Border Style="{StaticResource Hairline}" />
                     <TextBlock Text="Updates" Style="{StaticResource HeadlineText}" FontSize="14" />
+                    <TextBlock Text="New versions install automatically when no order is printing. The app restarts by itself and you stay signed in."
+                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Visibility="{Binding Update.CanSelfUpdate, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock Text="{Binding Update.UnavailableReason}" Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
                                Visibility="{Binding Update.CanSelfUpdate, Converter={StaticResource InverseBoolToVisibility}}" />
                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0"
