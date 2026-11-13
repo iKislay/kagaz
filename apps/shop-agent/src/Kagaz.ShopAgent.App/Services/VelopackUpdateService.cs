@@ -69,4 +69,20 @@ public sealed class VelopackUpdateService : IUpdateService
         _manager.ApplyUpdatesAndRestart(_pending.TargetFullRelease);
         return true;
     }
+
+    public async Task<bool> DownloadAsync(CancellationToken ct = default)
+    {
+        if (_manager is null) return false;
+        _pending = await _manager.CheckForUpdatesAsync();
+        if (_pending is null) return false;
+        await _manager.DownloadUpdatesAsync(_pending, null, ct);
+        return true;
+    }
+
+    public void ApplyDownloadedAndRestart()
+    {
+        if (_manager is null || _pending is null) return;
+        _log.LogInformation("Auto-update: applying {Version} and restarting", _pending.TargetFullRelease.Version);
+        _manager.ApplyUpdatesAndRestart(_pending.TargetFullRelease);
+    }
 }
