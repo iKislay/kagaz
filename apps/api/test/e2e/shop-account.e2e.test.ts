@@ -260,16 +260,14 @@ describe('owner flows from the app', () => {
   it('first-run setup: owner saves name, then a searched or located place with an edited address; each step persists', async () => {
     const o = await owner();
     const places = app.app.get(PlacesService);
-    const search = vi
-      .spyOn(places, 'search')
-      .mockResolvedValue([
-        {
-          name: 'KSRTC Bus Stand',
-          address: 'KSRTC Bus Stand, Mandya, 571401',
-          lat: 12.52,
-          lng: 76.89,
-        },
-      ]);
+    const search = vi.spyOn(places, 'search').mockResolvedValue([
+      {
+        name: 'KSRTC Bus Stand',
+        address: 'KSRTC Bus Stand, Mandya, 571401',
+        lat: 12.52,
+        lng: 76.89,
+      },
+    ]);
     const reverse = vi
       .spyOn(places, 'reverse')
       .mockResolvedValue('Near Vinayaka Nursing Home, Hospital Road, Mandya, 571401');
