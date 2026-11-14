@@ -55,8 +55,18 @@ public static class HostFactory
         builder.Services.AddSingleton(_ => new StartupRegistration(new CurrentUserRunKey()));
         builder.Services.AddSingleton<AppStatus>();
 
-        builder.Services.AddHttpClient<ShopApiClient>(client => client.Timeout = TimeSpan.FromSeconds(15));
-        builder.Services.AddHttpClient<KagazApiClient>(client => client.Timeout = TimeSpan.FromSeconds(5));
+        string userAgent = $"KaggazShop/{settings.AppVersion} (Windows NT {Environment.OSVersion.Version})";
+        builder.Services.AddHttpClient<ShopApiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+        });
+        // Slow shop links + TLS handshake: 5 s produced false "offline" readings.
+        builder.Services.AddHttpClient<KagazApiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+        });
 
         // PDFium + GDI printing run in a helper process so a driver/renderer crash can't take
         // down the app mid-print (it fails that attempt as UNCERTAIN instead).

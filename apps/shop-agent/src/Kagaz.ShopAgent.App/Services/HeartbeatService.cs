@@ -31,6 +31,7 @@ public sealed class HeartbeatService : BackgroundService
     private readonly ILogger<HeartbeatService> _log;
     private readonly string _os = HeartbeatBuilder.DescribeOs(Environment.OSVersion.Version);
     private bool _wasConnected;
+    private string? _lastProblem;
 
     public HeartbeatService(ShopApiClient api, KagazApiClient health, AgentSettings settings, AppStatus status,
         AgentStateStore state, ISpoolerProbe spooler, PrinterReachability reachability, AgentSignals signals,
@@ -51,7 +52,22 @@ public sealed class HeartbeatService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            bool healthy = _status.IsPaired ? await BeatAsync(stoppingToken) : await CheckHealthAsync(stoppingToken);
+            bool healthy;
+            try
+            {
+                healthy = _status.IsPaired ? await BeatAsync(stoppingToken) : await CheckHealthAsync(stoppingToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Anything unexpected (a missing DLL after an antivirus "clean", a spooler fault) must show
+                // on screen, not silently stop this loop and leave the window on "Checking connection…".
+                healthy = false;
+                string problem = $"{ex.GetType().Name}: {ApiException.RootCause(ex)}";
+                _log.LogError(ex, "Connection check failed");
+                ReportProblem(problem);
+                _status.SetConnection(ConnectionState.Offline, "Can't reach the Kaggaz server", problem);
+                MarkConnected(false);
+            }
 
             // Retry quickly while disconnected or unpaired so the indicator recovers fast.
             int seconds = healthy && _status.IsPaired ? Math.Max(5, _settings.HeartbeatSeconds) : 5;
@@ -85,6 +101,7 @@ public sealed class HeartbeatService : BackgroundService
             var problems = health.Where(h => h.Health.IsProblem).Select(h => $"{h.Printer.DisplayName}: {h.Health.LastError}").ToList();
             _status.SetPrinterAlert(problems.Count == 0 ? null : string.Join(" · ", problems));
 
+            ReportProblem(null);
             _status.SetConnection(ConnectionState.Connected, $"Connected · {_status.ShopName ?? "Kaggaz"}");
             MarkConnected(true);
             return true;
@@ -110,8 +127,8 @@ public sealed class HeartbeatService : BackgroundService
         }
         catch (ApiException ex)
         {
-            _log.LogWarning("Heartbeat failed: {Code}", ex.Code);
-            _status.SetConnection(ConnectionState.Offline, ex.Code == ApiErrorCodes.NetworkError ? "Offline — retrying" : $"Server error ({ex.Code})");
+            ReportProblem(ex.Message);
+            _status.SetConnection(ConnectionState.Offline, ex.Code == ApiErrorCodes.NetworkError ? "Offline — retrying" : $"Server error ({ex.Code})", ex.Message);
             MarkConnected(false);
             return false;
         }
@@ -134,9 +151,11 @@ public sealed class HeartbeatService : BackgroundService
         try
         {
             var result = await _health.GetHealthAsync(ct);
+            ReportProblem(result.FailureReason);
             if (_status.RevokedNotice is null)
             {
-                _status.SetConnection(ConnectionState.NotPaired, result.IsSuccess ? "Not connected to a shop yet" : "Offline · not connected to a shop");
+                if (result.IsSuccess) _status.SetConnection(ConnectionState.NotPaired, "Not connected to a shop yet");
+                else _status.SetConnection(ConnectionState.Offline, "Can't reach the Kaggaz server", result.FailureReason);
             }
             return result.IsSuccess;
         }
@@ -144,6 +163,15 @@ public sealed class HeartbeatService : BackgroundService
         {
             return false;
         }
+    }
+
+    /// <summary>Log the reason the server can't be reached once per change (the probe runs every 5 s).</summary>
+    private void ReportProblem(string? problem)
+    {
+        if (problem == _lastProblem) return;
+        _lastProblem = problem;
+        if (problem is null) _log.LogInformation("Server reachable again at {Url}", _settings.ApiBaseUrl);
+        else _log.LogWarning("Server unreachable at {Url}: {Problem}", _settings.ApiBaseUrl, problem);
     }
 
     private static DateTimeOffset GetProcessStart()

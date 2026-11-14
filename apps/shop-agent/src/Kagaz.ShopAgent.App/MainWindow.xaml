@@ -69,7 +69,7 @@
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center"
                                      Fill="{Binding Status.Connection, Converter={StaticResource ConnectionBrush}}" />
-                            <TextBlock Text="{Binding Status.ConnectionText}" FontSize="12" TextWrapping="Wrap"
+                            <TextBlock Text="{Binding Status.ConnectionText}" FontSize="12" TextWrapping="Wrap" ToolTip="{Binding Status.ConnectionProblem}"
                                        Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" MaxWidth="170" />
                         </StackPanel>
                         <!-- Read-only approval mode (ADR-002: changed in Settings) -->
@@ -178,7 +178,7 @@
                     <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center"
                              Fill="{Binding Status.Connection, Converter={StaticResource ConnectionBrush}}" />
                     <TextBlock Text="{Binding Status.ConnectionText}" Style="{StaticResource SecondaryText}" FontSize="12"
-                               VerticalAlignment="Center" />
+                               ToolTip="{Binding Status.ConnectionProblem}" VerticalAlignment="Center" />
                     <StackPanel Orientation="Horizontal" Margin="20,0,0,0"
                                 Visibility="{Binding Status.IsOperatorSignedIn, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="&#xE77B;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0"

@@ -28,6 +28,7 @@ public sealed partial class PairingViewModel : ObservableObject
 {
     private readonly ShopApiClient _api;
     private readonly AgentSettings _settings;
+    private readonly AgentPaths _paths;
 
     [ObservableProperty]
     private string _apiUrl;
@@ -74,14 +75,44 @@ public sealed partial class PairingViewModel : ObservableObject
     private string _deviceName;
 
     public PairingViewModel(ShopApiClient api, AgentSettings settings, AgentStateStore state, AppStatus status,
-        SupportViewModel? support = null)
+        AgentPaths paths, SupportViewModel? support = null)
     {
         _api = api;
         _settings = settings;
+        _paths = paths;
         Status = status;
         Support = support ?? new SupportViewModel();
         _apiUrl = settings.ApiBaseUrl;
         _deviceName = state.Load().DeviceName ?? Environment.MachineName;
+    }
+
+    // ─── Can't reach the server: give the shop something exact to send us ───
+
+    /// <summary>What Kaggaz support needs to diagnose a PC that can't reach the server.</summary>
+    public string Diagnostics() =>
+        $"Kaggaz Shop {_settings.AppVersion} on Windows {Environment.OSVersion.Version}{Environment.NewLine}" +
+        $"Server: {_settings.ApiBaseUrl}{Environment.NewLine}" +
+        $"Problem: {Status.ConnectionProblem ?? "none"}{Environment.NewLine}" +
+        $"Logs: {_paths.LogsDirectory}";
+
+    [RelayCommand]
+    private void CopyDiagnostics()
+    {
+        try { System.Windows.Clipboard.SetText(Diagnostics()); }
+        catch (System.Runtime.InteropServices.COMException) { } // clipboard held by another app
+    }
+
+    [RelayCommand]
+    private void OpenLogs() => Open(_paths.LogsDirectory);
+
+    /// <summary>If the browser can open the server but the app can't, something on this PC blocks the app.</summary>
+    [RelayCommand]
+    private void OpenServerInBrowser() => Open(_settings.ApiBaseUrl.TrimEnd('/') + "/health");
+
+    private static void Open(string target)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target) { UseShellExecute = true }); }
+        catch (System.ComponentModel.Win32Exception) { }
     }
 
     public AppStatus Status { get; }
@@ -274,7 +305,6 @@ public sealed partial class PairingViewModel : ObservableObject
 
     public static string CommonError(ApiException ex) => ex.Code switch
     {
-        ApiErrorCodes.NetworkError => "Can't reach Kaggaz. Check this PC's internet connection and try again.",
         ApiErrorCodes.RateLimited or "TOO_MANY_REQUESTS" or "TooManyRequests" => "Too many attempts. Please try again later.",
         ApiErrorCodes.AgentUpgradeRequired => "This version of Kaggaz Shop is too old. Install the latest version from kaggaz.in.",
         _ when ex.HttpStatus == 429 => "Too many attempts. Please try again later.",

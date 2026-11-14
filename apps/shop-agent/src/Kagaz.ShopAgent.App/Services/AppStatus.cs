@@ -36,6 +36,10 @@ public sealed partial class AppStatus : ObservableObject
     [ObservableProperty]
     private string _connectionText = "Checking connection…";
 
+    /// <summary>Why the server can't be reached ("api.kaggaz.in: No such host is known"); null while it can.</summary>
+    [ObservableProperty]
+    private string? _connectionProblem;
+
     [ObservableProperty]
     private bool _isPaired;
 
@@ -168,10 +172,11 @@ public sealed partial class AppStatus : ObservableObject
     /// <summary>Raised on the UI thread after the operator unpairs this PC or it was revoked.</summary>
     public event Action? Unpaired;
 
-    public void SetConnection(ConnectionState state, string text) => OnUi(() =>
+    public void SetConnection(ConnectionState state, string text, string? problem = null) => OnUi(() =>
     {
         Connection = state;
         ConnectionText = text;
+        ConnectionProblem = problem;
     });
 
     /// <summary>Apply the heartbeat's <c>shop</c> block (or a <c>shop.mode_changed</c> hint).</summary>

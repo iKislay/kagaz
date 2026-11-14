@@ -51,6 +51,28 @@
 
             <!-- Not paired: first-run welcome -->
             <StackPanel Visibility="{Binding Status.IsPaired, Converter={StaticResource InverseBoolToVisibility}}">
+                <!-- The server can't be reached from this PC: say exactly why, and how to prove where the block is -->
+                <Border Background="#14FF3B30" CornerRadius="12" Padding="16,12" Margin="0,0,0,16"
+                        Visibility="{Binding Status.ConnectionProblem, Converter={StaticResource NullToVisibility}}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="16" Foreground="{StaticResource RedBrush}"
+                                       Margin="0,0,10,0" VerticalAlignment="Top" />
+                            <StackPanel>
+                                <TextBlock Text="This PC can't reach the Kaggaz server" Style="{StaticResource HeadlineText}" />
+                                <TextBlock Text="{Binding Status.ConnectionProblem}" Style="{StaticResource BodyText}" TextWrapping="Wrap" MaxWidth="460" Margin="0,4,0,0" />
+                                <TextBlock Style="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="460" Margin="0,8,0,0"
+                                           Text="Check this PC's internet. If the page below opens in your browser but Kaggaz Shop still can't connect, an antivirus or firewall on this PC is blocking Kaggaz Shop — allow it there. Still stuck? Copy the details and WhatsApp them to Kaggaz." />
+                            </StackPanel>
+                        </StackPanel>
+                        <WrapPanel Margin="26,10,0,0">
+                            <Button Content="Open the server page in your browser" Style="{StaticResource QuietButton}" Command="{Binding OpenServerInBrowserCommand}" Margin="0,0,8,8" />
+                            <Button Content="Copy details" Style="{StaticResource QuietButton}" Command="{Binding CopyDiagnosticsCommand}" Margin="0,0,8,8" />
+                            <Button Content="Open log folder" Style="{StaticResource LinkButton}" Command="{Binding OpenLogsCommand}" Margin="0,0,0,8" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
                 <TextBlock Text="Welcome to Kaggaz Shop" Style="{StaticResource TitleText}" />
                 <TextBlock Text="Customers send their files from their phones. Kaggaz prints them on your shop printer, each with a pickup slip, and they pay you at the counter."
                            Style="{StaticResource SubtitleText}" TextWrapping="Wrap" Margin="0,10,0,18" />
