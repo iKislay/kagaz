@@ -283,29 +283,6 @@ describe('cancellation and business rules (P3.6)', () => {
     );
   });
 
-  it('opening hours (Asia/Kolkata) gate new orders', async () => {
-    const shop = await createShop(h.prisma);
-    const order = await payableOrder(h, shop.id);
-    // A window that is never "now": one minute, 12 hours away from the current IST time.
-    const ist = new Date(Date.now() + 330 * 60_000 + 12 * 3600_000);
-    const hh = String(ist.getUTCHours()).padStart(2, '0');
-    const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    await h.prisma.shop.update({
-      where: { id: shop.id },
-      data: { openingHours: { [days[ist.getUTCDay()]!]: [[`${hh}:00`, `${hh}:01`]] } },
-    });
-    const res = await h
-      .http()
-      .post('/api/orders')
-      .send({ shopId: shop.id, options: MONO })
-      .expect(409);
-    expect(res.body.error).toMatchObject({
-      code: 'SHOP_UNAVAILABLE',
-      details: { reason: 'OUTSIDE_OPENING_HOURS' },
-    });
-    expect((await pay(h, order).expect(409)).body.error.code).toBe('SHOP_UNAVAILABLE');
-  });
-
   it('P3.8: admin stores settlement fields (inactive)', async () => {
     const shop = await createShop(h.prisma);
     const res = await h

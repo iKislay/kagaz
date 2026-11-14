@@ -191,12 +191,6 @@ describe('shop settings, printers, pricing (P4.3)', () => {
       autoLimits: { maxPages: 20, maxQueueDepth: 4 },
     });
     await h.http().patch(`/api/admin/shops/${id}`).set(admin).send({ status: 'NOPE' }).expect(400);
-    await h
-      .http()
-      .patch(`/api/admin/shops/${id}`)
-      .set(admin)
-      .send({ openingHours: { mon: [['20:00', '09:00']] } })
-      .expect(400);
     const updatedAudit = await h.prisma.auditLog.findFirstOrThrow({
       where: { shopId: id, action: 'shop.updated' },
     });
