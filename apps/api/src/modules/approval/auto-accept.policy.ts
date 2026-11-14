@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { type PrintOptions } from '@kagaz/shared';
-import { isWithinOpeningHours } from '../shops/opening-hours.js';
 
 /** Why an order was NOT auto-accepted (stored on the PENDING_REVIEW order event). */
 export const AutoAcceptReason = {
@@ -8,7 +7,6 @@ export const AutoAcceptReason = {
   AUTO_PAUSED: 'AUTO_PAUSED',
   SHOP_NOT_OPEN: 'SHOP_NOT_OPEN',
   SHOP_MAINTENANCE: 'SHOP_MAINTENANCE',
-  OUTSIDE_OPENING_HOURS: 'OUTSIDE_OPENING_HOURS',
   FILE_NOT_VALIDATED: 'FILE_NOT_VALIDATED',
   TOO_MANY_PAGES: 'TOO_MANY_PAGES',
   TOO_MANY_COPIES: 'TOO_MANY_COPIES',
@@ -44,7 +42,6 @@ export interface AutoAcceptShop {
   approvalMode: 'MANUAL' | 'AUTO';
   autoPaused: boolean;
   autoLimits: unknown;
-  openingHours: unknown;
 }
 
 export interface AutoAcceptOrder {
@@ -112,9 +109,6 @@ export const AutoAcceptPolicy = {
     // 1. Shop availability
     if (shop.status === 'MAINTENANCE') reasons.push(AutoAcceptReason.SHOP_MAINTENANCE);
     else if (shop.status !== 'OPEN') reasons.push(AutoAcceptReason.SHOP_NOT_OPEN);
-    if (!isWithinOpeningHours(shop.openingHours, ctx.now)) {
-      reasons.push(AutoAcceptReason.OUTSIDE_OPENING_HOURS);
-    }
 
     // 2. Mode
     if (shop.approvalMode !== 'AUTO') reasons.push(AutoAcceptReason.MANUAL_MODE);

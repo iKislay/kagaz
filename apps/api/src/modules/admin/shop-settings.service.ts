@@ -5,9 +5,7 @@ import {
   type AdminShopMemberRequest,
   type AdminShopUpdateRequest,
   type AutoLimits,
-  OPENING_DAYS,
   OWNER_EDITABLE_SHOP_FIELDS,
-  type OpeningHours,
 } from '@kagaz/shared';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
@@ -24,7 +22,7 @@ export const DEFAULT_AUTO_LIMITS: AutoLimits = {
 };
 
 /**
- * Shop settings (P4.3, FR-ADMIN-03): details, opening hours, status, approval mode, auto
+ * Shop settings (P4.3, FR-ADMIN-03): details, status, approval mode, auto
  * limits, pause. Admins edit everything; owners only OWNER_EDITABLE_SHOP_FIELDS of their own
  * shop (scope enforced by ShopScopeGuard). Every change is audited in the same transaction.
  */
@@ -159,7 +157,6 @@ export class ShopSettingsService {
       approvalMode: shop.approvalMode,
       autoPaused: shop.autoPaused,
       autoLimits: (shop.autoLimits ?? {}) as Partial<AutoLimits>,
-      openingHours: normalizeHours(shop.openingHours),
       isDemo: shop.isDemo,
       latitude: shop.latitude,
       longitude: shop.longitude,
@@ -189,7 +186,7 @@ export class ShopSettingsService {
           status: 'CLOSED', // opens once it has a device, printer and pricing
           approvalMode: 'MANUAL',
           autoLimits: DEFAULT_AUTO_LIMITS,
-          openingHours: normalizeHours({}),
+          openingHours: {}, // unused column (opening hours were removed)
           isDemo: req.isDemo ?? false,
         },
       });
@@ -225,7 +222,6 @@ export class ShopSettingsService {
       if (!shop) throw shopNotFound();
 
       const patch: Record<string, unknown> = { ...req };
-      if (req.openingHours) patch.openingHours = normalizeHours(req.openingHours);
       // Auto-accept preconditions (PRD §8.4) are evaluated per order, not at mode switch.
       const changes = diffFields(shop as unknown as Record<string, unknown>, patch);
       if (Object.keys(changes).length === 0) return;
@@ -242,17 +238,6 @@ export class ShopSettingsService {
     // Realtime `shop.mode_changed` belongs to the realtime workstream (contract §5).
     return this.detail(shopId);
   }
-}
-
-/** Every weekday present; missing days are closed ([]). */
-export function normalizeHours(value: unknown): OpeningHours {
-  const src = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
-  const out: OpeningHours = {};
-  for (const day of OPENING_DAYS) {
-    const intervals = Array.isArray(src[day]) ? (src[day] as [string, string][]) : [];
-    out[day] = [...intervals].sort((a, b) => a[0].localeCompare(b[0]));
-  }
-  return out;
 }
 
 export function shopNotFound(): AppError {

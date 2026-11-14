@@ -12,7 +12,6 @@ import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { OrderStateMachine } from '../orders/order-state-machine.js';
-import { isWithinOpeningHours } from '../shops/opening-hours.js';
 import { RefundsService } from './refunds.service.js';
 
 /** Statuses an admin may reject from (before the stack is handed over). */
@@ -78,7 +77,7 @@ export class AdminOrderActionsService {
    * is closed, in maintenance or outside opening hours — they are kept, never auto-printed,
    * and need an explicit decision (accept when the shop reopens, or reject → refund).
    */
-  async heldOrders(now: Date = new Date()): Promise<HeldOrder[]> {
+  async heldOrders(): Promise<HeldOrder[]> {
     const orders = await this.prisma.order.findMany({
       where: { status: OrderStatus.PENDING_REVIEW },
       include: { shop: true },
@@ -92,9 +91,7 @@ export class AdminOrderActionsService {
           ? 'SHOP_MAINTENANCE'
           : o.shop.status !== 'OPEN'
             ? 'SHOP_NOT_OPEN'
-            : !isWithinOpeningHours(o.shop.openingHours, now)
-              ? 'OUTSIDE_OPENING_HOURS'
-              : null;
+            : null;
       if (!reason) continue;
       held.push({
         orderId: o.id,

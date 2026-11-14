@@ -17,7 +17,7 @@ import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.j
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type Prisma } from '../../generated/prisma/client.js';
-import { DEFAULT_AUTO_LIMITS, normalizeHours } from '../admin/shop-settings.service.js';
+import { DEFAULT_AUTO_LIMITS } from '../admin/shop-settings.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { LoginRateLimiter } from '../identity/login-rate-limiter.js';
 import { hashPassword, loginWhere, verifyPassword } from '../identity/passwords.js';
@@ -98,7 +98,7 @@ export class DevicesService {
           status: 'CLOSED', // Kaggaz activates it (subscription), then the owner opens it
           approvalMode: 'MANUAL',
           autoLimits: DEFAULT_AUTO_LIMITS,
-          openingHours: normalizeHours({}),
+          openingHours: {}, // unused column (opening hours were removed)
           isDemo: false,
           pricing: { create: { ...SIGNUP_PRICING, effectiveFrom: new Date() } },
         },

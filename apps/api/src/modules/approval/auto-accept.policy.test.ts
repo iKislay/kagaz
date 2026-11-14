@@ -14,7 +14,6 @@ const shop: AutoAcceptShop = {
   approvalMode: 'AUTO',
   autoPaused: false,
   autoLimits: { maxPages: 50, maxCopies: 5, maxSides: 250, maxQueueDepth: 10 },
-  openingHours: { sat: [['08:00', '21:00']] },
 };
 const printer: AutoAcceptPrinter = {
   id: 'p1',
@@ -55,13 +54,6 @@ describe('AutoAcceptPolicy.evaluate (PRD §8.4)', () => {
       expect(evaluate({}, { status: 'MAINTENANCE' }).reasons).toEqual([
         AutoAcceptReason.SHOP_MAINTENANCE,
       ]);
-    });
-    it('outside opening hours (Asia/Kolkata)', () => {
-      const r = evaluate({}, { openingHours: { sat: [['13:00', '21:00']] } });
-      expect(r).toMatchObject({
-        eligible: false,
-        reasons: [AutoAcceptReason.OUTSIDE_OPENING_HOURS],
-      });
     });
   });
 

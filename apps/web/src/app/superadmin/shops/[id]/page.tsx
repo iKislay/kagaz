@@ -11,16 +11,15 @@ import { useAdminSession } from '../../_components/session';
 import {
   DevicesSection,
   MembersSection,
-  HoursSection,
   PricingSection,
   PrintersSection,
   SettingsSection,
 } from './sections';
 import { SubscriptionSection } from './subscription';
 
-type Tab = 'settings' | 'hours' | 'pricing' | 'members' | 'printers' | 'devices' | 'subscription';
+type Tab = 'settings' | 'pricing' | 'members' | 'printers' | 'devices' | 'subscription';
 
-/** Shop management (P4.3): settings, hours, pricing, printers, devices + enrollment codes. */
+/** Shop management (P4.3): settings, pricing, printers, devices + enrollment codes. */
 export default function ShopDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { me } = useAdminSession();
@@ -36,7 +35,6 @@ export default function ShopDetailPage() {
 
   const tabs: { value: Tab; label: string }[] = [
     { value: 'settings', label: 'Settings' },
-    { value: 'hours', label: 'Hours' },
     { value: 'pricing', label: 'Pricing' },
     { value: 'members', label: 'Logins' },
     ...(admin
@@ -84,7 +82,6 @@ export default function ShopDetailPage() {
               {tab === 'settings' && (
                 <SettingsSection shop={shop} admin={admin} onSaved={setData} />
               )}
-              {tab === 'hours' && <HoursSection shop={shop} onSaved={setData} />}
               {tab === 'pricing' && <PricingSection shopId={shop.id} />}
               {tab === 'members' && <MembersSection shop={shop} admin={admin} onSaved={setData} />}
               {tab === 'printers' && admin && <PrintersSection shopId={shop.id} />}

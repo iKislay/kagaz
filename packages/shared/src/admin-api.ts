@@ -348,25 +348,6 @@ export type AdminMe = z.infer<typeof AdminMeSchema>;
 
 // ─── Shop management (P4.3, FR-ADMIN-03…06) ───
 
-const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/, 'Use HH:MM (24 h)');
-export const OPENING_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-export type OpeningDay = (typeof OPENING_DAYS)[number];
-
-/** Opening hours in Asia/Kolkata: per weekday, up to 4 [open, close] intervals. */
-const DayIntervals = z
-  .array(z.tuple([HHMM, HHMM]).refine(([a, b]) => a < b, 'Opening time must be before closing'))
-  .max(4);
-export const OpeningHoursSchema = z.strictObject({
-  mon: DayIntervals.optional(),
-  tue: DayIntervals.optional(),
-  wed: DayIntervals.optional(),
-  thu: DayIntervals.optional(),
-  fri: DayIntervals.optional(),
-  sat: DayIntervals.optional(),
-  sun: DayIntervals.optional(),
-});
-export type OpeningHours = z.infer<typeof OpeningHoursSchema>;
-
 export const AutoLimitsSchema = z.strictObject({
   maxPages: z.int().min(1).max(1000),
   maxCopies: z.int().min(1).max(100),
@@ -385,7 +366,6 @@ export const AdminShopDetailSchema = z.object({
   approvalMode: ApprovalModeSchema,
   autoPaused: z.boolean(),
   autoLimits: AutoLimitsSchema.partial(),
-  openingHours: OpeningHoursSchema,
   isDemo: z.boolean(),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
@@ -415,16 +395,10 @@ export const AdminShopUpdateRequestSchema = z.strictObject({
   approvalMode: ApprovalModeSchema.optional(),
   autoPaused: z.boolean().optional(),
   autoLimits: AutoLimitsSchema.optional(),
-  openingHours: OpeningHoursSchema.optional(),
   isDemo: z.boolean().optional(),
 });
 export type AdminShopUpdateRequest = z.infer<typeof AdminShopUpdateRequestSchema>;
-export const OWNER_EDITABLE_SHOP_FIELDS = [
-  'contactPhone',
-  'approvalMode',
-  'autoPaused',
-  'openingHours',
-] as const;
+export const OWNER_EDITABLE_SHOP_FIELDS = ['contactPhone', 'approvalMode', 'autoPaused'] as const;
 
 /**
  * Indian mobile numbers as typed by people → E.164: "98765 43210" / "09876543210" /
@@ -860,7 +834,7 @@ export const HeldOrderSchema = z.object({
   shopId: z.uuid(),
   shopName: z.string(),
   shopStatus: ShopStatusSchema,
-  /** SHOP_NOT_OPEN | SHOP_MAINTENANCE | OUTSIDE_OPENING_HOURS */
+  /** SHOP_NOT_OPEN | SHOP_MAINTENANCE */
   reason: z.string(),
   amountPaise: z.int().nullable(),
   paidAt: z.string().nullable(),

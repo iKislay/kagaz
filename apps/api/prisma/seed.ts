@@ -31,17 +31,6 @@ const prisma = new PrismaClient({
 });
 
 const DEFAULT_AUTO_LIMITS = { maxPages: 50, maxCopies: 5, maxSides: 250, maxQueueDepth: 10 };
-const DAILY = [['08:00', '21:00']];
-const OPENING_HOURS = {
-  mon: DAILY,
-  tue: DAILY,
-  wed: DAILY,
-  thu: DAILY,
-  fri: DAILY,
-  sat: DAILY,
-  sun: [],
-};
-
 const SHOPS = [
   {
     slug: 'demo-shop-a',
@@ -143,7 +132,7 @@ async function main() {
         status: 'OPEN',
         approvalMode: 'MANUAL',
         autoLimits: DEFAULT_AUTO_LIMITS,
-        openingHours: OPENING_HOURS,
+        openingHours: {},
         isDemo: true,
         onboardedAt: new Date(), // demo shops are fully set up
       },
