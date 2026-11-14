@@ -10,6 +10,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
+import { type Readable } from 'node:stream';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
 
@@ -109,6 +110,18 @@ export class StorageService implements OnModuleDestroy {
     }
     const bytes = await res.Body!.transformToByteArray();
     return Buffer.from(bytes);
+  }
+
+  /** Stream an object (served through the API), or null if it doesn't exist. */
+  async getStream(key: string): Promise<{ body: Readable; bytes: number } | null> {
+    try {
+      const res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      // In Node the SDK body is an IncomingMessage (a Readable).
+      return { body: res.Body as Readable, bytes: res.ContentLength ?? 0 };
+    } catch (err) {
+      if (isNotFound(err)) return null;
+      throw err;
+    }
   }
 
   async put(key: string, body: Buffer | Uint8Array, contentType: string): Promise<void> {

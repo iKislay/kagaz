@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, Param, Redirect } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Param, StreamableFile } from '@nestjs/common';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { StorageService } from './storage.service.js';
 
@@ -8,21 +8,27 @@ const SHOP_AGENT_FILE =
   /^(KagazShop-win-Setup\.exe|KagazShop-win-Portable\.zip|releases\.win\.json|assets\.win\.json|RELEASES|KagazShop-\d+\.\d+\.\d+(-[\w.]+)?-(full|delta)\.nupkg)$/;
 
 /**
- * Public downloads (the Windows shop app). The bucket stays private (CLAUDE.md invariant 11):
- * each request is redirected to a short-lived signed URL for an allow-listed file name.
+ * Public downloads (the Windows shop app), streamed from the private bucket (invariant 11) for an
+ * allow-listed file name. Served from api.kaggaz.in itself: redirecting to a presigned
+ * *.r2.cloudflarestorage.com URL got the installer blocked by antivirus web shields.
  */
 @Controller('downloads')
 export class DownloadsController {
   constructor(private readonly storage: StorageService) {}
 
   @Get('shop-agent/:file')
-  @Redirect()
-  async shopAgent(@Param('file') file: string): Promise<{ url: string; statusCode: number }> {
-    const key = SHOP_AGENT_PREFIX + file;
-    if (!SHOP_AGENT_FILE.test(file) || !(await this.storage.head(key))) {
+  async shopAgent(@Param('file') file: string): Promise<StreamableFile> {
+    const object = SHOP_AGENT_FILE.test(file)
+      ? await this.storage.getStream(SHOP_AGENT_PREFIX + file)
+      : null;
+    if (!object) {
       throw new AppError('DOWNLOAD_NOT_FOUND', 'File not found', HttpStatus.NOT_FOUND);
     }
-    const { url } = await this.storage.createDownloadUrl(key, 300);
-    return { url, statusCode: HttpStatus.FOUND };
+    const json = file.endsWith('.json');
+    return new StreamableFile(object.body, {
+      type: json ? 'application/json' : 'application/octet-stream',
+      length: object.bytes,
+      disposition: json ? undefined : `attachment; filename="${file}"`,
+    });
   }
 }

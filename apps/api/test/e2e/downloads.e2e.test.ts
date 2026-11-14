@@ -12,16 +12,31 @@ afterAll(async () => {
 });
 
 describe('shop app downloads', () => {
-  it('redirects an uploaded file to a short-lived signed URL', async () => {
-    await h.app
-      .get(StorageService)
-      .put(`${SHOP_AGENT_PREFIX}releases.win.json`, Buffer.from('{}'), 'application/json');
-    const res = await h
+  it('streams an uploaded file from the API itself (no storage redirect)', async () => {
+    const storage = h.app.get(StorageService);
+    await storage.put(
+      `${SHOP_AGENT_PREFIX}releases.win.json`,
+      Buffer.from('{"a":1}'),
+      'application/json',
+    );
+    await storage.put(
+      `${SHOP_AGENT_PREFIX}KagazShop-win-Setup.exe`,
+      Buffer.from('MZ'),
+      'application/octet-stream',
+    );
+
+    const feed = await h
       .http()
       .get('/api/downloads/shop-agent/releases.win.json?arch=x64')
-      .expect(302);
-    expect(res.headers.location).toContain('releases.win.json');
-    expect(res.headers.location).toContain('X-Amz-Signature');
+      .expect(200);
+    expect(feed.headers['content-type']).toContain('application/json');
+    expect(feed.body).toEqual({ a: 1 });
+
+    const exe = await h.http().get('/api/downloads/shop-agent/KagazShop-win-Setup.exe').expect(200);
+    expect(exe.headers['content-disposition']).toBe(
+      'attachment; filename="KagazShop-win-Setup.exe"',
+    );
+    expect(exe.headers['content-length']).toBe('2');
   });
 
   it('404s for files that are not uploaded or not allow-listed', async () => {
