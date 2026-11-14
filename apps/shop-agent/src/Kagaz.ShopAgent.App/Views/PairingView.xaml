@@ -51,13 +51,7 @@
 
             <!-- Not paired: first-run welcome -->
             <StackPanel Visibility="{Binding Status.IsPaired, Converter={StaticResource InverseBoolToVisibility}}">
-                <StackPanel Orientation="Horizontal">
-                    <Border Width="44" Height="44" CornerRadius="12" Background="{StaticResource AccentBrush}">
-                        <TextBlock Text="K" Foreground="White" FontFamily="{StaticResource DisplayFont}" FontSize="24" FontWeight="Bold"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Text="Welcome to Kaggaz Shop" Style="{StaticResource TitleText}" Margin="14,0,0,0" VerticalAlignment="Center" />
-                </StackPanel>
+                <TextBlock Text="Welcome to Kaggaz Shop" Style="{StaticResource TitleText}" />
                 <TextBlock Text="Customers send their files from their phones. Kaggaz prints them on your shop printer, each with a pickup slip, and they pay you at the counter."
                            Style="{StaticResource SubtitleText}" TextWrapping="Wrap" Margin="0,10,0,18" />
 

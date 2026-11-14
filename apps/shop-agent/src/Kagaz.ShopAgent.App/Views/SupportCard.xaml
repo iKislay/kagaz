@@ -10,28 +10,28 @@
     <StackPanel>
         <TextBlock Text="Need help? Contact Kaggaz support" Style="{StaticResource HeadlineText}" FontSize="14" />
         <WrapPanel Margin="0,8,0,0">
-            <Button Style="{StaticResource QuietButton}" Command="{Binding CallCommand}" Margin="0,0,8,8"
+            <Button Style="{StaticResource QuietButton}" Command="{Binding CallCommand}" Margin="0,0,8,8" AutomationProperties.Name="Call Kaggaz support"
                     Visibility="{Binding Phone, Converter={StaticResource NullToVisibility}}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE717;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
                     <TextBlock Text="{Binding DisplayPhone}" />
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource QuietButton}" Command="{Binding OpenWhatsAppCommand}" Margin="0,0,8,8"
+            <Button Style="{StaticResource QuietButton}" Command="{Binding OpenWhatsAppCommand}" Margin="0,0,8,8" AutomationProperties.Name="WhatsApp Kaggaz support"
                     Visibility="{Binding WhatsAppUrl, Converter={StaticResource NullToVisibility}}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE8BD;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
                     <TextBlock Text="WhatsApp" />
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource QuietButton}" Command="{Binding SendEmailCommand}" Margin="0,0,8,8"
+            <Button Style="{StaticResource QuietButton}" Command="{Binding SendEmailCommand}" Margin="0,0,8,8" AutomationProperties.Name="Email Kaggaz support"
                     Visibility="{Binding Email, Converter={StaticResource NullToVisibility}}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE715;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
                     <TextBlock Text="{Binding Email}" />
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource QuietButton}" Command="{Binding OpenWebsiteCommand}" Margin="0,0,8,8">
+            <Button Style="{StaticResource QuietButton}" Command="{Binding OpenWebsiteCommand}" Margin="0,0,8,8" AutomationProperties.Name="Visit kaggaz.in">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE774;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
                     <TextBlock Text="Visit kaggaz.in" />

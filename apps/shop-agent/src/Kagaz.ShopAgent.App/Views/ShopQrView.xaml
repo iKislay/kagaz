@@ -22,7 +22,7 @@
         </StackPanel>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,16">
-            <Button Style="{StaticResource PrimaryButton}" Click="Print_Click" IsEnabled="{Binding HasQr}">
+            <Button Style="{StaticResource PrimaryButton}" Click="Print_Click" IsEnabled="{Binding HasQr}" AutomationProperties.Name="Print poster">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE749;" Style="{StaticResource IconText}" FontSize="13" Foreground="White" Margin="0,0,8,0" />
                     <TextBlock Text="Print poster" />

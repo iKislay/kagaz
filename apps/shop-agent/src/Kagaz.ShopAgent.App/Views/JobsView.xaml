@@ -29,7 +29,7 @@
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,6,0,0">
                 <CheckBox Style="{StaticResource ToggleSwitch}" Content="Pause printing" IsChecked="{Binding IsPaused}" Margin="0,0,16,0" VerticalAlignment="Center" />
-                <Button Style="{StaticResource QuietButton}" Command="{Binding RefreshCommand}" ToolTip="Refresh now">
+                <Button Style="{StaticResource QuietButton}" Command="{Binding RefreshCommand}" ToolTip="Refresh now" AutomationProperties.Name="Refresh">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0" />
                         <TextBlock Text="Refresh" />
