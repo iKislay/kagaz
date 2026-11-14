@@ -8,14 +8,14 @@
              d:DataContext="{d:DesignInstance Type=vm:PrintersViewModel}"
              d:DesignHeight="600" d:DesignWidth="800"
              Loaded="OnLoaded">
-    <Grid>
+    <Grid MaxWidth="720">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" MaxWidth="720" HorizontalAlignment="Left">
+        <StackPanel Grid.Row="0">
             <TextBlock Text="Printers" Style="{StaticResource TitleText}" />
             <TextBlock Text="Choose the printer Kaggaz orders print on and confirm what it can really do. Kaggaz never sends a colour or double-sided order to a printer you haven't confirmed for it."
                        Style="{StaticResource SubtitleText}" />
@@ -24,7 +24,6 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
           <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="10*" MaxWidth="720" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <ItemsControl ItemsSource="{Binding Printers}">

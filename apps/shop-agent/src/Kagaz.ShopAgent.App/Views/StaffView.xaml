@@ -8,7 +8,7 @@
              d:DataContext="{d:DesignInstance Type=vm:StaffViewModel}"
              d:DesignHeight="700" d:DesignWidth="800">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="620" HorizontalAlignment="Left">
+        <StackPanel MaxWidth="720">
             <TextBlock Text="Staff" Style="{StaticResource TitleText}" />
             <TextBlock Text="People who can sign in to Kaggaz Shop for your shop with their mobile number."
                        Style="{StaticResource SubtitleText}" TextWrapping="Wrap" />

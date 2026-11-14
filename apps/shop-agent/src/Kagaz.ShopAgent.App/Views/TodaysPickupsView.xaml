@@ -8,7 +8,7 @@
              d:DataContext="{d:DesignInstance Type=vm:TodaysPickupsViewModel}"
              d:DesignHeight="700" d:DesignWidth="900">
     <!-- ADR-002: a list, not a verification step. Customers say "number 7"; find it here or in the stack. -->
-    <Grid MaxWidth="760" HorizontalAlignment="Left">
+    <Grid MaxWidth="720">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />

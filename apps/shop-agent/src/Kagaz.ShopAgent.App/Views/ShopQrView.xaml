@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:ShopQrViewModel}"
              d:DesignHeight="700" d:DesignWidth="900">
-    <Grid MaxWidth="760" HorizontalAlignment="Left">
+    <Grid MaxWidth="720">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />

@@ -9,7 +9,7 @@
              d:DataContext="{d:DesignInstance Type=vm:PricesViewModel}"
              d:DesignHeight="700" d:DesignWidth="800">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="560" HorizontalAlignment="Left">
+        <StackPanel MaxWidth="720">
             <TextBlock Text="Prices" Style="{StaticResource TitleText}" />
             <TextBlock Text="What customers pay per printed side, in rupees. Customers see the new prices for new orders."
                        Style="{StaticResource SubtitleText}" TextWrapping="Wrap" />
