@@ -176,3 +176,4 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 - 2026-11-12: production at kaggaz.in / api.kaggaz.in runs pay-at-counter (ADR-003). Live gateway still gated by **D6** (merchant of record).
 - 2026-11-12: shop subscriptions per connected printer, manual payment ledger in /superadmin → Billing ([ADR-004](docs/decisions/ADR-004-subscriptions.md)); enforcement behind `BILLING_ENFORCED`.
 - 2026-11-14: shop address/location are set by the owner in the shop app's first-run setup (never typed by superadmin); `shops.address` nullable, `shops.onboarded_at`. Shop app 0.5.0 targets `net10.0-windows10.0.19041.0`. Installer downloads stream from the API (no R2 redirect).
+- 2026-11-14: opening hours removed (the `opening_hours` column stays, unused). The shop sets Open/Closed/Maintenance itself via `PATCH /api/shop/mode {status}` from the shop app's Settings; the app's approval is just Manual | Auto (a paused Auto shows as Manual).
