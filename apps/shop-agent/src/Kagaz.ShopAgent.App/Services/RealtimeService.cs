@@ -31,7 +31,7 @@ public sealed class RealtimeService : BackgroundService
             _status.SetRealtimeConnected(connected);
             _log.LogInformation(connected ? "Realtime connected" : "Realtime disconnected");
         };
-        _client.ModeChanged += (mode, paused) => _status.ApplyShopState(mode, paused);
+        _client.ModeChanged += (mode, paused, open) => _status.ApplyShopState(mode, paused, open);
         status.Session.DeviceTokenRotated += _client.ReconnectNow;
         status.Unpaired += _client.ReconnectNow;
     }

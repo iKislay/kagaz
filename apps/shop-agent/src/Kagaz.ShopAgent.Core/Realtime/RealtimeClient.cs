@@ -62,8 +62,8 @@ public sealed class RealtimeClient
     /// <summary>Connected / disconnected (drives the poll intervals and the status indicator).</summary>
     public event Action<bool>? ConnectionChanged;
 
-    /// <summary><c>shop.mode_changed</c>: approval mode + autoPaused.</summary>
-    public event Action<string?, bool>? ModeChanged;
+    /// <summary><c>shop.mode_changed</c>: approval mode, autoPaused and open status (null from older servers).</summary>
+    public event Action<string?, bool, string?>? ModeChanged;
 
     /// <summary>Drop the current connection and reconnect now (e.g. after token rotation).</summary>
     public void ReconnectNow() => _reconnectNow?.Cancel();
@@ -139,7 +139,8 @@ public sealed class RealtimeClient
                 {
                     string? mode = p.TryGetProperty("approvalMode", out var m) && m.ValueKind == JsonValueKind.String ? m.GetString() : null;
                     bool paused = p.TryGetProperty("autoPaused", out var a) && a.ValueKind == JsonValueKind.True;
-                    ModeChanged?.Invoke(mode, paused);
+                    string? status = p.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.String ? st.GetString() : null;
+                    ModeChanged?.Invoke(mode, paused, status);
                 }
                 _signals.Heartbeat.Pulse();
                 break;

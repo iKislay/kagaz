@@ -124,9 +124,11 @@ public static class ApprovalMode
     public const string Auto = "AUTO";
 }
 
-public record ShopModeRequest(string? ApprovalMode, bool? AutoPaused);
+/// <summary><c>PATCH /shop/mode</c>: any of approval mode, auto pause, and <c>OPEN|CLOSED|MAINTENANCE</c>.</summary>
+public record ShopModeRequest(string? ApprovalMode, bool? AutoPaused, string? Status = null);
 
-public record ShopModeResponse(string ApprovalMode, bool AutoPaused);
+/// <summary><paramref name="Status"/> is null from servers older than shop-set status.</summary>
+public record ShopModeResponse(string ApprovalMode, bool AutoPaused, string? Status = null);
 
 // ─── Needs-check resolution (contract §2) ───
 

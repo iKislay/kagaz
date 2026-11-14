@@ -72,13 +72,13 @@
                             <TextBlock Text="{Binding Status.ConnectionText}" FontSize="12" TextWrapping="Wrap" ToolTip="{Binding Status.ConnectionProblem}"
                                        Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" MaxWidth="170" />
                         </StackPanel>
-                        <!-- Read-only approval mode (ADR-002: changed in Settings) -->
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" ToolTip="Order approval — change it in Settings"
+                        <!-- Read-only shop status and approval mode (changed in Settings) -->
+                        <StackPanel Margin="0,6,0,0" ToolTip="Shop status and order approval — change them in Settings"
                                     Visibility="{Binding Mode.IsVisible, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="&#xE8FB;" Style="{StaticResource IconText}" FontSize="10" Width="10" Margin="-1,0,7,0"
-                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                            <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                       AutomationProperties.Name="Order approval mode">
+                            <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" AutomationProperties.Name="Shop status">
+                                <Run Text="Shop:" /> <Run Text="{Binding Mode.StatusIndicator, Mode=OneWay}" Foreground="{StaticResource TextBrush}" />
+                            </TextBlock>
+                            <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" AutomationProperties.Name="Order approval mode">
                                 <Run Text="Approval:" /> <Run Text="{Binding Mode.Indicator, Mode=OneWay}" Foreground="{StaticResource TextBrush}" />
                             </TextBlock>
                         </StackPanel>

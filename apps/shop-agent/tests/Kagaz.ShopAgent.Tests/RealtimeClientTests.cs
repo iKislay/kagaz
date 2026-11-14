@@ -58,12 +58,12 @@ public class RealtimeClientTests
     public void Mode_changed_payload_is_forwarded()
     {
         var client = new RealtimeClient(() => new FakeConnection(), () => "t", new AgentSignals());
-        (string? Mode, bool Paused)? got = null;
-        client.ModeChanged += (m, p) => got = (m, p);
+        (string? Mode, bool Paused, string? Status)? got = null;
+        client.ModeChanged += (m, p, s) => got = (m, p, s);
 
-        client.Dispatch("shop.mode_changed", JsonDocument.Parse("""{ "approvalMode": "AUTO", "autoPaused": true }""").RootElement);
+        client.Dispatch("shop.mode_changed", JsonDocument.Parse("""{ "approvalMode": "AUTO", "autoPaused": true, "status": "CLOSED" }""").RootElement);
 
-        Assert.Equal(("AUTO", true), got);
+        Assert.Equal(("AUTO", true, "CLOSED"), got);
     }
 
     [Fact]

@@ -13,33 +13,22 @@
             <TextBlock Text="Settings" Style="{StaticResource TitleText}" />
             <TextBlock Text="How this shop takes orders, plus connection and app details for support." Style="{StaticResource SubtitleText}" />
 
-            <!-- Order approval (ADR-002): a shop setting; reflects the heartbeat / socket state, PATCHes only on operator changes. -->
+            <!-- The shop's daily switches: open/closed and order approval (ADR-002). Reflect the heartbeat /
+                 socket state; PATCH only on operator changes. -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding Mode}"
                     Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
+                    <TextBlock Text="Shop status" Style="{StaticResource HeadlineText}" />
+                    <ListBox AutomationProperties.Name="Shop status" Style="{StaticResource SegmentedControl}" HorizontalAlignment="Left" Margin="0,10,0,0"
+                             ItemsSource="{Binding Statuses}" SelectedItem="{Binding SelectedStatus, Mode=TwoWay}"
+                             IsEnabled="{Binding CanChange}" />
+                    <TextBlock Text="{Binding StatusHint}" Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+                    <Border Style="{StaticResource Hairline}" />
                     <TextBlock Text="Order approval" Style="{StaticResource HeadlineText}" />
-                    <TextBlock Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,14">
-                        <Run Text="Auto:" FontWeight="SemiBold" /><Run Text=" paid orders print automatically when the printer can do them." />
-                        <LineBreak />
-                        <Run Text="Manual:" FontWeight="SemiBold" /><Run Text=" you accept each order." />
-                    </TextBlock>
-                    <ListBox AutomationProperties.Name="Order approval" Style="{StaticResource SegmentedControl}" HorizontalAlignment="Left"
+                    <ListBox AutomationProperties.Name="Order approval" Style="{StaticResource SegmentedControl}" HorizontalAlignment="Left" Margin="0,10,0,0"
                              ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode, Mode=TwoWay}"
                              IsEnabled="{Binding CanChange}" />
-                    <StackPanel Visibility="{Binding IsAuto, Converter={StaticResource BoolToVisibility}}">
-                        <Border Style="{StaticResource Hairline}" />
-                        <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AutoPaused, Mode=TwoWay}" IsEnabled="{Binding CanChange}">
-                            <StackPanel>
-                                <TextBlock Text="Pause auto-accept" Style="{StaticResource HeadlineText}" FontSize="14" />
-                                <TextBlock Text="New orders wait for you to accept them until you turn this off."
-                                           Style="{StaticResource SecondaryText}" FontSize="12" />
-                            </StackPanel>
-                        </CheckBox>
-                    </StackPanel>
-                    <TextBlock Text="{Binding Hint}" Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0" />
-                    <TextBlock Text="Orders the printer can't do (colour on a black &amp; white printer, printer offline, too large) always wait for you."
-                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
-                               Visibility="{Binding IsAuto, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding Hint}" Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
                 </StackPanel>
             </Border>
 

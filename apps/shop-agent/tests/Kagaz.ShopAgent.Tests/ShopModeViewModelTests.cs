@@ -7,13 +7,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Kagaz.ShopAgent.Tests;
 
-/// <summary>P2.6: approval-mode control reflects the server and PATCHes only on operator changes.</summary>
+/// <summary>P2.6: approval-mode and open-status controls reflect the server and PATCH only on operator changes.</summary>
 public sealed class ShopModeViewModelTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "kagaz-mode-tests", Guid.NewGuid().ToString("N"));
     private readonly List<(string Method, string Body, string OperatorToken)> _calls = new();
     private HttpStatusCode _patchStatus = HttpStatusCode.OK;
-    private string _getMode = """{ "approvalMode": "AUTO", "autoPaused": true }""";
+    private string _getMode = """{ "approvalMode": "AUTO", "autoPaused": false, "status": "OPEN" }""";
 
     private (ShopModeViewModel Vm, AppStatus Status, AgentSession Session) Create()
     {
@@ -27,6 +27,7 @@ public sealed class ShopModeViewModelTests : IDisposable
             if (req.RequestUri!.AbsolutePath.EndsWith("/login")) return TestApi.Ok(TestApi.LoginResponse);
             if (req.Method == HttpMethod.Get) return TestApi.Ok(_getMode);
             if (_patchStatus != HttpStatusCode.OK) return TestApi.Error(_patchStatus, "OPERATOR_LOGIN_REQUIRED");
+            if (body.Contains("status")) return TestApi.Ok("""{ "approvalMode": "MANUAL", "autoPaused": false, "status": "CLOSED" }""");
             return TestApi.Ok(body.Contains("AUTO")
                 ? """{ "approvalMode": "AUTO", "autoPaused": false }"""
                 : body.Contains("autoPaused\":true") ? """{ "approvalMode": "AUTO", "autoPaused": true }""" : """{ "approvalMode": "MANUAL", "autoPaused": false }""");
@@ -42,10 +43,22 @@ public sealed class ShopModeViewModelTests : IDisposable
     {
         var (vm, status, _) = Create();
 
-        status.ApplyShopState("AUTO", autoPaused: true, "OPEN");
+        status.ApplyShopState("AUTO", autoPaused: false, "OPEN");
 
         Assert.Equal(ShopModeViewModel.AutoLabel, vm.SelectedMode);
-        Assert.True(vm.AutoPaused);
+        Assert.Equal(ShopModeViewModel.OpenLabel, vm.SelectedStatus);
+        Assert.Empty(_calls);
+    }
+
+    [Fact]
+    public void Paused_auto_shows_as_manual()
+    {
+        var (vm, status, _) = Create();
+
+        status.ApplyShopState("AUTO", autoPaused: true, "OPEN");
+
+        Assert.Equal(ShopModeViewModel.ManualLabel, vm.SelectedMode);
+        Assert.Equal("Manual", vm.Indicator);
         Assert.Empty(_calls);
     }
 
@@ -55,11 +68,12 @@ public sealed class ShopModeViewModelTests : IDisposable
         var (vm, status, _) = Create();
         status.ApplyShopState("MANUAL", false);
 
-        await vm.SendAsync(new ShopModeRequest(ApprovalMode.Auto, null));
+        vm.SelectedMode = ShopModeViewModel.AutoLabel;
+        await Task.Yield();
 
         var call = Assert.Single(_calls);
         Assert.Equal("PATCH", call.Method);
-        Assert.Equal("""{"approvalMode":"AUTO"}""", call.Body);
+        Assert.Equal("""{"approvalMode":"AUTO","autoPaused":false}""", call.Body);
         Assert.Equal("op-jwt", call.OperatorToken);
         Assert.Equal("AUTO", status.ApprovalMode);
         Assert.Equal(ShopModeViewModel.AutoLabel, vm.SelectedMode);
@@ -116,7 +130,7 @@ public sealed class ShopModeViewModelTests : IDisposable
 
         Assert.Same(vm, settings.Mode);
         status.ApplyShopState("AUTO", autoPaused: false);
-        Assert.True(settings.Mode.IsAuto);
+        Assert.Equal(ShopModeViewModel.AutoLabel, settings.Mode.SelectedMode);
         Assert.Empty(_calls);
     }
 
@@ -124,7 +138,7 @@ public sealed class ShopModeViewModelTests : IDisposable
     [InlineData(null, false, "—")]
     [InlineData("MANUAL", false, "Manual")]
     [InlineData("AUTO", false, "Auto")]
-    [InlineData("AUTO", true, "Auto · paused")]
+    [InlineData("AUTO", true, "Manual")]
     public void Indicator_reflects_server_state(string? mode, bool paused, string expected)
     {
         var (vm, status, _) = Create();
@@ -141,10 +155,10 @@ public sealed class ShopModeViewModelTests : IDisposable
         var changed = new List<string?>();
         vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
-        status.ApplyShopState("AUTO", autoPaused: true);
+        status.ApplyShopState("AUTO", autoPaused: false);
 
         Assert.Contains(nameof(ShopModeViewModel.Indicator), changed);
-        Assert.Equal("Auto · paused", vm.Indicator);
+        Assert.Equal("Auto", vm.Indicator);
         Assert.DoesNotContain(_calls, c => c.Method == "PATCH");
     }
 
@@ -159,9 +173,8 @@ public sealed class ShopModeViewModelTests : IDisposable
         var call = Assert.Single(_calls);
         Assert.Equal("GET", call.Method);
         Assert.Equal("AUTO", status.ApprovalMode);
-        Assert.True(status.AutoPaused);
         Assert.Equal(ShopModeViewModel.AutoLabel, vm.SelectedMode);
-        Assert.True(vm.AutoPaused);
+        Assert.Equal(ShopModeViewModel.OpenLabel, vm.SelectedStatus);
     }
 
     [Fact]
@@ -178,16 +191,19 @@ public sealed class ShopModeViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Pause_switch_sends_only_auto_paused()
+    public async Task Closing_the_shop_sends_only_the_status()
     {
         var (vm, status, _) = Create();
-        status.ApplyShopState("AUTO", false);
+        status.ApplyShopState("MANUAL", false, "OPEN");
 
-        vm.AutoPaused = true;
+        vm.SelectedStatus = ShopModeViewModel.ClosedLabel;
+        await Task.Yield();
 
         var call = Assert.Single(_calls);
         Assert.Equal("PATCH", call.Method);
-        Assert.Equal("""{"autoPaused":true}""", call.Body);
+        Assert.Equal("""{"status":"CLOSED"}""", call.Body);
+        Assert.Equal("CLOSED", status.ShopOpenStatus);
+        Assert.Equal("Closed", vm.StatusIndicator);
     }
 
     private sealed class MemoryRunKey : IRunKey
