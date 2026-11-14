@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
              xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             xmlns:local="clr-namespace:Kagaz.ShopAgent.App.Views"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:PricesViewModel}"
              d:DesignHeight="700" d:DesignWidth="800">
@@ -15,50 +16,7 @@
 
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Black &amp; white, per side (₹)" Style="{StaticResource FieldLabel}" />
-                            <TextBox AutomationProperties.Name="Black and white price per side" Text="{Binding Mono, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource TextField}" MaxLength="10" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Colour, per side (₹)" Style="{StaticResource FieldLabel}" />
-                            <TextBox AutomationProperties.Name="Colour price per side" Text="{Binding Colour, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource TextField}" MaxLength="10" />
-                        </StackPanel>
-                    </Grid>
-
-                    <Border Style="{StaticResource Hairline}" />
-                    <TextBlock Text="Double-sided (optional)" Style="{StaticResource HeadlineText}" FontSize="14" />
-                    <TextBlock Text="Leave empty to charge each side the same as single-sided."
-                               Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,10" />
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Black &amp; white, per side (₹)" Style="{StaticResource FieldLabel}" />
-                            <TextBox AutomationProperties.Name="Double-sided black and white price per side" Text="{Binding MonoDuplex, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource TextField}" MaxLength="10" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Colour, per side (₹)" Style="{StaticResource FieldLabel}" />
-                            <TextBox AutomationProperties.Name="Double-sided colour price per side" Text="{Binding ColourDuplex, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource TextField}" MaxLength="10" />
-                        </StackPanel>
-                    </Grid>
-
-                    <Border Style="{StaticResource Hairline}" />
-                    <TextBlock Text="Minimum charge per order (₹)" Style="{StaticResource FieldLabel}" />
-                    <TextBox AutomationProperties.Name="Minimum charge per order" Text="{Binding Minimum, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource TextField}" MaxLength="10" Width="200" HorizontalAlignment="Left" />
+                    <local:PriceFields />
 
                     <Button Content="Save prices" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}"
                             HorizontalAlignment="Left" Margin="0,20,0,0" />

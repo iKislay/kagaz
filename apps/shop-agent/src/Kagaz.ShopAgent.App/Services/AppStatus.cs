@@ -45,6 +45,10 @@ public sealed partial class AppStatus : ObservableObject
     [ObservableProperty]
     private bool _shopIsDemo;
 
+    /// <summary>The owner finished first-run setup (shop details, location, prices) for the paired shop.</summary>
+    [ObservableProperty]
+    private bool _shopSetupComplete;
+
     /// <summary>Set when the server revoked this device (P2.4); shown on the pairing screen.</summary>
     [ObservableProperty]
     private string? _revokedNotice;
@@ -96,6 +100,7 @@ public sealed partial class AppStatus : ObservableObject
         _isPaired = !string.IsNullOrEmpty(SafeLoadToken());
         _shopName = _isPaired ? state.ShopName : null;
         _shopIsDemo = state.ShopIsDemo;
+        _shopSetupComplete = _isPaired && state.ShopSetupComplete;
         _revokedNotice = !_isPaired && state.DeviceRevoked ? RevokedText : null;
 
         session.OperatorChanged += () => OnUi(SyncOperator);
@@ -142,6 +147,21 @@ public sealed partial class AppStatus : ObservableObject
 
     public void SetPrinterAlert(string? alert) => OnUi(() => PrinterAlert = alert);
 
+    /// <summary>Apply the server's shop profile: its name and whether first-run setup is done (persisted).</summary>
+    public void ApplyShopProfile(ShopProfile profile)
+    {
+        _stateStore.Update(s =>
+        {
+            s.ShopName = profile.Name;
+            s.ShopSetupComplete = profile.SetupComplete;
+        });
+        OnUi(() =>
+        {
+            ShopName = profile.Name;
+            ShopSetupComplete = profile.SetupComplete;
+        });
+    }
+
     /// <summary>Raised on the UI thread after a successful pairing.</summary>
     public event Action? Paired;
 
@@ -181,6 +201,7 @@ public sealed partial class AppStatus : ObservableObject
             s.ApiBaseUrl = apiBaseUrl;
             s.ShopName = response.Shop.Name;
             s.ShopIsDemo = response.Shop.IsDemo;
+            s.ShopSetupComplete = false;
             s.DeviceName = response.Device.Name;
             s.DeviceRevoked = false;
             s.TokenRotatedAt = DateTimeOffset.UtcNow;
@@ -196,6 +217,7 @@ public sealed partial class AppStatus : ObservableObject
             RevokedNotice = null;
             ShopName = response.Shop.Name;
             ShopIsDemo = response.Shop.IsDemo;
+            ShopSetupComplete = false;
             ApprovalMode = null;
             Connection = ConnectionState.Checking;
             ConnectionText = "Connecting…";
@@ -223,6 +245,7 @@ public sealed partial class AppStatus : ObservableObject
         _stateStore.Update(s =>
         {
             s.ShopName = null;
+            s.ShopSetupComplete = false;
             s.DeviceName = revoked ? s.DeviceName : null;
             s.DeviceRevoked = revoked;
             s.RegisteredPrinterNames.Clear();
@@ -233,6 +256,7 @@ public sealed partial class AppStatus : ObservableObject
         {
             IsPaired = false;
             ShopName = null;
+            ShopSetupComplete = false;
             ApprovalMode = null;
             RevokedNotice = revoked ? RevokedText : null;
             Connection = revoked ? ConnectionState.Unauthorized : ConnectionState.NotPaired;

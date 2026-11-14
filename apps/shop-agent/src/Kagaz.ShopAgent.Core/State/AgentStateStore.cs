@@ -80,6 +80,8 @@ public sealed class AgentState
     /// <summary>API base URL chosen on the pairing screen (overrides appsettings.json).</summary>
     public string? ApiBaseUrl { get; set; }
     public string? ShopName { get; set; }
+    /// <summary>The owner finished first-run setup for the paired shop (cached so an offline start isn't blocked).</summary>
+    public bool ShopSetupComplete { get; set; }
     public string? DeviceName { get; set; }
     public bool ShopIsDemo { get; set; }
 }

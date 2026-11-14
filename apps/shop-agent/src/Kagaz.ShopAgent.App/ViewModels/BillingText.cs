@@ -7,28 +7,17 @@ namespace Kagaz.ShopAgent.App.ViewModels;
 public static class BillingText
 {
     /// <summary>
-    /// The calm notice bar text, or null when there's nothing to say. <paramref name="contact"/> is how
+    /// The calm notice bar inside the app, or null when there's nothing to say. Inactive subscriptions
+    /// never get here: they block the app with the subscription screen. <paramref name="contact"/> is how
     /// to reach Kaggaz (e.g. "Kaggaz support on +91 98765 43210").
     /// </summary>
-    public static string? Notice(bool paired, string? shopStatus, HeartbeatSubscription? sub, string contact)
+    public static string? Notice(string? shopStatus, HeartbeatSubscription? sub, string contact) => sub switch
     {
-        if (!paired) return null;
-        if (sub is null)
-        {
-            // Older server: no billing block, but a brand-new shop is still CLOSED until activated.
-            return shopStatus == "CLOSED"
-                ? $"Your shop is set up. Kaggaz will activate your subscription — contact {contact}."
-                : null;
-        }
-        return sub.Status switch
-        {
-            "NONE" => $"Your shop isn't taking orders yet. Kaggaz will activate your subscription — contact {contact}.",
-            "EXPIRED" => $"Your subscription ended{On(sub.PeriodEnd)}. New orders are paused until it's renewed — contact {contact}.",
-            "ACTIVE" when sub.DaysLeft is int d && d <= 0 => "Your subscription ends today.",
-            "ACTIVE" when sub.DaysLeft is int d && d <= 7 => $"Your subscription ends in {d} day{(d == 1 ? "" : "s")}.",
-            _ => null,
-        };
-    }
+        { Status: "ACTIVE", DaysLeft: <= 0 } => $"Your subscription ends today — contact {contact} to renew.",
+        { Status: "ACTIVE", DaysLeft: int d and <= 7 } => $"Your subscription ends in {d} day{(d == 1 ? "" : "s")}.",
+        _ when shopStatus == "CLOSED" => $"Your shop is closed to new orders — contact {contact} to open it.",
+        _ => null,
+    };
 
     /// <summary>Plan line for Settings, e.g. "Active · 2 printers · until 12 Dec 2026".</summary>
     public static string Plan(HeartbeatSubscription? sub) => sub?.Status switch

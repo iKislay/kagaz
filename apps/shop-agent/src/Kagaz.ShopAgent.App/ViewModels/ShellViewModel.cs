@@ -9,20 +9,20 @@ namespace Kagaz.ShopAgent.App.ViewModels;
 /// <summary>
 /// Source-list sidebar entry. <paramref name="Icon"/> is a Segoe Fluent Icons line glyph;
 /// <paramref name="Page"/> is the page view model shown in the content area.
-/// <paramref name="RequiresOperator"/> pages show the operator sign-in until someone signs in (P2.3);
 /// <paramref name="OwnerOnly"/> pages are listed only while the shop owner is signed in.
 /// </summary>
-public sealed record NavigationItem(string Title, string Icon, string Subtitle, object Page, bool RequiresOperator = false,
-    bool OwnerOnly = false)
+public sealed record NavigationItem(string Title, string Icon, string Subtitle, object Page, bool OwnerOnly = false)
 {
     /// <summary>Used as the accessible name of the sidebar row.</summary>
     public override string ToString() => Title;
 }
 
 /// <summary>
-/// Window shell: sidebar navigation, connection indicator, signed-in operator, read-only
-/// approval-mode indicator (changed in Settings, ADR-002), billing notice + subscription sheet,
-/// update-required banner (P4.4), toasts.
+/// Window shell. Until the shop is ready (<see cref="AppGates"/>: connected, someone signed in, setup
+/// finished, subscription active) a single full-window screen is shown and no page is reachable.
+/// Then: sidebar navigation, connection indicator, signed-in operator, approval-mode indicator,
+/// billing notice, update-required banner (P4.4), toasts. Printing of accepted jobs runs in the
+/// background whatever is on screen.
 /// </summary>
 public sealed partial class ShellViewModel : ObservableObject
 {
@@ -33,7 +33,6 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly SupportViewModel _support;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CurrentPage))]
     private NavigationItem? _selectedNavigation;
 
     public ShellViewModel(
@@ -41,6 +40,8 @@ public sealed partial class ShellViewModel : ObservableObject
         ShopApiClient api,
         PairingViewModel pairing,
         OperatorLoginViewModel login,
+        SetupViewModel setup,
+        SubscriptionViewModel subscription,
         PrintersViewModel printers,
         JobsViewModel jobs,
         TodaysPickupsViewModel pickups,
@@ -52,107 +53,98 @@ public sealed partial class ShellViewModel : ObservableObject
         StaffViewModel staff,
         PricesViewModel prices)
     {
-        _ = support.LoadAsync();
-        status.Paired += () => _ = support.LoadAsync();
         _api = api;
         _qr = qr;
         _staff = staff;
         _prices = prices;
         _support = support;
         Status = status;
+        Pairing = pairing;
         Login = login;
+        Setup = setup;
+        Subscription = subscription;
         Mode = mode;
         Update = update;
-        Subscription = new SubscriptionPromptViewModel(support);
         Version = typeof(ShellViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
-        WindowTitle = "Kaggaz Shop";
 
         NavigationItems =
         [
-            new NavigationItem("Jobs", "", "Paid orders to accept, print and hand over.", jobs, RequiresOperator: true),
-            new NavigationItem("Today's pickups", "", "Today's paid orders by pickup number.", pickups, RequiresOperator: true),
-            new NavigationItem("Printers", "", "Printers on this PC and what they can do.", printers, RequiresOperator: true),
+            new NavigationItem("Jobs", "", "Paid orders to accept, print and hand over.", jobs),
+            new NavigationItem("Today's pickups", "", "Today's paid orders by pickup number.", pickups),
+            new NavigationItem("Printers", "", "Printers on this PC and what they can do.", printers),
             new NavigationItem("Shop QR code", "", "The scan-to-print poster for your counter.", qr),
-            new NavigationItem("Staff", "", "Who can sign in to this shop.", staff, RequiresOperator: true, OwnerOnly: true),
-            new NavigationItem("Prices", "", "What customers pay per printed side.", prices, RequiresOperator: true, OwnerOnly: true),
-            new NavigationItem("This PC", "", "Connect this PC to your Kaggaz shop.", pairing),
+            new NavigationItem("Staff", "", "Who can sign in to this shop.", staff, OwnerOnly: true),
+            new NavigationItem("Prices", "", "What customers pay per printed side.", prices, OwnerOnly: true),
+            new NavigationItem("This PC", "", "This PC's connection to your Kaggaz shop.", pairing),
             new NavigationItem("Settings", "", "Order approval, connection and app details.", settings),
         ];
-        Jobs = NavigationItems[0];
-        Printers = NavigationItems[2];
-        Pairing = NavigationItems[6];
-        Settings = NavigationItems[7];
+        _jobs = NavigationItems[0];
+        _printersItem = NavigationItems[2];
+        _settingsItem = NavigationItems[7];
+        _selectedNavigation = _jobs;
 
-        SelectedNavigation = status.IsPaired ? Jobs : Pairing;
-
-        // After pairing, set up printers first (behind the sign-in); after unpairing/revoke, back to pairing.
-        status.Paired += () => SelectedNavigation = Printers;
-        status.Unpaired += () => SelectedNavigation = Pairing;
+        _ = support.LoadAsync();
+        status.Paired += () =>
+        {
+            _ = support.LoadAsync();
+            SelectedNavigation = _printersItem; // a new PC sets up its printers first
+        };
         status.PropertyChanged += OnStatusChanged;
         support.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(SupportViewModel.ContactLine)) OnPropertyChanged(nameof(BillingNotice));
         };
-        // A call refused for billing opens the subscription sheet, whatever page it came from.
-        status.Session.SubscriptionInactive += () => status.RunOnUi(Subscription.ForceOpen);
+        if (status.IsOperatorSignedIn) _ = setup.LoadAsync(); // session restored from disk
     }
 
+    private readonly NavigationItem _jobs;
+    private readonly NavigationItem _printersItem;
+    private readonly NavigationItem _settingsItem;
+
     public AppStatus Status { get; }
+    public PairingViewModel Pairing { get; }
     public OperatorLoginViewModel Login { get; }
+    public SetupViewModel Setup { get; }
+    public SubscriptionViewModel Subscription { get; }
     public ShopModeViewModel Mode { get; }
     public UpdateViewModel Update { get; }
     public string Version { get; }
-    public string WindowTitle { get; }
+    public string WindowTitle => "Kaggaz Shop";
     public IReadOnlyList<NavigationItem> NavigationItems { get; }
 
-    /// <summary>"Get a Kaggaz subscription" sheet.</summary>
-    public SubscriptionPromptViewModel Subscription { get; }
+    public AppGate Gate => AppGates.Resolve(Status.IsPaired, Status.IsOperatorSignedIn, Status.ShopSetupComplete,
+        Status.Subscription?.Status);
 
-    /// <summary>Calm notice bar while the shop can't take orders (activation pending, expired, ending soon).</summary>
-    public string? BillingNotice =>
-        BillingText.Notice(Status.IsPaired, Status.ShopOpenStatus, Status.Subscription, _support.ContactLine);
+    public bool IsReady => Gate == AppGate.Ready;
+
+    /// <summary>The full-window screen while the shop isn't ready; null once it is.</summary>
+    public object? GatePage => Gate switch
+    {
+        AppGate.Connect => Pairing,
+        AppGate.SignIn => Login,
+        AppGate.Setup => Setup,
+        AppGate.Subscription => Subscription,
+        _ => null,
+    };
+
+    /// <summary>Calm notice bar inside the app (subscription ending soon, shop closed).</summary>
+    public string? BillingNotice => BillingText.Notice(Status.ShopOpenStatus, Status.Subscription, _support.ContactLine);
 
     /// <summary>Sidebar rows: owner-only pages appear only while the owner is signed in.</summary>
     public IReadOnlyList<NavigationItem> VisibleNavigationItems =>
         NavigationItems.Where(i => !i.OwnerOnly || Status.IsOwner).ToList();
 
-    private NavigationItem Jobs { get; }
-    private NavigationItem Printers { get; }
-    private NavigationItem Pairing { get; }
-    private NavigationItem Settings { get; }
+    public object? CurrentPage => SelectedNavigation?.Page;
 
     partial void OnSelectedNavigationChanged(NavigationItem? value)
     {
-        // Show the server's approval mode as soon as Settings opens (never PATCHes).
-        if (value is not null && ReferenceEquals(value, Settings)) _ = Mode.LoadAsync();
-        LoadPage(value);
+        OnPropertyChanged(nameof(CurrentPage));
+        if (value is null) return;
+        if (ReferenceEquals(value, _settingsItem)) _ = Mode.LoadAsync(); // the server's approval mode, never PATCHes
+        if (ReferenceEquals(value.Page, _qr)) _ = _qr.LoadAsync();
+        if (ReferenceEquals(value.Page, _staff)) _ = _staff.LoadAsync();
+        if (ReferenceEquals(value.Page, _prices)) _ = _prices.LoadAsync();
     }
-
-    private void LoadPage(NavigationItem? item)
-    {
-        if (item is null) return;
-        if (ReferenceEquals(item.Page, _qr)) _ = _qr.LoadAsync();
-        // Owner pages need the owner signed in; they load again once someone signs in.
-        if (!Status.IsOwner) return;
-        if (ReferenceEquals(item.Page, _staff)) _ = _staff.LoadAsync();
-        if (ReferenceEquals(item.Page, _prices)) _ = _prices.LoadAsync();
-    }
-
-    /// <summary>
-    /// The page to show. Operator pages need a paired PC and a signed-in operator: otherwise the
-    /// pairing screen or the operator sign-in is shown in their place. Owner pages need the owner.
-    /// </summary>
-    public object? CurrentPage => SelectedNavigation switch
-    {
-        null => null,
-        { RequiresOperator: true } when !Status.IsPaired => Pairing.Page,
-        { RequiresOperator: true } when !Status.IsOperatorSignedIn => Login,
-        { OwnerOnly: true } when !Status.IsOwner => Login,
-        var item => item.Page,
-    };
-
-    [RelayCommand]
-    private void OpenSubscription() => Subscription.ForceOpen();
 
     [RelayCommand]
     private async Task SignOutAsync()
@@ -163,16 +155,27 @@ public sealed partial class ShellViewModel : ObservableObject
 
     private void OnStatusChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(AppStatus.IsPaired) or nameof(AppStatus.OperatorName) or nameof(AppStatus.OperatorRole))
+        switch (e.PropertyName)
         {
-            OnPropertyChanged(nameof(CurrentPage));
-            OnPropertyChanged(nameof(VisibleNavigationItems));
-            if (e.PropertyName != nameof(AppStatus.IsPaired)) LoadPage(SelectedNavigation);
+            case nameof(AppStatus.OperatorName):
+                // Someone else may sign in next: start them on Jobs, and refresh the shop's setup state.
+                SelectedNavigation = _jobs;
+                if (Status.IsOperatorSignedIn) _ = Setup.LoadAsync();
+                break;
+            case nameof(AppStatus.OperatorRole):
+                OnPropertyChanged(nameof(VisibleNavigationItems));
+                break;
+            case nameof(AppStatus.ShopOpenStatus):
+                OnPropertyChanged(nameof(BillingNotice));
+                return;
         }
-        if (e.PropertyName is nameof(AppStatus.IsPaired) or nameof(AppStatus.ShopOpenStatus) or nameof(AppStatus.Subscription))
+        if (e.PropertyName is nameof(AppStatus.IsPaired) or nameof(AppStatus.OperatorName) or nameof(AppStatus.ShopSetupComplete)
+            or nameof(AppStatus.Subscription))
         {
+            OnPropertyChanged(nameof(Gate));
+            OnPropertyChanged(nameof(IsReady));
+            OnPropertyChanged(nameof(GatePage));
             OnPropertyChanged(nameof(BillingNotice));
-            if (Status.IsPaired) Subscription.Observe(Status.Subscription);
         }
     }
 }

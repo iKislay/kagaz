@@ -1,0 +1,178 @@
+<UserControl x:Class="Kagaz.ShopAgent.App.Views.SetupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml/design"
+             xmlns:vm="clr-namespace:Kagaz.ShopAgent.App.ViewModels"
+             xmlns:local="clr-namespace:Kagaz.ShopAgent.App.Views"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:SetupViewModel}"
+             d:DesignHeight="760" d:DesignWidth="640">
+    <UserControl.Resources>
+        <!-- Step chip in the progress row: filled while it is the current step (Tag = is current). -->
+        <Style x:Key="StepChip" TargetType="Border">
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Background" Value="{StaticResource ControlFillBrush}" />
+            <Setter Property="TextElement.Foreground" Value="{StaticResource TextBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="White" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,0,24">
+            <TextBlock Text="Set up your shop" Style="{StaticResource TitleText}" />
+            <TextBlock Text="Three quick steps. Each one is saved as soon as you continue."
+                       Style="{StaticResource SubtitleText}" TextWrapping="Wrap" />
+
+            <!-- Operators: only the owner can set up the shop. -->
+            <Border Style="{StaticResource Card}" Visibility="{Binding Status.IsOwner, Converter={StaticResource InverseBoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="&#xE823;" Style="{StaticResource IconText}" FontSize="24" Foreground="{StaticResource OrangeBrush}" HorizontalAlignment="Left" />
+                    <TextBlock Text="Waiting for the shop owner" Style="{StaticResource HeadlineText}" Margin="0,10,0,0" />
+                    <TextBlock Text="The owner needs to sign in on this PC once to finish setting up the shop. Then you can sign in and take orders."
+                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    <Button Content="Check again" Style="{StaticResource QuietButton}" Command="{Binding LoadCommand}"
+                            HorizontalAlignment="Left" Margin="0,14,0,0" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Visibility="{Binding Status.IsOwner, Converter={StaticResource BoolToVisibility}}">
+                <!-- Loading, or loading failed -->
+                <Border Style="{StaticResource Card}" Visibility="{Binding IsLoaded, Converter={StaticResource InverseBoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding BusyText, TargetNullValue='Your shop could not be loaded.'}" Style="{StaticResource BodyText}" />
+                        <TextBlock Text="{Binding Error}" Style="{StaticResource ErrorText}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Visibility="{Binding Error, Converter={StaticResource NullToVisibility}}" />
+                        <Button Content="Try again" Style="{StaticResource QuietButton}" Command="{Binding LoadCommand}"
+                                HorizontalAlignment="Left" Margin="0,14,0,0"
+                                Visibility="{Binding IsBusy, Converter={StaticResource InverseBoolToVisibility}}" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Visibility="{Binding IsLoaded, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                        <Border Style="{StaticResource StepChip}" Tag="{Binding IsDetailsStep}">
+                            <TextBlock Text="1  Shop details" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                        <Border Style="{StaticResource StepChip}" Tag="{Binding IsLocationStep}">
+                            <TextBlock Text="2  Location" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                        <Border Style="{StaticResource StepChip}" Tag="{Binding IsPricesStep}">
+                            <TextBlock Text="3  Prices" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                    </StackPanel>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <!-- Step 1: shop details -->
+                            <StackPanel Visibility="{Binding IsDetailsStep, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Shop details" Style="{StaticResource HeadlineText}" />
+                                <TextBlock Text="Customers see this name when they choose a shop." Style="{StaticResource SecondaryText}" Margin="0,2,0,14" />
+                                <TextBlock Text="Shop name" Style="{StaticResource FieldLabel}" />
+                                <TextBox AutomationProperties.Name="Shop name" Text="{Binding ShopName, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TextField}" MaxLength="120" />
+                                <TextBlock Text="Shop mobile number (optional)" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
+                                <TextBox AutomationProperties.Name="Shop mobile number" Text="{Binding ContactPhone, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TextField}" MaxLength="20" Width="240" HorizontalAlignment="Left" />
+                                <Button Content="Save and continue" Style="{StaticResource PrimaryButton}" Command="{Binding SaveDetailsCommand}"
+                                        IsDefault="{Binding IsDetailsStep}" HorizontalAlignment="Left" Margin="0,22,0,0" />
+                            </StackPanel>
+
+                            <!-- Step 2: location -->
+                            <StackPanel Visibility="{Binding IsLocationStep, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Where is your shop?" Style="{StaticResource HeadlineText}" />
+                                <TextBlock Text="Customers use this to find shops near them. Use this PC's location if it's at the shop, or search."
+                                           Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,2,0,14" />
+                                <Button Style="{StaticResource QuietButton}" Command="{Binding UseCurrentLocationCommand}" HorizontalAlignment="Left"
+                                        AutomationProperties.Name="Use this PC's location">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE81D;" Style="{StaticResource IconText}" FontSize="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Use this PC's location" />
+                                    </StackPanel>
+                                </Button>
+
+                                <TextBlock Text="Or search for your shop, area or a landmark" Style="{StaticResource FieldLabel}" Margin="0,18,0,6" />
+                                <TextBox AutomationProperties.Name="Search for your shop's address" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TextField}" MaxLength="120" />
+                                <Border BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="1" CornerRadius="8" Margin="0,6,0,0" Padding="4"
+                                        Visibility="{Binding HasSuggestions, Converter={StaticResource BoolToVisibility}}">
+                                    <ListBox ItemsSource="{Binding Suggestions}" SelectedItem="{Binding SelectedPlace}"
+                                             ItemContainerStyle="{StaticResource RowItem}" BorderThickness="0" Background="Transparent"
+                                             AutomationProperties.Name="Address suggestions" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Left" Text="&#xE81D;" Style="{StaticResource IconText}" FontSize="13"
+                                                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,10,0" VerticalAlignment="Top" />
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Address}" Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+
+                                <!-- The pin, and the address customers will read (editable). -->
+                                <StackPanel Visibility="{Binding HasPin, Converter={StaticResource BoolToVisibility}}">
+                                    <Border Style="{StaticResource Hairline}" Margin="0,18,0,14" />
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="Check on map" Style="{StaticResource LinkButton}" FontSize="12"
+                                                Command="{Binding OpenMapCommand}" VerticalAlignment="Center" />
+                                        <TextBlock Text="&#xE81D;" Style="{StaticResource IconText}" FontSize="14" Foreground="{StaticResource GreenBrush}"
+                                                   Margin="0,0,8,0" VerticalAlignment="Center" />
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding PinSource}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                                            <TextBlock Text="{Binding PinText}" Style="{StaticResource SecondaryText}" FontSize="12" FontFamily="{StaticResource MonoFont}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <TextBlock Text="Address customers will see" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
+                                    <TextBox AutomationProperties.Name="Address customers will see" Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource TextField}" MaxLength="300" TextWrapping="Wrap" MinHeight="58" />
+                                    <TextBlock Text="Edit it so customers can find you: add the shop number, floor or a nearby landmark."
+                                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,22,0,0">
+                                    <Button Content="Back" Style="{StaticResource QuietButton}" Command="{Binding BackCommand}" Margin="0,0,8,0" />
+                                    <Button Content="Save and continue" Style="{StaticResource PrimaryButton}" Command="{Binding SaveLocationCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Step 3: prices -->
+                            <StackPanel Visibility="{Binding IsPricesStep, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Your prices" Style="{StaticResource HeadlineText}" />
+                                <TextBlock Text="What customers pay per printed side, in rupees. You can change these any time under Prices."
+                                           Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,2,0,14" />
+                                <local:PriceFields DataContext="{Binding Prices}" />
+                                <TextBlock Text="{Binding Prices.Message}" Style="{StaticResource ErrorText}" TextWrapping="Wrap" Margin="0,12,0,0"
+                                           Visibility="{Binding Prices.MessageIsError, Converter={StaticResource BoolToVisibility}}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,22,0,0">
+                                    <Button Content="Back" Style="{StaticResource QuietButton}" Command="{Binding BackCommand}" Margin="0,0,8,0" />
+                                    <Button Content="Finish setup" Style="{StaticResource PrimaryButton}" Command="{Binding FinishCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Status -->
+                            <TextBlock Text="{Binding BusyText}" Style="{StaticResource SecondaryText}" Margin="0,14,0,0"
+                                       Visibility="{Binding BusyText, Converter={StaticResource NullToVisibility}}" />
+                            <TextBlock Text="{Binding Error}" Style="{StaticResource ErrorText}" TextWrapping="Wrap" Margin="0,14,0,0"
+                                       Visibility="{Binding Error, Converter={StaticResource NullToVisibility}}" />
+                            <Button Content="Open Windows location settings" Style="{StaticResource LinkButton}" FontSize="12"
+                                    Command="{Binding OpenLocationSettingsCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                    Visibility="{Binding CanOpenLocationSettings, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

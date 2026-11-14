@@ -35,4 +35,11 @@ public class SupportContactTests
         Assert.Equal("https://wa.me/919876543210", vm.WhatsAppUrl);
         Assert.Equal("help@kaggaz.in", vm.Email);
     }
+
+    [Theory]
+    [InlineData("+918987263735", "89872 63735")]
+    [InlineData("8987263735", "89872 63735")]
+    [InlineData("+44 20 7946 0958", "+44 20 7946 0958")]
+    public void Indian_numbers_are_shown_the_way_people_say_them(string raw, string expected) =>
+        Assert.Equal(expected, SupportViewModel.FormatPhone(raw));
 }

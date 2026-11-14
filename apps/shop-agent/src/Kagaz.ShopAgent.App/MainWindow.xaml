@@ -14,8 +14,9 @@
         FontFamily="{StaticResource UiFont}"
         TextOptions.TextFormattingMode="Ideal"
         UseLayoutRounding="True">
-    <!-- macOS-style layout (CLAUDE.md "Design language"): source-list sidebar + content. -->
     <Grid>
+    <!-- The shop is ready: macOS-style source-list sidebar + content (CLAUDE.md "Design language"). -->
+    <Grid Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="232" />
             <ColumnDefinition Width="*" />
@@ -114,12 +115,10 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Subscription / activation (calm amber bar): stays while the shop can't take orders. -->
+            <!-- Calm amber bar: subscription ending soon, or the shop closed to new orders. -->
             <Border Grid.Row="0" Style="{StaticResource NoticeBar}"
                     Visibility="{Binding BillingNotice, Converter={StaticResource NullToVisibility}}">
                 <DockPanel>
-                    <Button DockPanel.Dock="Right" Content="Contact Kaggaz" Style="{StaticResource LinkButton}" FontSize="12"
-                            Command="{Binding OpenSubscriptionCommand}" VerticalAlignment="Center" Margin="12,0,0,0" />
                     <TextBlock Text="&#xE946;" Style="{StaticResource IconText}" FontSize="13" Foreground="{StaticResource OrangeBrush}" Margin="0,0,8,0" />
                     <TextBlock Text="{Binding BillingNotice}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AmberTextBrush}"
                                TextWrapping="Wrap" />
@@ -140,9 +139,6 @@
                 <ContentControl.Resources>
                     <DataTemplate DataType="{x:Type vm:PairingViewModel}">
                         <views:PairingView />
-                    </DataTemplate>
-                    <DataTemplate DataType="{x:Type vm:OperatorLoginViewModel}">
-                        <views:OperatorLoginView />
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:PrintersViewModel}">
                         <views:PrintersView />
@@ -168,9 +164,66 @@
                 </ContentControl.Resources>
             </ContentControl>
 
+        </Grid>
+
+    </Grid>
+
+    <!-- Not ready yet (AppGates): one full-window screen — connect this PC, sign in, set up the shop or
+         subscribe. No sidebar and no page is reachable until the shop is ready. -->
+    <DockPanel Visibility="{Binding IsReady, Converter={StaticResource InverseBoolToVisibility}}">
+        <Border DockPanel.Dock="Top" Padding="24,16" BorderBrush="{StaticResource SeparatorBrush}" BorderThickness="0,0,0,1"
+                Background="{StaticResource SurfaceBrush}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center"
+                             Fill="{Binding Status.Connection, Converter={StaticResource ConnectionBrush}}" />
+                    <TextBlock Text="{Binding Status.ConnectionText}" Style="{StaticResource SecondaryText}" FontSize="12"
+                               VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" Margin="20,0,0,0"
+                                Visibility="{Binding Status.IsOperatorSignedIn, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="&#xE77B;" Style="{StaticResource IconText}" FontSize="13" Margin="0,0,6,0"
+                                   Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Status.OperatorName}" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+                        <Button Content="Sign out" Style="{StaticResource LinkButton}" FontSize="12" Margin="12,0,0,0"
+                                Command="{Binding SignOutCommand}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="30" Height="30" CornerRadius="8" Background="{StaticResource AccentBrush}">
+                        <TextBlock Text="K" Foreground="White" FontWeight="Bold" FontSize="16"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Status.ShopName, TargetNullValue=Kaggaz Shop, FallbackValue=Kaggaz Shop}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                        <TextBlock Text="{Binding Version, StringFormat=Kaggaz Shop {0}}" Style="{StaticResource SecondaryText}" FontSize="11" />
+                    </StackPanel>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <ContentControl Content="{Binding GatePage}" Focusable="False" MaxWidth="640" Margin="24,28,24,0"
+                        HorizontalAlignment="Stretch">
+            <ContentControl.Resources>
+                <DataTemplate DataType="{x:Type vm:PairingViewModel}">
+                    <views:PairingView />
+                </DataTemplate>
+                <DataTemplate DataType="{x:Type vm:OperatorLoginViewModel}">
+                    <views:OperatorLoginView />
+                </DataTemplate>
+                <DataTemplate DataType="{x:Type vm:SetupViewModel}">
+                    <views:SetupView />
+                </DataTemplate>
+                <DataTemplate DataType="{x:Type vm:SubscriptionViewModel}">
+                    <views:SubscriptionView />
+                </DataTemplate>
+            </ContentControl.Resources>
+        </ContentControl>
+    </DockPanel>
+
             <!-- Toasts: top-right notification banners -->
-            <ItemsControl Grid.Row="2" ItemsSource="{Binding Status.Toasts}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                          Margin="0,16,20,0" Width="320" Focusable="False" IsHitTestVisible="False">
+            <ItemsControl ItemsSource="{Binding Status.Toasts}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                          Margin="0,72,20,0" Width="320" Focusable="False" IsHitTestVisible="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border Style="{StaticResource Card}" Padding="14,12" Margin="0,0,0,8">
@@ -197,53 +250,9 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-        </Grid>
-
-        <!-- "Get a Kaggaz subscription": opens when the shop isn't (or is no longer) subscribed. -->
-        <Border Grid.ColumnSpan="2" Background="{StaticResource ScrimBrush}" DataContext="{Binding Subscription}"
-                Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}">
-            <Border Style="{StaticResource Sheet}" Width="480">
-                <StackPanel>
-                    <TextBlock Text="&#xE946;" Style="{StaticResource IconText}" FontSize="28" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Left" />
-                    <TextBlock Text="{Binding Title}" Style="{StaticResource TitleText}" FontSize="22" Margin="0,10,0,0" />
-                    <TextBlock Text="{Binding EndedText}" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"
-                               Visibility="{Binding EndedText, Converter={StaticResource NullToVisibility}}" />
-                    <TextBlock Text="{Binding Body}" Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,8,0,0" />
-
-                    <!-- Contact (from the server config) -->
-                    <StackPanel DataContext="{Binding Support}" Margin="0,18,0,0">
-                        <StackPanel Visibility="{Binding DisplayPhone, Converter={StaticResource NullToVisibility}}">
-                            <TextBlock Text="Call or WhatsApp Kaggaz" Style="{StaticResource FieldLabel}" />
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="Copy" Style="{StaticResource QuietButton}" Command="{Binding CopyPhoneCommand}"
-                                        VerticalAlignment="Center" />
-                                <TextBox Text="{Binding DisplayPhone, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
-                                         FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Foreground="{StaticResource TextBrush}"
-                                         AutomationProperties.Name="Kaggaz phone number" />
-                            </DockPanel>
-                            <WrapPanel Margin="0,10,0,0">
-                                <Button Style="{StaticResource PrimaryButton}" Command="{Binding CallCommand}" Margin="0,0,8,8">
-                                    <TextBlock Text="{Binding CallText}" />
-                                </Button>
-                                <Button Content="WhatsApp us" Style="{StaticResource QuietButton}" Command="{Binding OpenWhatsAppCommand}" Margin="0,0,8,8"
-                                        Visibility="{Binding WhatsAppUrl, Converter={StaticResource NullToVisibility}}" />
-                            </WrapPanel>
-                        </StackPanel>
-                        <Button Content="Visit kaggaz.in" Style="{StaticResource LinkButton}" Command="{Binding OpenWebsiteCommand}"
-                                HorizontalAlignment="Left" Margin="0,6,0,0" />
-                    </StackPanel>
-
-                    <!-- Future: "Buy online" (Razorpay) when CanPurchaseOnline -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-                        <Button Content="Close" Style="{StaticResource QuietButton}" Command="{Binding DismissCommand}" Margin="0,0,8,0" />
-                        <Button Content="I've contacted Kaggaz" Style="{StaticResource PrimaryButton}" Command="{Binding DismissCommand}" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </Border>
 
         <!-- "Update required" (P4.4): blocks the whole window while the server says this version is too old. -->
-        <Border Grid.ColumnSpan="2" Background="{StaticResource ScrimBrush}" DataContext="{Binding Update}"
+        <Border Background="{StaticResource ScrimBrush}" DataContext="{Binding Update}"
                 Visibility="{Binding Status.UpgradeRequired, Converter={StaticResource BoolToVisibility}}">
             <Border Style="{StaticResource Sheet}" MaxWidth="460">
                 <StackPanel>

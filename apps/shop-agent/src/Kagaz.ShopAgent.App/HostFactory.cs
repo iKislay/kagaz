@@ -73,6 +73,9 @@ public static class HostFactory
         builder.Services.AddSingleton(sp => new PricesViewModel(sp.GetRequiredService<ShopApiClient>()));
         builder.Services.AddSingleton<PairingViewModel>();
         builder.Services.AddSingleton<OperatorLoginViewModel>();
+        builder.Services.AddSingleton<ILocationService, WindowsLocationService>();
+        builder.Services.AddSingleton<SetupViewModel>();
+        builder.Services.AddSingleton<SubscriptionViewModel>();
         builder.Services.AddSingleton<PrintersViewModel>();
         builder.Services.AddSingleton<JobsViewModel>();
         builder.Services.AddSingleton<TodaysPickupsViewModel>();

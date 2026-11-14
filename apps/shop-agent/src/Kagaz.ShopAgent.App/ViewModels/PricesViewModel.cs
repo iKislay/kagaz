@@ -56,24 +56,29 @@ public sealed partial class PricesViewModel : ObservableObject
     private bool CanSave() => !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanSave))]
-    private async Task SaveAsync()
+    private Task SaveAsync() => TrySaveAsync();
+
+    /// <summary>Validates and saves the prices; true when the server accepted them (also used by first-run setup).</summary>
+    public async Task<bool> TrySaveAsync()
     {
-        if (_api is null) return;
+        if (_api is null) return false;
         var request = BuildRequest(Mono, Colour, MonoDuplex, ColourDuplex, Minimum, out var error);
         if (request is null)
         {
             Show(error!, error: true);
-            return;
+            return false;
         }
         IsBusy = true;
         try
         {
             Apply(await _api.SetPricingAsync(request));
             Show("Saved. Customers see the new prices for new orders.", error: false);
+            return true;
         }
         catch (ApiException ex)
         {
             Show(StaffViewModel.OwnerError(ex), error: true);
+            return false;
         }
         finally
         {
