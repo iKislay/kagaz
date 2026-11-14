@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Markup;
 using System.Windows.Threading;
 using Kagaz.ShopAgent.Core;
 using Kagaz.ShopAgent.App.ViewModels;
@@ -19,6 +20,7 @@ public sealed partial class App : Application
     private Mutex? _singleInstanceMutex;
     private bool _ownsSingleInstanceMutex;
     private IHost? _host;
+    private bool _closingOnFatal;
 
     public App()
     {
@@ -99,8 +101,19 @@ public sealed partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        Log.Error(e.Exception, "Dispatcher unhandled exception");
         e.Handled = true;
+        if (_closingOnFatal) return;
+        if (e.Exception is not XamlParseException)
+        {
+            Log.Error(e.Exception, "Dispatcher unhandled exception");
+            return;
+        }
+        // A broken screen throws again on every layout pass: report it once and close instead of spinning.
+        _closingOnFatal = true;
+        Log.Fatal(e.Exception, "A Kaggaz Shop screen failed to load");
+        _ = MessageBox.Show("Kaggaz Shop hit a problem and needs to close. Please contact Kaggaz support.", "Kaggaz Shop",
+            MessageBoxButton.OK, MessageBoxImage.Stop);
+        Shutdown(1);
     }
 
     private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)

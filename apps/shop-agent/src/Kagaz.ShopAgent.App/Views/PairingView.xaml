@@ -8,13 +8,6 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:PairingViewModel}"
              d:DesignHeight="760" d:DesignWidth="800">
-    <UserControl.Resources>
-        <!-- Two-choice switch at the top of the first-run screen. -->
-        <Style x:Key="ChoiceButton" TargetType="Button" BasedOn="{StaticResource QuietButton}">
-            <Setter Property="MinWidth" Value="170" />
-        </Style>
-    </UserControl.Resources>
-
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="560" HorizontalAlignment="Left">
 
@@ -70,28 +63,8 @@
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,14"
                             Visibility="{Binding IsCode, Converter={StaticResource InverseBoolToVisibility}}">
-                    <Button Content="Sign in" Command="{Binding ShowSignInCommand}" Margin="0,0,8,0">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource ChoiceButton}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsSignIn}" Value="True">
-                                        <Setter Property="Style" Value="{StaticResource PrimaryButton}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    <Button Content="Create shop account" Command="{Binding ShowSignUpCommand}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource ChoiceButton}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsSignUp}" Value="True">
-                                        <Setter Property="Style" Value="{StaticResource PrimaryButton}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
+                    <Button Content="Sign in" Command="{Binding ShowSignInCommand}" Style="{StaticResource ChoiceButton}" Tag="{Binding IsSignIn}" Margin="0,0,8,0" />
+                    <Button Content="Create shop account" Command="{Binding ShowSignUpCommand}" Style="{StaticResource ChoiceButton}" Tag="{Binding IsSignUp}" />
                 </StackPanel>
 
                 <Border Style="{StaticResource Card}" Margin="0,0,0,16">

@@ -214,6 +214,19 @@
         <Style x:Key="DestructiveButton" TargetType="Button" BasedOn="{StaticResource QuietButton}">
             <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
         </Style>
+        <!-- Choice pill: quiet, filled with the accent while Tag is true (bind Tag to "is this the current choice").
+             Never swap Style from a trigger: WPF throws "Style object is not allowed to affect the Style property". -->
+        <Style x:Key="ChoiceButton" TargetType="Button" BasedOn="{StaticResource QuietButton}">
+            <Setter Property="MinWidth" Value="170" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                    <Setter Property="Foreground" Value="White" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <!-- Link-style text button -->
         <Style x:Key="LinkButton" TargetType="Button">
             <Setter Property="FontFamily" Value="{StaticResource UiFont}" />

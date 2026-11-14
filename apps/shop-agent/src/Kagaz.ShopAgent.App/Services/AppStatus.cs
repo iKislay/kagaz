@@ -275,7 +275,8 @@ public sealed partial class AppStatus : ObservableObject
     private static void OnUi(Action action)
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        // After the UI thread has shut down nothing would ever run a queued action: run it here.
+        if (dispatcher is null || dispatcher.HasShutdownStarted || dispatcher.CheckAccess())
         {
             action();
         }
