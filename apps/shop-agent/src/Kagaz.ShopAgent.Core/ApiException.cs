@@ -22,6 +22,16 @@ public sealed class ApiException : Exception
         Details = details;
     }
 
+    /// <summary>
+    /// The innermost message of a failed HTTP call ("No such host is known", "The remote certificate
+    /// is invalid…", "connection actively refused"): what a shopkeeper must report for us to help.
+    /// </summary>
+    public static string RootCause(Exception ex)
+    {
+        while (ex.InnerException is { } inner) ex = inner;
+        return ex.Message.TrimEnd('.');
+    }
+
     /// <summary><c>details.shops</c> of <c>409 MULTIPLE_SHOPS</c>: the shops this login manages.</summary>
     public List<ShopChoice> DetailShops()
     {

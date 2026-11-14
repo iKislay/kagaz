@@ -60,16 +60,32 @@ public class KagazApiClientTests
     }
 
     [Fact]
-    public async Task Thrown_http_request_exception_returns_failure_with_reason()
+    public async Task Thrown_http_request_exception_returns_failure_with_the_root_cause()
     {
-        StubHttpMessageHandler handler = new((_, _) => throw new HttpRequestException("connect failed"));
+        // .NET wraps the real reason: "The SSL connection could not be established" → "The remote certificate is invalid…"
+        StubHttpMessageHandler handler = new((_, _) => throw new HttpRequestException("The SSL connection could not be established, see inner exception.",
+            new System.Security.Authentication.AuthenticationException("The remote certificate is invalid according to the validation procedure.")));
         KagazApiClient client = CreateClient(handler);
 
         HealthResult result = await client.GetHealthAsync(CancellationToken.None);
 
         Assert.False(result.IsSuccess);
-        Assert.NotNull(result.FailureReason);
+        Assert.Equal("localhost: The remote certificate is invalid according to the validation procedure", result.FailureReason);
         Assert.Null(result.Report);
+    }
+
+    [Fact]
+    public async Task Shop_client_network_error_names_the_host_and_the_root_cause()
+    {
+        StubHttpMessageHandler handler = new((_, _) => throw new HttpRequestException("Name or service not known",
+            new System.Net.Sockets.SocketException(11001))); // WSAHOST_NOT_FOUND
+        ShopApiClient client = TestApi.Client(handler);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => client.GetPrintersAsync());
+
+        Assert.Equal(ApiErrorCodes.NetworkError, ex.Code);
+        Assert.StartsWith("Can't reach the Kaggaz server (localhost: ", ex.Message);
+        Assert.Contains("antivirus or firewall", ex.Message);
     }
 
     [Fact]

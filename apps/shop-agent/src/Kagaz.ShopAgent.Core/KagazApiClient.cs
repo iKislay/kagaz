@@ -50,11 +50,11 @@ public sealed class KagazApiClient
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return HealthResult.Failure("Request timed out");
+            return HealthResult.Failure($"No answer from {uri.Host} within {_httpClient.Timeout.TotalSeconds:0} seconds");
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
-            return HealthResult.Failure("API unreachable");
+            return HealthResult.Failure($"{uri.Host}: {ApiException.RootCause(ex)}");
         }
         catch (JsonException)
         {

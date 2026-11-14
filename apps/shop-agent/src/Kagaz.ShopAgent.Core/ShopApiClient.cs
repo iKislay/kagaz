@@ -21,6 +21,8 @@ namespace Kagaz.ShopAgent.Core;
 /// </summary>
 public sealed class ShopApiClient
 {
+    private const string NetworkHint = "Check this PC's internet connection, and that no antivirus or firewall blocks Kaggaz Shop.";
+
     private readonly HttpClient _httpClient;
     private readonly AgentSettings _settings;
     private readonly ISecureStore _secureStore;
@@ -366,11 +368,13 @@ public sealed class ShopApiClient
         }
         catch (HttpRequestException ex)
         {
-            throw new ApiException(ApiErrorCodes.NetworkError, $"Cannot reach the Kaggaz server ({ex.Message})");
+            throw new ApiException(ApiErrorCodes.NetworkError,
+                $"Can't reach the Kaggaz server ({request.RequestUri?.Host}: {ApiException.RootCause(ex)}). {NetworkHint}");
         }
         catch (TaskCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new ApiException(ApiErrorCodes.NetworkError, "The Kaggaz server did not respond in time");
+            throw new ApiException(ApiErrorCodes.NetworkError,
+                $"The Kaggaz server did not answer within {_httpClient.Timeout.TotalSeconds:0} seconds. {NetworkHint}");
         }
         finally
         {
