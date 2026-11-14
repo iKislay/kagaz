@@ -63,7 +63,7 @@ Scripts default to `http://localhost:$API_PORT/api` (4000 = the live printer ser
 Shop app `appsettings.json` keys: `ApiBaseUrl`, `SafetyPollSeconds`, `TokenRotationDays`, `RealtimeEnabled`, `UpdateFeedUrl`.
 
 Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/SeaweedFS aren't running), `GET /api/config` (drives the web DEMO banner).
-Shop accounts are created in the Kaggaz Shop app: `POST /api/shop/signup` (shop CLOSED + owner login + this PC), `POST /api/shop/enroll-with-login` (owner connects another PC), `GET/POST/DELETE /api/shop/members` and `GET/PUT /api/shop/pricing` (owner signed in on the PC). Support contact on the website comes from `SUPPORT_PHONE` / `SUPPORT_WHATSAPP` / `SUPPORT_EMAIL`.
+Shop accounts are created in the Kaggaz Shop app: `POST /api/shop/signup` (shop CLOSED + owner login + this PC), `POST /api/shop/enroll-with-login` (owner connects another PC), `GET/POST/DELETE /api/shop/members` and `GET/PUT /api/shop/pricing` (owner signed in on the PC). First-run setup in the app (owner): `GET/PATCH /api/shop/profile`, `GET /api/shop/places?q=` + `/places/reverse` (Photon/OpenStreetMap, no key), `PUT /api/shop/location` (pin + owner-edited address), `POST /api/shop/profile/complete-setup`. The shop app opens in order: connect PC → sign in → setup → subscription → app (`AppGates`). Support contact on the website comes from `SUPPORT_PHONE` / `SUPPORT_WHATSAPP` / `SUPPORT_EMAIL`.
 
 ### Toolchain notes (versions matter)
 
@@ -175,3 +175,4 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 - Open decisions blocking hardware work: **D1** (demo PC + printer model).
 - 2026-11-12: production at kaggaz.in / api.kaggaz.in runs pay-at-counter (ADR-003). Live gateway still gated by **D6** (merchant of record).
 - 2026-11-12: shop subscriptions per connected printer, manual payment ledger in /superadmin → Billing ([ADR-004](docs/decisions/ADR-004-subscriptions.md)); enforcement behind `BILLING_ENFORCED`.
+- 2026-11-14: shop address/location are set by the owner in the shop app's first-run setup (never typed by superadmin); `shops.address` nullable, `shops.onboarded_at`. Shop app 0.5.0 targets `net10.0-windows10.0.19041.0`. Installer downloads stream from the API (no R2 redirect).
