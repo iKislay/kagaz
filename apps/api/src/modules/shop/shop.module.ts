@@ -14,6 +14,8 @@ import { ShopController } from './shop.controller.js';
 import { ShopAccountService } from './shop-account.service.js';
 import { ShopJobsService } from './shop-jobs.service.js';
 import { ShopPrintersService } from './shop-printers.service.js';
+import { ShopProfileService } from './shop-profile.service.js';
+import { PlacesService } from './places.service.js';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { ShopPrintersService } from './shop-printers.service.js';
     PrintJobsService,
     ShopPrintersService,
     ShopAccountService,
+    ShopProfileService,
+    PlacesService,
     PrintPreparationService,
   ],
 })

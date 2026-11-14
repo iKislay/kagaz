@@ -185,7 +185,6 @@ export class ShopSettingsService {
         data: {
           slug: req.slug,
           name: req.name,
-          address: req.address,
           contactPhone: req.contactPhone ?? null,
           status: 'CLOSED', // opens once it has a device, printer and pricing
           approvalMode: 'MANUAL',

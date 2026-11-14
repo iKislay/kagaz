@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { PlacesService } from '../../src/modules/shop/places.service.js';
 import { hashPassword } from '../../src/modules/identity/passwords.js';
 import { type Harness, createHarness, createShop } from './harness.js';
 
@@ -13,7 +14,6 @@ afterAll(async () => {
 const randomMobile = () => `9${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
 const signupBody = (phone: string) => ({
   shopName: 'Raju Xerox & Prints',
-  address: 'Near Bus Stand, Mandya',
   ownerName: 'Raju',
   phone,
   password: 'raju-pass-123',
@@ -255,5 +255,110 @@ describe('owner flows from the app', () => {
       .set(o.auth)
       .send({ monoRatePaise: 300, colourRatePaise: 1200 })
       .expect(401);
+  });
+
+  it('first-run setup: owner saves name, then a searched or located place with an edited address; each step persists', async () => {
+    const o = await owner();
+    const places = app.app.get(PlacesService);
+    const search = vi
+      .spyOn(places, 'search')
+      .mockResolvedValue([
+        {
+          name: 'KSRTC Bus Stand',
+          address: 'KSRTC Bus Stand, Mandya, 571401',
+          lat: 12.52,
+          lng: 76.89,
+        },
+      ]);
+    const reverse = vi
+      .spyOn(places, 'reverse')
+      .mockResolvedValue('Near Vinayaka Nursing Home, Hospital Road, Mandya, 571401');
+
+    const start = await app.http().get('/api/shop/profile').set(o.auth).expect(200);
+    expect(start.body).toEqual({
+      name: 'Raju Xerox & Prints',
+      contactPhone: `+91${o.mobile}`,
+      address: null,
+      location: null,
+      setupComplete: false,
+    });
+
+    // Finishing before the location is set is refused.
+    const early = await app
+      .http()
+      .post('/api/shop/profile/complete-setup')
+      .set(o.ownerAuth)
+      .expect(409);
+    expect(early.body.error.code).toBe('SETUP_INCOMPLETE');
+
+    // Step 1: name, saved immediately.
+    const named = await app
+      .http()
+      .patch('/api/shop/profile')
+      .set(o.ownerAuth)
+      .send({ name: 'Raju Prints' })
+      .expect(200);
+    expect(named.body.name).toBe('Raju Prints');
+
+    // Step 2: suggestions while typing, or a suggested address for the PC's position.
+    const found = await app
+      .http()
+      .get('/api/shop/places')
+      .query({ q: 'bus stand' })
+      .set(o.ownerAuth)
+      .expect(200);
+    expect(found.body.places).toHaveLength(1);
+    expect(search).toHaveBeenCalledWith('bus stand', null);
+    await app.http().get('/api/shop/places').query({ q: 'ab' }).set(o.ownerAuth).expect(400);
+    const suggested = await app
+      .http()
+      .get('/api/shop/places/reverse')
+      .query({ lat: 12.5223, lng: 76.8975 })
+      .set(o.ownerAuth)
+      .expect(200);
+    expect(suggested.body.address).toBe(
+      'Near Vinayaka Nursing Home, Hospital Road, Mandya, 571401',
+    );
+    expect(reverse).toHaveBeenCalledWith(12.5223, 76.8975);
+    await app.http().get('/api/shop/places').query({ q: 'bus stand' }).set(o.auth).expect(401);
+
+    // The owner saves the pin with the address as they edited it.
+    const located = await app
+      .http()
+      .put('/api/shop/location')
+      .set(o.ownerAuth)
+      .send({ lat: 12.5223, lng: 76.8975, address: 'Shop 4, Hospital Road, Mandya, 571401' })
+      .expect(200);
+    expect(located.body).toMatchObject({
+      address: 'Shop 4, Hospital Road, Mandya, 571401',
+      location: { lat: 12.5223, lng: 76.8975 },
+      setupComplete: false,
+    });
+    await app
+      .http()
+      .put('/api/shop/location')
+      .set(o.ownerAuth)
+      .send({ lat: 12.5, lng: 76.9, address: '' })
+      .expect(400);
+
+    const done = await app
+      .http()
+      .post('/api/shop/profile/complete-setup')
+      .set(o.ownerAuth)
+      .expect(200);
+    expect(done.body.setupComplete).toBe(true);
+
+    const shop = await app.prisma.shop.findUniqueOrThrow({ where: { id: o.shopId } });
+    expect(shop).toMatchObject({ name: 'Raju Prints', latitude: 12.5223, longitude: 76.8975 });
+    expect(shop.onboardedAt).toBeInstanceOf(Date);
+    const audit = await app.prisma.auditLog.findMany({ where: { shopId: o.shopId } });
+    expect(audit.map((a) => a.action)).toEqual(
+      expect.arrayContaining(['shop.profile_updated', 'shop.location_set', 'shop.setup_completed']),
+    );
+
+    // Owner only: the bare device token (no one signed in) can read but not change.
+    await app.http().patch('/api/shop/profile').set(o.auth).send({ name: 'X Y' }).expect(401);
+    search.mockRestore();
+    reverse.mockRestore();
   });
 });

@@ -110,7 +110,8 @@ export const AdminShopSchema = z.object({
   id: z.uuid(),
   slug: z.string(),
   name: z.string(),
-  address: z.string(),
+  /** From the location the owner set in the Kaggaz Shop app; null until then. */
+  address: z.string().nullable(),
   /** ISO-8601; self-registered shops show as "New" while CLOSED and recent. */
   createdAt: z.string(),
   status: ShopStatusSchema,
@@ -378,7 +379,7 @@ export const AdminShopDetailSchema = z.object({
   id: z.uuid(),
   slug: z.string(),
   name: z.string(),
-  address: z.string(),
+  address: z.string().nullable(),
   contactPhone: z.string().nullable(),
   status: ShopStatusSchema,
   approvalMode: ApprovalModeSchema,
@@ -405,7 +406,6 @@ export type AdminShopDetail = z.infer<typeof AdminShopDetailSchema>;
 /** PATCH /api/admin/shops/:id — owners may only change the OWNER_EDITABLE fields. */
 export const AdminShopUpdateRequestSchema = z.strictObject({
   name: z.string().trim().min(2).max(120).optional(),
-  address: z.string().trim().min(2).max(300).optional(),
   contactPhone: z
     .string()
     .regex(/^\+[1-9]\d{7,14}$/, 'Use E.164, e.g. +919876543210')
@@ -417,8 +417,6 @@ export const AdminShopUpdateRequestSchema = z.strictObject({
   autoLimits: AutoLimitsSchema.optional(),
   openingHours: OpeningHoursSchema.optional(),
   isDemo: z.boolean().optional(),
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional(),
 });
 export type AdminShopUpdateRequest = z.infer<typeof AdminShopUpdateRequestSchema>;
 export const OWNER_EDITABLE_SHOP_FIELDS = [
@@ -471,7 +469,6 @@ export const AdminShopCreateRequestSchema = z.strictObject({
     .string()
     .regex(/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/, 'lowercase letters, digits and dashes'),
   name: z.string().trim().min(2).max(120),
-  address: z.string().trim().min(2).max(300),
   contactPhone: z
     .string()
     .regex(/^\+[1-9]\d{7,14}$/)

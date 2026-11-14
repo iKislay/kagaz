@@ -94,7 +94,6 @@ export class DevicesService {
         data: {
           slug,
           name: req.shopName,
-          address: req.address,
           contactPhone: req.phone,
           status: 'CLOSED', // Kaggaz activates it (subscription), then the owner opens it
           approvalMode: 'MANUAL',

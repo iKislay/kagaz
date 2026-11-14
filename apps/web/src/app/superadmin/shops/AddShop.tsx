@@ -26,7 +26,7 @@ function slugFor(name: string): string {
 export function AddShop({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const action = useAction();
-  const [f, setF] = useState({ name: '', address: '', owner: '', phone: '', password: '' });
+  const [f, setF] = useState({ name: '', owner: '', phone: '', password: '' });
   const set = (k: keyof typeof f) => (v: string) => setF((s) => ({ ...s, [k]: v }));
 
   async function save() {
@@ -34,7 +34,6 @@ export function AddShop({ onClose }: { onClose: () => void }) {
       adminApi.createShop({
         slug: slugFor(f.name),
         name: f.name.trim(),
-        address: f.address.trim(),
         contactPhone: normalizePhone(f.phone),
       }),
     );
@@ -63,12 +62,6 @@ export function AddShop({ onClose }: { onClose: () => void }) {
       <ErrorNote error={action.error} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Input label="Shop name" value={f.name} onChange={set('name')} placeholder="Raju Xerox" />
-        <Input
-          label="Shop address"
-          value={f.address}
-          onChange={set('address')}
-          placeholder="Near KSRTC Bus Stand, Mandya"
-        />
         <Input label="Owner name" value={f.owner} onChange={set('owner')} placeholder="Raju" />
         <Input
           label="Owner mobile number"
@@ -92,7 +85,8 @@ export function AddShop({ onClose }: { onClose: () => void }) {
         </Button>
         <span className="text-[12px] text-text-secondary">
           The shop starts Closed. The owner signs in to the Kaggaz Shop app with this mobile number
-          and password; add a subscription, set the map location and open it when they’ve paid.
+          and password, then sets the shop’s location and address there. Add a subscription and open
+          the shop when they’ve paid.
         </span>
       </div>
     </Card>

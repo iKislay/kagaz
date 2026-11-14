@@ -168,7 +168,6 @@ describe('shop settings, printers, pricing (P4.3)', () => {
       .send({
         slug: `e2e-new-${randomCode(4).toLowerCase()}`,
         name: 'New Shop',
-        address: 'Road 1, Mandya',
       })
       .expect(201);
     const id = created.body.id as string;

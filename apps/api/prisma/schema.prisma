@@ -141,7 +141,8 @@ model Shop {
   id               String       @id @default(uuid(7)) @db.Uuid
   slug             String       @unique
   name             String
-  address          String
+  /// Looked up from the location the owner captured on the shop PC; never typed. Null until then.
+  address          String?
   contactPhone     String?      @map("contact_phone")
   status           ShopStatus   @default(CLOSED)
   approvalMode     ApprovalMode @default(MANUAL) @map("approval_mode")
@@ -154,6 +155,8 @@ model Shop {
   /// WGS84 degrees for the customer "near me" sort; null = location not set.
   latitude         Float?
   longitude        Float?
+  /// The owner finished first-run setup in the Kaggaz Shop app (name, location, prices).
+  onboardedAt      DateTime?    @map("onboarded_at")
   /// Live-payment settlement fields — present, not active (PRD §8.8 / D6)
   gatewayAccountId String?      @map("gateway_account_id")
   settlementConfig Json?        @map("settlement_config")

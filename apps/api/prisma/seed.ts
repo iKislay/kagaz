@@ -128,7 +128,13 @@ async function main() {
   for (const [i, def] of SHOPS.entries()) {
     const shop = await prisma.shop.upsert({
       where: { slug: def.slug },
-      update: { name: def.name, address: def.address, isDemo: true, ...def.location },
+      update: {
+        name: def.name,
+        address: def.address,
+        isDemo: true,
+        onboardedAt: new Date(),
+        ...def.location,
+      },
       create: {
         slug: def.slug,
         name: def.name,
@@ -139,6 +145,7 @@ async function main() {
         autoLimits: DEFAULT_AUTO_LIMITS,
         openingHours: OPENING_HOURS,
         isDemo: true,
+        onboardedAt: new Date(), // demo shops are fully set up
       },
     });
     shops.push(shop);

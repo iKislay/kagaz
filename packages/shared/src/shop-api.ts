@@ -38,7 +38,6 @@ export type EnrollDeviceResponse = z.infer<typeof EnrollDeviceResponseSchema>;
  */
 export const ShopSignupRequestSchema = z.strictObject({
   shopName: z.string().trim().min(2).max(120),
-  address: z.string().trim().min(2).max(300),
   ownerName: z.string().trim().min(2).max(80),
   phone: MobileSchema,
   password: z.string().min(8, 'At least 8 characters').max(200),
@@ -94,6 +93,63 @@ export type ShopPricing = z.infer<typeof ShopPricingSchema>;
 /** PUT /api/shop/pricing (owner): a new pricing version effective now; same rules as admin. */
 export const UpdateShopPricingSchema = CreatePricingVersionSchema;
 export type UpdateShopPricing = z.infer<typeof UpdateShopPricingSchema>;
+
+// ─── Shop profile + first-run setup (owner, from the app) ───
+
+/**
+ * GET /api/shop/profile. `location` comes from the shop PC's position or a place the owner picked
+ * from search (never typed coordinates); `address` is what customers read, which the owner may edit.
+ * `setupComplete` is false until the owner finishes first-run setup.
+ */
+export const ShopProfileSchema = z.object({
+  name: z.string(),
+  contactPhone: z.string().nullable(),
+  address: z.string().nullable(),
+  location: z.object({ lat: z.number(), lng: z.number() }).nullable(),
+  setupComplete: z.boolean(),
+});
+export type ShopProfile = z.infer<typeof ShopProfileSchema>;
+
+/** PATCH /api/shop/profile (owner). */
+export const UpdateShopProfileSchema = z
+  .strictObject({
+    name: z.string().trim().min(2).max(120).optional(),
+    contactPhone: MobileSchema.optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, 'Nothing to update');
+export type UpdateShopProfile = z.infer<typeof UpdateShopProfileSchema>;
+
+/** A place from address search / reverse lookup (OpenStreetMap). */
+export const PlaceSchema = z.object({
+  /** Short title, e.g. "KSRTC Bus Stand". */
+  name: z.string(),
+  /** Full one-line address, e.g. "KSRTC Bus Stand, Dr. Rajkumar Road, Mandya, 571401". */
+  address: z.string(),
+  lat: z.number(),
+  lng: z.number(),
+});
+export type Place = z.infer<typeof PlaceSchema>;
+
+/** GET /api/shop/places?q= (signed in): address suggestions near the shop. */
+export const PlaceSearchQuerySchema = z.strictObject({ q: z.string().trim().min(3).max(120) });
+export const PlaceSearchResponseSchema = z.object({ places: z.array(PlaceSchema) });
+export type PlaceSearchResponse = z.infer<typeof PlaceSearchResponseSchema>;
+
+/** GET /api/shop/places/reverse?lat=&lng= (signed in): a suggested address for a position. */
+export const ReversePlaceQuerySchema = z.strictObject({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+});
+export const ReversePlaceResponseSchema = z.object({ address: z.string().nullable() });
+export type ReversePlaceResponse = z.infer<typeof ReversePlaceResponseSchema>;
+
+/** PUT /api/shop/location (owner): the pin and the address customers will read. */
+export const ShopLocationRequestSchema = z.strictObject({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  address: z.string().trim().min(5, 'Enter the shop address').max(300),
+});
+export type ShopLocationRequest = z.infer<typeof ShopLocationRequestSchema>;
 
 export const HeartbeatRequestSchema = z.strictObject({
   appVersion: z.string().max(40).optional(),

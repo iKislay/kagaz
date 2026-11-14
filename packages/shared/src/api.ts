@@ -20,7 +20,7 @@ export const ShopSummarySchema = z.object({
   id: z.uuid(),
   slug: z.string(),
   name: z.string(),
-  address: z.string(),
+  address: z.string().nullable(),
   status: z.enum(enumValues(ShopStatus)),
   /** The shop's Windows app is connected (recent heartbeat). */
   online: z.boolean(),
@@ -84,7 +84,12 @@ export const PublicOrderSchema = z.object({
   id: z.uuid(),
   publicRef: z.string(),
   status: OrderStatusSchema,
-  shop: z.object({ id: z.uuid(), name: z.string(), address: z.string(), isDemo: z.boolean() }),
+  shop: z.object({
+    id: z.uuid(),
+    name: z.string(),
+    address: z.string().nullable(),
+    isDemo: z.boolean(),
+  }),
   options: PrintOptionsSchema,
   file: z.object({ pageCount: z.int(), bytes: z.int() }).nullable(),
   quote: QuoteSchema.nullable(),

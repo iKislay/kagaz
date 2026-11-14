@@ -40,15 +40,11 @@ export function SettingsSection({
   onSaved: (s: AdminShopDetail) => void;
 }) {
   const [name, setName] = useState(shop.name);
-  const [address, setAddress] = useState(shop.address);
   const [phone, setPhone] = useState(shop.contactPhone ?? '');
   const [status, setStatus] = useState(shop.status);
   const [mode, setMode] = useState(shop.approvalMode);
   const [paused, setPaused] = useState(shop.autoPaused);
   const [isDemo, setIsDemo] = useState(shop.isDemo);
-  const [location, setLocation] = useState(
-    shop.latitude !== null && shop.longitude !== null ? `${shop.latitude}, ${shop.longitude}` : '',
-  );
   const [limits, setLimits] = useState<Record<keyof AutoLimits, string>>({
     maxPages: String(shop.autoLimits.maxPages ?? 50),
     maxCopies: String(shop.autoLimits.maxCopies ?? 5),
@@ -66,17 +62,8 @@ export function SettingsSection({
     if (paused !== shop.autoPaused) p.autoPaused = paused;
     if (!admin) return p;
     if (name.trim() !== shop.name) p.name = name.trim();
-    if (address.trim() !== shop.address) p.address = address.trim();
     if (status !== shop.status) p.status = status;
     if (isDemo !== shop.isDemo) p.isDemo = isDemo;
-    // "lat, lng" as copied from a Google Maps pin; empty clears it. Bad input is caught by the API.
-    const [lat = null, lng = null] = location.trim()
-      ? location.split(',').map((v) => Number(v.trim()))
-      : [];
-    if (lat !== shop.latitude || lng !== shop.longitude) {
-      p.latitude = lat;
-      p.longitude = lng;
-    }
     const nextLimits = Object.fromEntries(
       Object.entries(limits).map(([k, v]) => [k, Number.parseInt(v, 10)]),
     ) as AutoLimits;
@@ -102,24 +89,34 @@ export function SettingsSection({
       <Card title="Details">
         <div className="space-y-3">
           {admin ? (
-            <>
-              <Input label="Name" value={name} onChange={setName} />
-              <Input label="Address" value={address} onChange={setAddress} />
-              <Input
-                label="Map location (lat, lng)"
-                value={location}
-                onChange={setLocation}
-                placeholder="12.5243, 76.8968"
-              />
-            </>
+            <Input label="Name" value={name} onChange={setName} />
           ) : (
-            <Facts
-              items={[
-                ['Name', shop.name],
-                ['Address', shop.address],
-              ]}
-            />
+            <Facts items={[['Name', shop.name]]} />
           )}
+          <Facts
+            items={[
+              ['Address', shop.address ?? 'Not set yet'],
+              [
+                'Map location',
+                shop.latitude !== null && shop.longitude !== null ? (
+                  <a
+                    key="map"
+                    className="text-accent"
+                    href={`https://www.google.com/maps?q=${shop.latitude},${shop.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {shop.latitude.toFixed(5)}, {shop.longitude.toFixed(5)}
+                  </a>
+                ) : (
+                  'Not set yet'
+                ),
+              ],
+            ]}
+          />
+          <p className="text-[12px] text-text-secondary">
+            The shop owner sets the location and address in the Kaggaz Shop app.
+          </p>
           <Input
             label="Contact phone (E.164)"
             value={phone}
@@ -214,7 +211,7 @@ export function SettingsSection({
         {saved && !error && <span className="text-[13px] text-green">Saved</span>}
         {!admin && (
           <span className="text-[12px] text-text-secondary">
-            Name, address, status and limits are managed by Kaggaz.
+            Name, status and limits are managed by Kaggaz.
           </span>
         )}
       </div>
