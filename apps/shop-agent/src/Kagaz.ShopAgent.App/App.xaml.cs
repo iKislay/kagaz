@@ -50,6 +50,14 @@ public sealed partial class App : Application
             Log.Logger = LoggingSetup.CreateLogger(paths);
 
             _host = HostFactory.CreateHost(paths);
+#if !DEBUG
+            // A dev build in bin\ must not register itself to start with Windows.
+            try { _host.Services.GetRequiredService<Services.StartupRegistration>().EnableOnFirstRun(_host.Services.GetRequiredService<AgentStateStore>()); }
+            catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or System.IO.IOException)
+            {
+                Log.Warning(ex, "Could not turn on start with Windows");
+            }
+#endif
             await _host.StartAsync();
 
             MainWindow = _host.Services.GetRequiredService<MainWindow>();

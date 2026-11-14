@@ -31,6 +31,28 @@ public class StartupRegistrationTests
     }
 
     [Fact]
+    public void First_run_turns_it_on_once_and_respects_a_later_off()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "kagaz-startup-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var state = new Kagaz.ShopAgent.Core.AgentStateStore(Path.Combine(root, "state.json"));
+            var startup = new StartupRegistration(new FakeRunKey(), @"C:\kagaz\Kagaz.ShopAgent.App.exe");
+
+            startup.EnableOnFirstRun(state);
+            Assert.True(startup.IsEnabled);
+
+            startup.SetEnabled(false);
+            startup.EnableOnFirstRun(state);
+            Assert.False(startup.IsEnabled);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Entry_pointing_elsewhere_is_not_reported_as_enabled()
     {
         var key = new FakeRunKey();

@@ -84,6 +84,8 @@ public sealed class AgentState
     public bool ShopSetupComplete { get; set; }
     public string? DeviceName { get; set; }
     public bool ShopIsDemo { get; set; }
+    /// <summary>"Start with Windows" was switched on once by default; after that it is the operator's choice.</summary>
+    public bool StartupDefaultApplied { get; set; }
 }
 
 /// <summary>

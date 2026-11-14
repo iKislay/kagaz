@@ -60,4 +60,15 @@ public sealed class StartupRegistration
         if (enabled) _runKey.Set(ValueName, Command);
         else _runKey.Delete(ValueName);
     }
+
+    /// <summary>
+    /// On by default: the first run (including the first run after this update) switches it on once. If the
+    /// operator turns it off later, it stays off.
+    /// </summary>
+    public void EnableOnFirstRun(Kagaz.ShopAgent.Core.AgentStateStore state)
+    {
+        if (state.Load().StartupDefaultApplied) return;
+        SetEnabled(true);
+        state.Update(s => s.StartupDefaultApplied = true);
+    }
 }
