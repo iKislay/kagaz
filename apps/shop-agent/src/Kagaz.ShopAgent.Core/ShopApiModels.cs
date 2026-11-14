@@ -62,8 +62,7 @@ public record HeartbeatSubscription(string Status, int? PrinterSeats, string? Pe
 public record EnrollWithLoginRequest(string Login, string Password, string DeviceName, string? AppVersion, string? ShopId = null);
 
 /// <summary><c>POST /shop/signup</c>: create the shop + owner login and pair this PC in one go.</summary>
-public record ShopSignupRequest(string ShopName, string Address, string OwnerName, string Phone, string Password,
-    string DeviceName, string? AppVersion);
+public record ShopSignupRequest(string ShopName, string OwnerName, string Phone, string Password, string DeviceName, string? AppVersion);
 
 /// <summary>One choice from <c>409 MULTIPLE_SHOPS</c> <c>details.shops</c>.</summary>
 public record ShopChoice(string Id, string Name)
@@ -74,6 +73,9 @@ public record ShopChoice(string Id, string Name)
 // ─── Owner pages: staff + prices ───
 
 public record ShopMember(string UserId, string? Name, string? Phone, string Role);
+
+/// <summary><c>GET /shop/members</c> body.</summary>
+public record ShopMemberList(List<ShopMember> Members);
 
 public record AddShopMemberRequest(string Phone, string Name, string Password);
 
@@ -94,6 +96,25 @@ public record UpdateShopPricingRequest(
     int? ColourDuplexRatePaise,
     string DuplexRule,
     int MinimumChargePaise);
+
+// ─── Shop profile + first-run setup (owner) ───
+
+public record GeoPoint(double Lat, double Lng);
+
+/// <summary><c>GET /shop/profile</c>. The address is what customers read; the location pins the shop.</summary>
+public record ShopProfile(string Name, string? ContactPhone, string? Address, GeoPoint? Location, bool SetupComplete);
+
+public record UpdateShopProfileRequest(string? Name = null, string? ContactPhone = null);
+
+/// <summary>A place from address search (OpenStreetMap, via the Kaggaz API).</summary>
+public record Place(string Name, string Address, double Lat, double Lng);
+
+public record PlaceSearchResponse(List<Place> Places);
+
+public record ReversePlaceResponse(string? Address);
+
+/// <summary><c>PUT /shop/location</c>: the pin and the address as the owner confirmed it.</summary>
+public record ShopLocationRequest(double Lat, double Lng, string Address);
 
 // ─── Approval mode (contract §3) ───
 

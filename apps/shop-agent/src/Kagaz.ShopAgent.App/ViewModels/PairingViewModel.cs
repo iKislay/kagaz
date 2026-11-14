@@ -60,9 +60,6 @@ public sealed partial class PairingViewModel : ObservableObject
     private string _shopName = string.Empty;
 
     [ObservableProperty]
-    private string _shopAddress = string.Empty;
-
-    [ObservableProperty]
     private string _ownerName = string.Empty;
 
     [ObservableProperty]
@@ -174,9 +171,9 @@ public sealed partial class PairingViewModel : ObservableObject
     private async Task SignUpAsync()
     {
         string phone = SignUpPhone.Trim();
-        if (ShopName.Trim().Length < 2 || ShopAddress.Trim().Length < 2 || OwnerName.Trim().Length < 2)
+        if (ShopName.Trim().Length < 2 || OwnerName.Trim().Length < 2)
         {
-            Error = "Enter your shop name, shop address and your name.";
+            Error = "Enter your shop name and your name.";
             return;
         }
         if (phone.Count(char.IsAsciiDigit) < 10)
@@ -198,7 +195,7 @@ public sealed partial class PairingViewModel : ObservableObject
         await RunAsync(async () =>
         {
             var response = await _api.SignupAsync(new ShopSignupRequest(
-                ShopName.Trim(), ShopAddress.Trim(), OwnerName.Trim(), phone, password, PcName(), AppVersion()));
+                ShopName.Trim(), OwnerName.Trim(), phone, password, PcName(), AppVersion()));
             await CompleteAsync(response, phone, password);
         }, ex =>
         {

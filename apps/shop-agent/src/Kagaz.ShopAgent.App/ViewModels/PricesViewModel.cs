@@ -106,8 +106,10 @@ public sealed partial class PricesViewModel : ObservableObject
         return true;
     }
 
-    private void Apply(ShopPricing p)
+    /// <summary>Shows the current prices; a shop without prices yet starts from empty fields.</summary>
+    private void Apply(ShopPricing? p)
     {
+        if (p is null) return;
         Mono = Rupees.FromPaise(p.MonoRatePaise);
         Colour = Rupees.FromPaise(p.ColourRatePaise);
         MonoDuplex = p.MonoDuplexRatePaise is int md ? Rupees.FromPaise(md) : string.Empty;

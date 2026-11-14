@@ -149,7 +149,7 @@ public sealed class ShopApiClient
     public async Task<List<ShopMember>> GetMembersAsync(CancellationToken ct = default)
     {
         using var response = await SendAsync(HttpMethod.Get, "/shop/members", null, ct, auth: Auth.Operator);
-        return await ReadAsync<List<ShopMember>>(response, ct);
+        return (await ReadAsync<ShopMemberList>(response, ct)).Members;
     }
 
     public async Task AddMemberAsync(AddShopMemberRequest request, CancellationToken ct = default)
@@ -164,16 +164,58 @@ public sealed class ShopApiClient
         await EnsureSuccess(response);
     }
 
-    public async Task<ShopPricing> GetPricingAsync(CancellationToken ct = default)
+    /// <summary>The prices in effect now, or null before the shop's first prices are set.</summary>
+    public async Task<ShopPricing?> GetPricingAsync(CancellationToken ct = default)
     {
         using var response = await SendAsync(HttpMethod.Get, "/shop/pricing", null, ct, auth: Auth.Operator);
-        return await ReadAsync<ShopPricing>(response, ct);
+        return await ReadAsync<ShopPricing>(response, ct, allowEmpty: true);
     }
 
     public async Task<ShopPricing> SetPricingAsync(UpdateShopPricingRequest request, CancellationToken ct = default)
     {
         using var response = await SendAsync(HttpMethod.Put, "/shop/pricing", request, ct, auth: Auth.Operator);
         return await ReadAsync<ShopPricing>(response, ct);
+    }
+
+    // ─── Shop profile + first-run setup ───
+
+    public async Task<ShopProfile> GetProfileAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/profile", null, ct);
+        return await ReadAsync<ShopProfile>(response, ct);
+    }
+
+    public async Task<ShopProfile> UpdateProfileAsync(UpdateShopProfileRequest request, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Patch, "/shop/profile", request, ct, auth: Auth.Operator);
+        return await ReadAsync<ShopProfile>(response, ct);
+    }
+
+    /// <summary>Address suggestions near the shop for what the owner typed (3+ characters).</summary>
+    public async Task<List<Place>> SearchPlacesAsync(string query, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, $"/shop/places?q={Uri.EscapeDataString(query)}", null, ct, auth: Auth.Operator);
+        return (await ReadAsync<PlaceSearchResponse>(response, ct)).Places;
+    }
+
+    /// <summary>A suggested address for a position, or null when none is known.</summary>
+    public async Task<string?> ReversePlaceAsync(double lat, double lng, CancellationToken ct = default)
+    {
+        var at = FormattableString.Invariant($"lat={lat}&lng={lng}");
+        using var response = await SendAsync(HttpMethod.Get, $"/shop/places/reverse?{at}", null, ct, auth: Auth.Operator);
+        return (await ReadAsync<ReversePlaceResponse>(response, ct)).Address;
+    }
+
+    public async Task<ShopProfile> SetLocationAsync(ShopLocationRequest request, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Put, "/shop/location", request, ct, auth: Auth.Operator);
+        return await ReadAsync<ShopProfile>(response, ct);
+    }
+
+    public async Task<ShopProfile> CompleteSetupAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, "/shop/profile/complete-setup", null, ct, auth: Auth.Operator);
+        return await ReadAsync<ShopProfile>(response, ct);
     }
 
     /// <summary><c>GET /config</c> (public, no token): Kaggaz support contact, or null if not set.</summary>
@@ -357,6 +399,11 @@ public sealed class ShopApiClient
         catch (JsonException) when (allowEmpty)
         {
             return default;
+        }
+        catch (JsonException)
+        {
+            // A body this app can't read must reach callers as an ApiException they handle, never crash the UI.
+            throw new ApiException("INVALID_RESPONSE", "Unexpected response from the Kaggaz server");
         }
     }
 
