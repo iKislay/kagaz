@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -180,7 +179,7 @@ public sealed partial class JobsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelection))]
-    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(OpenRejectCommand), nameof(OpenPreviewCommand),
+    [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(OpenRejectCommand),
         nameof(OpenConfirmPrintedCommand), nameof(OpenReprintCommand), nameof(OpenMarkFailedCommand))]
     private JobItem? _selectedJob;
 
@@ -512,29 +511,92 @@ public sealed partial class JobsViewModel : ObservableObject
         return t.Length > 500 ? t[..500] : t;
     }
 
-    // ─── Preview ───
+    // ─── Preview: the customer's PDF in the detail pane, one page at a time (full screen from the view) ───
 
-    private bool CanOpenPreview() => SelectedJob is not null;
+    private PdfPreview? _preview;
+    private string? _previewOrderId;
+    private int _previewVersion;
 
-    [RelayCommand(CanExecute = nameof(CanOpenPreview))]
-    private async Task OpenPreviewAsync()
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPreview))]
+    private System.Windows.Media.ImageSource? _previewImage;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PreviewPageText))]
+    [NotifyCanExecuteChangedFor(nameof(NextPageCommand), nameof(PreviousPageCommand))]
+    private int _previewPage;
+
+    /// <summary>"Loading preview…" / "Preview not available"; null while a page is shown.</summary>
+    [ObservableProperty]
+    private string? _previewMessage;
+
+    public bool HasPreview => PreviewImage is not null;
+    public int PreviewPageCount => _preview?.PageCount ?? 0;
+    public string PreviewPageText => $"Page {PreviewPage + 1} of {PreviewPageCount}";
+
+    partial void OnSelectedJobChanged(JobItem? value)
     {
-        var job = SelectedJob!;
+        // Every refresh re-creates the rows: reload only when a different order is selected.
+        if (value?.OrderId != _previewOrderId) _ = LoadPreviewAsync(value);
+    }
+
+    private async Task LoadPreviewAsync(JobItem? job)
+    {
+        int version = ++_previewVersion;
+        _previewOrderId = job?.OrderId;
+        _preview = null;
+        PreviewImage = null;
+        PreviewPage = 0;
+        PreviewMessage = job is null ? null : "Loading preview…";
+        if (job is null) return;
         try
         {
             var detail = await _api.GetJobAsync(job.OrderId);
+            if (version != _previewVersion) return;
             if (string.IsNullOrEmpty(detail.PreviewUrl))
             {
-                _status.ShowToast("No preview available", job.PublicRef, warning: true);
+                PreviewMessage = "No preview available";
                 return;
             }
-            // Short-lived signed URL: hand it to the default viewer, never log it.
-            Process.Start(new ProcessStartInfo(detail.PreviewUrl) { UseShellExecute = true });
+            var preview = await PdfPreview.LoadAsync(detail.PreviewUrl);
+            if (version != _previewVersion) return;
+            _preview = preview;
+            await ShowPageAsync(0, version);
         }
-        catch (ApiException ex)
+        catch (Exception) // API, network, JSON or the Windows PDF renderer: the preview is optional, the job isn't
         {
-            Error = ex.Message;
+            if (version != _previewVersion) return;
+            _previewOrderId = null; // selecting the job again retries
+            PreviewMessage = "Preview not available right now";
         }
+    }
+
+    private async Task ShowPageAsync(int index, int version)
+    {
+        if (_preview is null) return;
+        var image = await _preview.RenderAsync(index);
+        if (version != _previewVersion) return;
+        PreviewImage = image;
+        PreviewPage = index;
+        PreviewMessage = null;
+        OnPropertyChanged(nameof(PreviewPageCount));
+        OnPropertyChanged(nameof(PreviewPageText));
+    }
+
+    private bool CanNextPage() => HasPreview && PreviewPage + 1 < PreviewPageCount;
+
+    [RelayCommand(CanExecute = nameof(CanNextPage))]
+    private Task NextPageAsync() => TryShowPageAsync(PreviewPage + 1);
+
+    private bool CanPreviousPage() => HasPreview && PreviewPage > 0;
+
+    [RelayCommand(CanExecute = nameof(CanPreviousPage))]
+    private Task PreviousPageAsync() => TryShowPageAsync(PreviewPage - 1);
+
+    private async Task TryShowPageAsync(int index)
+    {
+        try { await ShowPageAsync(index, _previewVersion); }
+        catch (Exception) { PreviewMessage = "Couldn't show this page"; } // renderer failure on one page
     }
 
     private async Task RunActionAsync(Func<Task> action)
