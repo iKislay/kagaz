@@ -31,6 +31,7 @@ public sealed class HeartbeatService : BackgroundService
     private readonly ILogger<HeartbeatService> _log;
     private readonly string _os = HeartbeatBuilder.DescribeOs(Environment.OSVersion.Version);
     private bool _wasConnected;
+    private int _failuresInARow;
     private string? _lastProblem;
 
     public HeartbeatService(ShopApiClient api, KagazApiClient health, AgentSettings settings, AppStatus status,
@@ -102,6 +103,7 @@ public sealed class HeartbeatService : BackgroundService
             _status.SetPrinterAlert(problems.Count == 0 ? null : string.Join(" · ", problems));
 
             ReportProblem(null);
+            _failuresInARow = 0;
             _status.SetConnection(ConnectionState.Connected, $"Connected · {_status.ShopName ?? "Kaggaz"}");
             MarkConnected(true);
             return true;
@@ -128,6 +130,7 @@ public sealed class HeartbeatService : BackgroundService
         catch (ApiException ex)
         {
             ReportProblem(ex.Message);
+            if (RideOutBlip(_wasConnected, ++_failuresInARow)) return false; // retried in 5 s, still shown as connected
             _status.SetConnection(ConnectionState.Offline, ex.Code == ApiErrorCodes.NetworkError ? "Offline — retrying" : $"Server error ({ex.Code})", ex.Message);
             MarkConnected(false);
             return false;
@@ -137,6 +140,13 @@ public sealed class HeartbeatService : BackgroundService
             return false;
         }
     }
+
+    /// <summary>
+    /// One failed beat after a good one (a dropped Wi-Fi packet, a slow server response) keeps showing
+    /// "Connected" and retries in 5 s; only a second failure in a row shows offline. Printing is unaffected
+    /// either way: leases and jobs go over REST and are retried on their own.
+    /// </summary>
+    public static bool RideOutBlip(bool wasConnected, int failuresInARow) => wasConnected && failuresInARow < 2;
 
     /// <summary>Offline → online: tell the print worker to reconcile before printing (plan A.3).</summary>
     private void MarkConnected(bool connected)
