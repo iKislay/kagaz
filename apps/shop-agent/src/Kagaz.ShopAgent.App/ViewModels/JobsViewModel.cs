@@ -172,7 +172,7 @@ public sealed partial class JobsViewModel : ObservableObject
     private readonly AgentSettings _settings;
     private readonly AgentSignals _signals;
     private readonly List<JobItem> _all = new();
-    private HashSet<string>? _knownPending;
+    private HashSet<string>? _knownOrders;
 
     [ObservableProperty]
     private JobTab _selectedTab;
@@ -294,7 +294,7 @@ public sealed partial class JobsViewModel : ObservableObject
             }));
             Error = null;
             LastUpdated = $"Updated {DateTime.Now:h:mm:ss tt}";
-            NotifyNewPending();
+            NotifyNewOrders();
             ApplyFilter();
             Refreshed?.Invoke(jobs);
         }
@@ -340,20 +340,42 @@ public sealed partial class JobsViewModel : ObservableObject
             : inTab;
     }
 
-    private void NotifyNewPending()
+    /// <summary>
+    /// Orders that arrived since the last refresh: new order ids waiting for review or queued (Auto mode
+    /// accepts them on its own, but the shop still wants to know). Nothing on the first load, so opening
+    /// the app doesn't announce every order already there.
+    /// </summary>
+    public static IReadOnlyList<JobItem> NewOrders(IEnumerable<JobItem> all, IReadOnlySet<string>? known) =>
+        known is null
+            ? []
+            : all.Where(j => j.TabCategory is "Pending" or "Queue" && !known.Contains(j.OrderId)).ToList();
+
+    private void NotifyNewOrders()
     {
-        var pending = _all.Where(j => j.TabCategory == "Pending").Select(j => j.OrderId).ToHashSet();
-        if (_knownPending is not null)
-        {
-            var fresh = _all.Where(j => j.TabCategory == "Pending" && !_knownPending.Contains(j.OrderId)).ToList();
-            if (fresh.Count > 0)
-            {
-                _status.ShowToast(fresh.Count == 1 ? "New order to review" : $"{fresh.Count} new orders to review",
-                    string.Join(", ", fresh.Select(f => f.PublicRef)));
-                try { System.Media.SystemSounds.Asterisk.Play(); } catch (InvalidOperationException) { }
-            }
-        }
-        _knownPending = pending;
+        var fresh = NewOrders(_all, _knownOrders);
+        _knownOrders = _all.Select(j => j.OrderId).ToHashSet();
+        if (fresh.Count == 0) return;
+
+        bool review = fresh.Any(f => f.CanAccept);
+        string title = fresh.Count == 1
+            ? review ? "New order to review" : "New order"
+            : review ? $"{fresh.Count} new orders to review" : $"{fresh.Count} new orders";
+        string detail = string.Join(", ", fresh.Select(f => f.HasPickupNumber ? $"{f.DisplayPickupNumber} · {f.PublicRef}" : f.PublicRef));
+        _status.ShowToast(title, detail);
+        NewOrdersArrived?.Invoke(title, detail, fresh[0].OrderId);
+        try { System.Media.SystemSounds.Asterisk.Play(); } catch (InvalidOperationException) { }
+    }
+
+    /// <summary>New orders arrived: title, detail line, and the order to open when the notification is clicked.</summary>
+    public event Action<string, string, string>? NewOrdersArrived;
+
+    /// <summary>Show this order: switch to its tab and select it (from a clicked notification).</summary>
+    public void Select(string orderId)
+    {
+        var job = _all.FirstOrDefault(j => j.OrderId == orderId);
+        if (job is null) return;
+        SelectedTab = Tabs.FirstOrDefault(t => t.Key == job.TabCategory) ?? SelectedTab;
+        SelectedJob = Jobs.FirstOrDefault(j => j.OrderId == orderId) ?? SelectedJob;
     }
 
     // ─── Accept ───

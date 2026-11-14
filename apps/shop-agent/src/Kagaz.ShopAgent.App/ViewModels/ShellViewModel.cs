@@ -51,7 +51,8 @@ public sealed partial class ShellViewModel : ObservableObject
         UpdateViewModel update,
         SupportViewModel support,
         StaffViewModel staff,
-        PricesViewModel prices)
+        PricesViewModel prices,
+        DesktopNotifier? notifier = null)
     {
         _api = api;
         _qr = qr;
@@ -82,6 +83,17 @@ public sealed partial class ShellViewModel : ObservableObject
         _printersItem = NavigationItems[2];
         _settingsItem = NavigationItems[7];
         _selectedNavigation = _jobs;
+
+        if (notifier is not null)
+        {
+            jobs.NewOrdersArrived += (title, detail, orderId) => notifier.Show(title, detail, orderId);
+            notifier.Clicked += orderId =>
+            {
+                if (!IsReady) return;
+                SelectedNavigation = _jobs;
+                jobs.Select(orderId);
+            };
+        }
 
         _ = support.LoadAsync();
         status.Paired += () =>

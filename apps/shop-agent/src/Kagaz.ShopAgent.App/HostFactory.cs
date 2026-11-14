@@ -93,6 +93,7 @@ public static class HostFactory
         builder.Services.AddSingleton<SettingsViewModel>();
         builder.Services.AddSingleton<ShopModeViewModel>();
         builder.Services.AddSingleton<UpdateViewModel>();
+        builder.Services.AddSingleton<DesktopNotifier>();
         builder.Services.AddSingleton<ShellViewModel>();
         builder.Services.AddSingleton<MainWindow>();
 
