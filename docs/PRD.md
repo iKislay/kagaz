@@ -150,7 +150,7 @@ A credible end-to-end product experience with **real printer output**, clear ope
 | --------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CUSTOMER`                  | Own orders only | Create orders, upload, pay, view own order status and pickup code, cancel before payment.                                                             |
 | `SHOP_OPERATOR`             | One shop        | View shop jobs, accept/reject, print, mark ready, verify pickup, resolve operator checks, pause auto mode.                                            |
-| `SHOP_OWNER`                | One shop        | All operator permissions + edit shop pricing, opening hours, approval mode, view shop reports and staff.                                              |
+| `SHOP_OWNER`                | One shop        | All operator permissions + edit shop pricing, shop status (open/closed/maintenance), approval mode, view shop reports and staff.                      |
 | `ADMIN`                     | Platform        | Manage all shops, printers, devices, enrollment codes, pricing, modes, demo controls; read audit logs; search all orders.                             |
 | `DEVICE` (machine identity) | One shop device | Authenticated Windows agent: fetch jobs, lease printers, report status/heartbeat. Human actions on a device are attributed to the logged-in operator. |
 
@@ -268,7 +268,7 @@ Priority: **P0** = required for the Day 0–1 vertical-slice demo; **P1** = requ
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
 | FR-ADMIN-01 | Admin login (staff account with `ADMIN` role).                                                                                                         | P0 (seeded admin) |
 | FR-ADMIN-02 | Shop list with status, mode, paused flag, device online/offline, printer health, queue depth, today's orders.                                          | P1                |
-| FR-ADMIN-03 | Create/edit shop: name, address, contact, opening hours, status (OPEN/CLOSED/MAINTENANCE), approval mode, auto-mode limits, demo flag.                 | P1                |
+| FR-ADMIN-03 | Create/edit shop: name, address, contact, status (OPEN/CLOSED/MAINTENANCE), approval mode, auto-mode limits, demo flag.                                | P1                |
 | FR-ADMIN-04 | Generate one-time device enrollment codes per shop (expiry 30 min); list/revoke devices.                                                               | P0 (seeded) / P1  |
 | FR-ADMIN-05 | Printer setup per shop: name, mapped device, confirmed capabilities, enabled flag.                                                                     | P1                |
 | FR-ADMIN-06 | Pricing per shop with `effective_from` versioning; existing orders keep their snapshot.                                                                | P1                |
@@ -402,7 +402,7 @@ total          = max(subtotal, minimumCharge)
 
 ### 8.4 Auto-accept preconditions (all must be true)
 
-1. Shop status is `OPEN`, within opening hours, not in maintenance.
+1. Shop status is `OPEN` (not closed or in maintenance).
 2. Shop approval mode is `AUTO` and `autoPaused` is false.
 3. A target printer exists, is enabled, its capability profile is **operator-confirmed**, and it supports the requested colour/duplex/A4.
 4. Target printer is online: last heartbeat ≤ 45 s ago and last reported status is `READY`/`IDLE`.
@@ -519,7 +519,7 @@ Minimum entities (database is PostgreSQL via Prisma; columns snake_case, API cam
 | Entity              | Important fields                                                                                                                                                                                                                                       |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `User`              | id, phone (E.164, unique, nullable), email (unique, nullable), password_hash (staff only), name, role (`CUSTOMER`/`ADMIN`/staff), created_at                                                                                                           |
-| `Shop`              | id, name, slug, address, contact_phone, status (`OPEN`/`CLOSED`/`MAINTENANCE`), approval_mode (`MANUAL`/`AUTO`), auto_paused, auto_limits JSON, opening_hours JSON, is_demo, gateway_account_id (nullable), settlement_config JSON, created_at         |
+| `Shop`              | id, name, slug, address, contact_phone, status (`OPEN`/`CLOSED`/`MAINTENANCE`), approval_mode (`MANUAL`/`AUTO`), auto_paused, auto_limits JSON, is_demo, gateway_account_id (nullable), settlement_config JSON, created_at                             |
 | `ShopUser`          | id, shop_id, user_id, role (`OWNER`/`OPERATOR`), permissions JSON                                                                                                                                                                                      |
 | `ShopDevice`        | id, shop_id, name, token_hash, app_version, last_heartbeat_at, status (`ACTIVE`/`REVOKED`), created_at                                                                                                                                                 |
 | `EnrollmentCode`    | id, shop_id, code_hash, expires_at, used_at, created_by                                                                                                                                                                                                |
