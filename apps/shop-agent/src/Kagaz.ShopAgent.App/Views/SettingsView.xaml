@@ -9,9 +9,9 @@
              d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
              d:DesignHeight="600" d:DesignWidth="800">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="620" HorizontalAlignment="Left">
+        <StackPanel MaxWidth="720">
             <TextBlock Text="Settings" Style="{StaticResource TitleText}" />
-            <TextBlock Text="How this shop takes orders, plus connection and app details for support." Style="{StaticResource SubtitleText}" />
+            <TextBlock Text="How your shop takes orders." Style="{StaticResource SubtitleText}" />
 
             <!-- The shop's daily switches: open/closed and order approval (ADR-002). Reflect the heartbeat /
                  socket state; PATCH only on operator changes. -->
@@ -32,52 +32,26 @@
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource Card}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="150" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Text="Shop" Style="{StaticResource SecondaryText}" Margin="0,0,0,12" />
-                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Status.ShopName, TargetNullValue=Not paired}" Style="{StaticResource BodyText}" />
-                    <TextBlock Grid.Row="1" Text="Connection" Style="{StaticResource SecondaryText}" Margin="0,0,0,12" />
-                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-                        <Ellipse Width="8" Height="8" Margin="0,0,8,0" Fill="{Binding Status.Connection, Converter={StaticResource ConnectionBrush}}" />
-                        <TextBlock Text="{Binding Status.ConnectionText}" Style="{StaticResource BodyText}" />
-                    </StackPanel>
-                    <TextBlock Grid.Row="2" Text="Server" Style="{StaticResource SecondaryText}" Margin="0,0,0,12" />
-                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Settings.ApiBaseUrl}" Style="{StaticResource BodyText}" />
-                    <TextBlock Grid.Row="3" Text="Checks for jobs" Style="{StaticResource SecondaryText}" Margin="0,0,0,12" />
-                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Settings.PollIntervalSeconds, StringFormat=Every {0} seconds}" Style="{StaticResource BodyText}" />
-                    <TextBlock Grid.Row="4" Text="App version" Style="{StaticResource SecondaryText}" Margin="0,0,0,12" />
-                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Version}" Style="{StaticResource BodyText}" />
-                    <TextBlock Grid.Row="5" Text="Local data" Style="{StaticResource SecondaryText}" />
-                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding StatePath}" Style="{StaticResource BodyText}" />
-                </Grid>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Subscription" Style="{StaticResource HeadlineText}" />
+                    <TextBlock Text="{Binding PlanText}" Style="{StaticResource BodyText}" Margin="0,4,0,2" />
+                    <TextBlock Text="Kaggaz is billed per connected printer. To change your plan, contact Kaggaz support."
+                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" />
+                    <Border Style="{StaticResource Hairline}" />
+                    <TextBlock Text="Help &amp; support" Style="{StaticResource HeadlineText}" />
+                    <TextBlock Text="Questions about your account, logins, printers or billing? We're here to help."
+                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,14" />
+                    <views:SupportCard DataContext="{Binding Support}" />
+                </StackPanel>
             </Border>
 
-            <!-- Startup + updates (P5.4) -->
-            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+            <!-- Updates (P5.4) -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
-                    <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding StartWithWindows, Mode=TwoWay}">
-                        <StackPanel>
-                            <TextBlock Text="Start with Windows" Style="{StaticResource HeadlineText}" FontSize="14" />
-                            <TextBlock Text="Open Kaggaz Shop automatically when you sign in to this PC."
-                                       Style="{StaticResource SecondaryText}" FontSize="12" />
-                        </StackPanel>
-                    </CheckBox>
-                    <TextBlock Text="{Binding StartupMessage}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,6,0,0"
-                               Visibility="{Binding StartupMessage, Converter={StaticResource NullToVisibility}}" />
-                    <Border Style="{StaticResource Hairline}" />
-                    <TextBlock Text="Updates" Style="{StaticResource HeadlineText}" FontSize="14" />
+                    <TextBlock Style="{StaticResource HeadlineText}">
+                        <Run Text="Kaggaz Shop" /> <Run Text="{Binding Version, Mode=OneWay}" />
+                    </TextBlock>
                     <TextBlock Text="New versions install automatically when no order is printing. The app restarts by itself and you stay signed in."
                                Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
                                Visibility="{Binding Update.CanSelfUpdate, Converter={StaticResource BoolToVisibility}}" />
@@ -93,48 +67,70 @@
                 </StackPanel>
             </Border>
 
-            <!-- Device token rotation (P2.4) -->
-            <Border Style="{StaticResource Card}" Margin="0,16,0,0"
-                    Visibility="{Binding Status.IsPaired, Converter={StaticResource BoolToVisibility}}">
+            <!-- Set once, rarely opened again -->
+            <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowMore, Mode=TwoWay}" Margin="4,0,0,12">
+                <TextBlock Text="Show more settings" Style="{StaticResource SecondaryText}" />
+            </CheckBox>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16"
+                    Visibility="{Binding ShowMore, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
-                    <TextBlock Text="Security key" Style="{StaticResource HeadlineText}" />
-                    <TextBlock Style="{StaticResource SecondaryText}" Margin="0,4,0,14" TextWrapping="Wrap">
-                        <Run Text="{Binding RotationPolicy, Mode=OneWay}" />
-                        <Run Text="Last renewed:" />
-                        <Run Text="{Binding LastRotated, Mode=OneWay}" />
-                    </TextBlock>
-                    <StackPanel Orientation="Horizontal">
-                        <Button Content="Renew now" Style="{StaticResource QuietButton}" Command="{Binding RotateTokenCommand}" />
-                        <TextBlock Text="{Binding RotationMessage}" Style="{StaticResource SecondaryText}" VerticalAlignment="Center"
-                                   Margin="12,0,0,0" TextWrapping="Wrap" MaxWidth="380"
-                                   Visibility="{Binding RotationMessage, Converter={StaticResource NullToVisibility}}" />
+                    <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding StartWithWindows, Mode=TwoWay}">
+                        <StackPanel>
+                            <TextBlock Text="Start with Windows" Style="{StaticResource HeadlineText}" FontSize="14" />
+                            <TextBlock Text="Open Kaggaz Shop automatically when you sign in to this PC."
+                                       Style="{StaticResource SecondaryText}" FontSize="12" />
+                        </StackPanel>
+                    </CheckBox>
+                    <TextBlock Text="{Binding StartupMessage}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,6,0,0"
+                               Visibility="{Binding StartupMessage, Converter={StaticResource NullToVisibility}}" />
+
+                    <!-- Device token rotation (P2.4) -->
+                    <StackPanel Visibility="{Binding Status.IsPaired, Converter={StaticResource BoolToVisibility}}">
+                        <Border Style="{StaticResource Hairline}" />
+                        <TextBlock Text="Security key" Style="{StaticResource HeadlineText}" FontSize="14" />
+                        <TextBlock Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,4,0,10" TextWrapping="Wrap">
+                            <Run Text="{Binding RotationPolicy, Mode=OneWay}" />
+                            <Run Text="Last renewed:" />
+                            <Run Text="{Binding LastRotated, Mode=OneWay}" />
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Renew now" Style="{StaticResource QuietButton}" Command="{Binding RotateTokenCommand}" />
+                            <TextBlock Text="{Binding RotationMessage}" Style="{StaticResource SecondaryText}" VerticalAlignment="Center"
+                                       Margin="12,0,0,0" TextWrapping="Wrap" MaxWidth="380"
+                                       Visibility="{Binding RotationMessage, Converter={StaticResource NullToVisibility}}" />
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
-            </Border>
 
-            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
-                <StackPanel>
-                    <TextBlock Text="Subscription" Style="{StaticResource HeadlineText}" />
-                    <TextBlock Text="{Binding PlanText}" Style="{StaticResource BodyText}" Margin="0,4,0,2" />
-                    <TextBlock Text="Kaggaz is billed per connected printer. To change your plan, contact Kaggaz support."
-                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" />
                     <Border Style="{StaticResource Hairline}" />
-                    <TextBlock Text="Help &amp; support" Style="{StaticResource HeadlineText}" />
-                    <TextBlock Text="Questions about your account, logins, printers or billing? We're here to help."
-                               Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,14" />
-                    <views:SupportCard DataContext="{Binding Support}" />
-                </StackPanel>
-            </Border>
-
-            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
-                <StackPanel>
-                    <TextBlock Text="Troubleshooting" Style="{StaticResource HeadlineText}" />
-                    <TextBlock Text="Logs never contain tokens or download links."
-                               Style="{StaticResource SecondaryText}" Margin="0,4,0,14" />
+                    <TextBlock Text="Troubleshooting" Style="{StaticResource HeadlineText}" FontSize="14" />
+                    <TextBlock Text="Kaggaz support may ask for these. Logs never contain passwords or download links."
+                               Style="{StaticResource SecondaryText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,10" />
                     <StackPanel Orientation="Horizontal">
                         <Button Content="Open logs folder" Style="{StaticResource QuietButton}" Command="{Binding OpenLogsCommand}" />
-                        <Button Content="Open “Print to PDF” output" Style="{StaticResource QuietButton}" Command="{Binding OpenPrintToPdfCommand}" Margin="10,0,0,0" />
+                        <Button Content="Open “Print to PDF” output" Style="{StaticResource QuietButton}" Command="{Binding OpenPrintToPdfCommand}" Margin="10,0,0,0"
+                                Visibility="{Binding ShowTechnicalDetails, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
+
+                    <!-- Developer details: debug builds or a local server only -->
+                    <Grid Visibility="{Binding ShowTechnicalDetails, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Border Grid.ColumnSpan="2" Style="{StaticResource Hairline}" />
+                        <TextBlock Grid.Row="1" Text="Server" Style="{StaticResource SecondaryText}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Settings.ApiBaseUrl}" Style="{StaticResource BodyText}" />
+                        <TextBlock Grid.Row="2" Text="Checks for jobs" Style="{StaticResource SecondaryText}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Settings.PollIntervalSeconds, StringFormat=Every {0} seconds}" Style="{StaticResource BodyText}" />
+                        <TextBlock Grid.Row="3" Text="Local data" Style="{StaticResource SecondaryText}" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding StatePath}" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
+                    </Grid>
                 </StackPanel>
             </Border>
         </StackPanel>

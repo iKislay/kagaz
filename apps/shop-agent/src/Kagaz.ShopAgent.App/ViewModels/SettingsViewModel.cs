@@ -9,8 +9,8 @@ using Kagaz.ShopAgent.Core;
 namespace Kagaz.ShopAgent.App.ViewModels;
 
 /// <summary>
-/// Order approval mode (ADR-002), app details: server, pairing, device-token rotation (P2.4), where local
-/// state and logs live.
+/// Settings page: shop status and order approval (ADR-002), subscription and support, updates; under
+/// "More settings": start with Windows, device-token rotation (P2.4), logs, and developer-only details.
 /// </summary>
 public sealed partial class SettingsViewModel : ObservableObject
 {
@@ -34,6 +34,10 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _startupMessage;
+
+    /// <summary>"More settings": start with Windows, security key, troubleshooting (set once, rarely opened).</summary>
+    [ObservableProperty]
+    private bool _showMore;
 
     public SettingsViewModel(AgentSettings settings, AgentPaths paths, AppStatus status, TokenRotationService rotation,
         StartupRegistration startup, UpdateViewModel update, ShopModeViewModel mode, SupportViewModel? support = null)
@@ -69,6 +73,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     public AgentSettings Settings { get; }
     public AppStatus Status { get; }
     public string Version { get; }
+    /// <summary>Server URL, poll interval, local paths: only for debug builds or a local server, never in a shop.</summary>
+    public bool ShowTechnicalDetails =>
+#if DEBUG
+        true;
+#else
+        Uri.TryCreate(Settings.ApiBaseUrl, UriKind.Absolute, out var api) && api.IsLoopback;
+#endif
+
     public string StatePath => _paths.RootDirectory;
     public string LogPath => _paths.LogsDirectory;
     public string PrintToPdfPath => Path.Combine(_paths.RootDirectory, "print-to-pdf");
