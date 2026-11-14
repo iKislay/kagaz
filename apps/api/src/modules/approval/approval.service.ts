@@ -126,32 +126,37 @@ export class ApprovalService {
   async getMode(shopId: string): Promise<ShopMode> {
     const shop = await this.prisma.shop.findUniqueOrThrow({
       where: { id: shopId },
-      select: { approvalMode: true, autoPaused: true },
+      select: { approvalMode: true, autoPaused: true, status: true },
     });
     return shop;
   }
 
   /** PATCH /api/shop/mode (contract §3): audited SHOP_MODE_CHANGED + realtime hint. */
   async setMode(shopId: string, req: UpdateShopModeRequest, actor: Actor): Promise<ShopMode> {
-    if (req.approvalMode === undefined && req.autoPaused === undefined) {
+    if (
+      req.approvalMode === undefined &&
+      req.autoPaused === undefined &&
+      req.status === undefined
+    ) {
       throw new AppError(
         'VALIDATION_FAILED',
-        'Send approvalMode and/or autoPaused',
+        'Send approvalMode, autoPaused and/or status',
         HttpStatus.BAD_REQUEST,
       );
     }
     const { before, after } = await this.prisma.$transaction(async (tx) => {
       const before = await tx.shop.findUniqueOrThrow({
         where: { id: shopId },
-        select: { approvalMode: true, autoPaused: true },
+        select: { approvalMode: true, autoPaused: true, status: true },
       });
       const after = await tx.shop.update({
         where: { id: shopId },
         data: {
           ...(req.approvalMode === undefined ? {} : { approvalMode: req.approvalMode }),
           ...(req.autoPaused === undefined ? {} : { autoPaused: req.autoPaused }),
+          ...(req.status === undefined ? {} : { status: req.status }),
         },
-        select: { approvalMode: true, autoPaused: true },
+        select: { approvalMode: true, autoPaused: true, status: true },
       });
       await tx.auditLog.create({
         data: {
@@ -164,7 +169,11 @@ export class ApprovalService {
       });
       return { before, after };
     });
-    if (before.approvalMode !== after.approvalMode || before.autoPaused !== after.autoPaused) {
+    if (
+      before.approvalMode !== after.approvalMode ||
+      before.autoPaused !== after.autoPaused ||
+      before.status !== after.status
+    ) {
       this.events.publish(this.prisma, DomainEvent.SHOP_MODE_CHANGED, { shopId, ...after });
     }
     return after;

@@ -67,6 +67,7 @@ export interface ShopModeChangedEvent {
   shopId: string;
   approvalMode: 'MANUAL' | 'AUTO';
   autoPaused: boolean;
+  status: 'OPEN' | 'CLOSED' | 'MAINTENANCE';
 }
 
 export interface DeviceRevokedEvent {

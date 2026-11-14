@@ -150,20 +150,30 @@ describe('PATCH /api/shop/mode (contract §3)', () => {
         approvalMode: 'AUTO',
         autoPaused: true,
       }).expect(200);
-      expect(res.body).toEqual({ approvalMode: 'AUTO', autoPaused: true });
+      expect(res.body).toEqual({ approvalMode: 'AUTO', autoPaused: true, status: 'OPEN' });
     } finally {
       bus.off(DomainEvent.SHOP_MODE_CHANGED, listener);
     }
-    expect(seen).toEqual([{ shopId: s.shop.id, approvalMode: 'AUTO', autoPaused: true }]);
+    expect(seen).toEqual([
+      { shopId: s.shop.id, approvalMode: 'AUTO', autoPaused: true, status: 'OPEN' },
+    ]);
     expect((await h.http().get('/api/shop/mode').set(s.auth).expect(200)).body).toEqual({
       approvalMode: 'AUTO',
       autoPaused: true,
+      status: 'OPEN',
     });
     const audit = await h.prisma.auditLog.findFirstOrThrow({
       where: { shopId: s.shop.id, action: 'SHOP_MODE_CHANGED' },
     });
     expect(audit).toMatchObject({ actorType: 'STAFF' });
     expect(audit.metadata).toMatchObject({ deviceId: s.deviceId });
+
+    // The shop opens and closes itself from its app.
+    const closed = await shopAction(h, s.auth, 'patch', '/api/shop/mode', {
+      status: 'CLOSED',
+    }).expect(200);
+    expect(closed.body.status).toBe('CLOSED');
+    await shopAction(h, s.auth, 'patch', '/api/shop/mode', { status: 'GONE' }).expect(400);
 
     await shopAction(h, s.auth, 'patch', '/api/shop/mode', {}).expect(400);
     await shopAction(h, s.auth, 'patch', '/api/shop/mode', { approvalMode: 'YOLO' }).expect(400);

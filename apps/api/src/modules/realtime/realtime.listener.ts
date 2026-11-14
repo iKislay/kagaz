@@ -30,6 +30,7 @@ export class RealtimeListener {
     this.publisher.publishToShop(e.shopId, RealtimeEvent.SHOP_MODE_CHANGED, {
       approvalMode: e.approvalMode,
       autoPaused: e.autoPaused,
+      status: e.status,
     });
   }
 
