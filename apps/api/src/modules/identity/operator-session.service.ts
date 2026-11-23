@@ -155,10 +155,12 @@ export class OperatorSessionService {
     });
     if (!member) throw operatorLoginRequired();
     // Slide the expiry on use, at most once a day (one cheap UPDATE per active PC per day).
+    // Scoped by shopId like every device-request query: the tenant guard rejects it otherwise,
+    // which turned every operator action into a 500 once a sign-in was a day old.
     const renewed = new Date(Date.now() + OPERATOR_SESSION_DAYS * DAY_MS);
     if (renewed.getTime() - session.expiresAt.getTime() > DAY_MS) {
       await this.prisma.operatorSession.updateMany({
-        where: { id: session.id, revokedAt: null },
+        where: { id: session.id, shopId: device.shopId, revokedAt: null },
         data: { expiresAt: renewed },
       });
     }

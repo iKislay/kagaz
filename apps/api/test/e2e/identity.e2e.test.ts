@@ -190,6 +190,31 @@ describe('operator sessions (P2.3, contract §4)', () => {
     });
   });
 
+  it('a day-old operator sign-in still works over HTTP (renewal stays shop-scoped)', async () => {
+    // Regression: the once-a-day renewal ran an OperatorSession update without shopId inside a
+    // device request; the tenant guard turned it into a 500, so every operator action (Accept,
+    // Reject, printers…) failed from the day after sign-in. verify() alone doesn't catch it:
+    // the guard only runs inside a device-bound HTTP request.
+    const { shop, paired } = await shopWithPrinter();
+    const order = await paidOrder(shop.id);
+    const where = { deviceId: paired.deviceId, userId: paired.operatorId };
+    const before = await h.prisma.operatorSession.findFirstOrThrow({ where });
+    await h.prisma.operatorSession.updateMany({
+      where,
+      data: { expiresAt: new Date(before.expiresAt.getTime() - 2 * 86_400_000) },
+    });
+
+    const res = await h
+      .http()
+      .post(`/api/shop/jobs/${order.order.id}/accept`)
+      .set(paired.opAuth)
+      .send({});
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.status).toBe('QUEUED');
+    const renewed = await h.prisma.operatorSession.findFirstOrThrow({ where });
+    expect(renewed.expiresAt.getTime()).toBeGreaterThan(before.expiresAt.getTime() - 86_400_000);
+  });
+
   it('a removed shop membership ends the operator session', async () => {
     const shop = await createShop(h.prisma, { printer: true });
     const paired = await pairDevice(h, shop.id);
