@@ -1,6 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { MoneyError, PageRangeError } from '@kagaz/shared';
+import { MoneyError, PageRangeError, totalPageCount } from '@kagaz/shared';
 import { type PricingRates, calculateQuote } from './quote.js';
+
+describe('multi-file quote (ADR-005)', () => {
+  const r: PricingRates = {
+    id: 'pricing-1',
+    monoRatePaise: 200,
+    colourRatePaise: 1000,
+    monoDuplexRatePaise: 150,
+    colourDuplexRatePaise: 800,
+    duplexRule: 'SAME_AS_SIMPLEX',
+    minimumChargePaise: 500,
+  };
+  const o = { copies: 1, colour: false, duplex: false };
+
+  it('prices the total pages of all files: 3-page PDF + 1 photo + 2-page PDF', () => {
+    const pages = totalPageCount([{ pageCount: 3 }, { pageCount: 1 }, { pageCount: 2 }]);
+    const quote = calculateQuote(r, { ...o, copies: 2 }, pages);
+    expect(quote).toMatchObject({ selectedPages: 6, printedSides: 12, totalPaise: 2400 });
+    expect(Number.isInteger(quote.totalPaise)).toBe(true);
+  });
+
+  it('a page range counts pages of the combined document', () => {
+    const pages = totalPageCount([{ pageCount: 3 }, { pageCount: 1 }]);
+    expect(calculateQuote(r, { ...o, pageRange: '3-4' }, pages)).toMatchObject({
+      selectedPages: 2,
+      subtotalPaise: 400,
+      minimumChargeApplied: true,
+      totalPaise: 500,
+    });
+    expect(() => calculateQuote(r, { ...o, pageRange: '5' }, pages)).toThrow(PageRangeError);
+  });
+
+  it('one colour photo alone is one printed side', () => {
+    expect(calculateQuote(r, { ...o, colour: true }, 1)).toMatchObject({
+      printedSides: 1,
+      subtotalPaise: 1000,
+      totalPaise: 1000,
+    });
+  });
+});
 
 const rates: PricingRates = {
   id: 'pricing-1',

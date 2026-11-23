@@ -134,7 +134,13 @@ describe('loadConfig', () => {
       paymentMode: 'DEMO',
       otpMode: 'DEMO',
       demoControls: true,
-      limits: { maxUploadBytes: 26_214_400, maxPages: 300, maxCopies: 20, maxSides: 1000 },
+      limits: {
+        maxUploadBytes: 26_214_400,
+        maxPages: 300,
+        maxCopies: 20,
+        maxSides: 1000,
+        maxFiles: 20,
+      },
       support: { phone: null, whatsapp: null, email: null },
     });
   });

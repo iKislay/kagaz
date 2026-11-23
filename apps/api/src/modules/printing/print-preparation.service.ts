@@ -5,6 +5,7 @@ import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { CombinedDocumentService } from '../files/combined-document.service.js';
 import { StorageService } from '../files/storage.service.js';
 import { pickupDateString } from '../pickup/pickup-number.service.js';
 import { buildPrintPacket } from './packet-builder.js';
@@ -29,18 +30,17 @@ export class PrintPreparationService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly documents: CombinedDocumentService,
   ) {}
 
   async prepare(orderId: string, options: PrintOptions): Promise<PreparedPacket> {
     const order = await this.prisma.order.findUniqueOrThrow({
       where: { id: orderId, ...tenantWhere() },
-      include: {
-        shop: { select: { name: true, isDemo: true } },
-        files: { where: { kind: 'ORIGINAL', status: 'VALID' }, take: 1 },
-      },
+      include: { shop: { select: { name: true, isDemo: true } } },
     });
-    const original = order.files[0];
-    if (!original?.pageCount) {
+    // All of the customer's files as one PDF, in print order (ADR-005) → still one packet.
+    const document = await this.documents.forOrder(order.id);
+    if (!document) {
       throw new AppError(
         'FILE_MISSING',
         'The customer file is no longer available',
@@ -48,7 +48,7 @@ export class PrintPreparationService {
       );
     }
 
-    const source = await this.storage.getBuffer(original.objectKey, this.config.MAX_UPLOAD_BYTES);
+    const source = await this.storage.getBuffer(document.objectKey, document.maxBytes);
     if (order.pickupNumber === null || !order.pickupDate) {
       throw new AppError(
         'PICKUP_NUMBER_MISSING',
@@ -64,7 +64,7 @@ export class PrintPreparationService {
         pickupDate: pickupDateString(order.pickupDate)!,
         publicRef: order.publicRef,
         shopName: order.shop.name,
-        pages: parsePageRange(options.pageRange, original.pageCount).length,
+        pages: parsePageRange(options.pageRange, document.pageCount).length,
         copies: options.copies,
         colour: options.colour,
         duplex: options.duplex,

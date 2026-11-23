@@ -13,7 +13,6 @@ import {
 import {
   Group,
   Notice,
-  ProgressBar,
   Row,
   SegmentedControl,
   Spinner,
@@ -27,13 +26,16 @@ import {
   createOrder,
   getOrder,
   payOrder,
+  removeFile,
+  reorderFiles,
   requestUploadUrl,
   updateOptions,
   uploadToSignedUrl,
 } from '@/lib/api';
+import { pdfThumbnail } from '@/lib/pdf-render';
 import { saveTrackingToken } from '@/lib/tracking';
-
-type Phase = 'idle' | 'uploading' | 'validating' | 'ready' | 'paying';
+import { type FileCard, FileCards, isBusy } from './FileCards';
+import { PrintPreview } from './PrintPreview';
 
 const DEFAULT_OPTIONS: PrintOptions = {
   copies: 1,
@@ -43,100 +45,270 @@ const DEFAULT_OPTIONS: PrintOptions = {
   pageRange: '',
 };
 
+/** Uploads running at once; the rest wait their turn on their card. */
+const PARALLEL_UPLOADS = 2;
+
+/** Quick client-side hint only; the API decides by content (CLAUDE.md invariant 11). */
+function kindOf(file: File): FileCard['kind'] | 'heic' | null {
+  const name = file.name.toLowerCase();
+  if (file.type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+  if (/^image\/(jpeg|png|webp)$/.test(file.type) || /\.(jpe?g|png|webp)$/.test(name)) {
+    return 'image';
+  }
+  if (/^image\/hei[cf]/.test(file.type) || /\.(heic|heif)$/.test(name)) return 'heic';
+  return null;
+}
+
+/** Newer server state wins (responses of parallel requests can arrive out of order). */
+const newer = (prev: PublicOrder | null, next: PublicOrder) =>
+  !prev || Date.parse(next.updatedAt) >= Date.parse(prev.updatedAt) ? next : prev;
+
 /**
- * PRD journey 6.1: upload → options → server quote → pay (demo) → tracking.
- * The browser never computes or sends a price; every number shown comes from the API.
+ * PRD journey 6.1 with several files (ADR-005): pick PDFs and photos → options → server quote over
+ * all pages → print preview → pay. The browser never computes or sends a price.
  */
 export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: PublicConfig }) {
   const router = useRouter();
   const [options, setOptions] = useState<PrintOptions>(DEFAULT_OPTIONS);
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [progress, setProgress] = useState(0);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [cards, setCards] = useState<FileCard[]>([]);
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [requoting, setRequoting] = useState(false);
+  const [requoteNonce, setRequoteNonce] = useState(0);
   const [reviewing, setReviewing] = useState(false);
-  /** Local preview of the customer's own file (never leaves the browser this way). */
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const requestSeq = useRef(0);
+  const [paying, setPaying] = useState(false);
+
   const isDemo = config.paymentMode === 'DEMO';
   const atCounter = config.paymentMode === 'COUNTER';
-
-  useEffect(() => () => void (fileUrl && URL.revokeObjectURL(fileUrl)), [fileUrl]);
   const maxMb = Math.floor(config.limits.maxUploadBytes / 1024 / 1024);
+  const maxFiles = config.limits.maxFiles;
 
-  // ─── Upload ───
-  const handleFile = useCallback(
-    async (file: File) => {
-      setError(null);
-      setRangeError(null);
-      if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
-        setError('Please choose a PDF file.');
-        return;
-      }
-      if (file.size > config.limits.maxUploadBytes) {
-        setError(`This file is too large. The limit is ${maxMb} MB.`);
-        return;
-      }
+  // Refs for async work that outlives a render.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  const orderPromise = useRef<Promise<{ id: string; token: string }> | null>(null);
+  const files = useRef(new Map<string, File>());
+  const aborts = useRef(new Map<string, AbortController>());
+  const started = useRef(new Set<string>());
+  const requestSeq = useRef(0);
 
-      setFileName(file.name);
-      setFileUrl((old) => {
-        if (old) URL.revokeObjectURL(old);
-        return URL.createObjectURL(file);
-      });
-      setPhase('uploading');
-      setProgress(0);
-      try {
-        // A new file always starts a fresh draft; an abandoned one simply expires.
-        const created = await createOrder(shop.id, options);
-        saveTrackingToken(created.order.id, created.trackingToken);
-        setToken(created.trackingToken);
-        setOrder(created.order);
-
-        const upload = await requestUploadUrl(created.order.id, file.size, created.trackingToken);
-        await uploadToSignedUrl(upload, file, setProgress);
-        setPhase('validating');
-        setReviewing(false);
-        const validated = await completeUpload(
-          created.order.id,
-          upload.fileId,
-          created.trackingToken,
-        );
-        setOrder(validated);
-        setPhase('ready');
-      } catch (err) {
-        if (err instanceof ApiRequestError && err.code === 'PAGE_RANGE_INVALID') {
-          // The file is fine; only the page range doesn't fit this document.
-          setRangeError(err.message);
-          setPhase('ready');
-          return;
-        }
-        setError(messageOf(err));
-        setFileName(null);
-        setOrder(null);
-        setPhase('idle');
-      }
-    },
-    [config.limits.maxUploadBytes, maxMb, options, shop.id],
+  const applyOrder = useCallback((next: PublicOrder) => setOrder((prev) => newer(prev, next)), []);
+  const patch = useCallback(
+    (key: string, p: Partial<FileCard>) =>
+      setCards((cs) => cs.map((c) => (c.key === key ? { ...c, ...p } : c))),
+    [],
   );
 
+  // Revoke thumbnails on unmount.
+  useEffect(
+    () => () => {
+      for (const c of cardsRef.current) if (c.thumb) URL.revokeObjectURL(c.thumb);
+      for (const a of aborts.current.values()) a.abort();
+    },
+    [],
+  );
+
+  // Pages per card come from the API's file list.
+  useEffect(() => {
+    if (!order) return;
+    const byId = new Map(order.files.map((f) => [f.id, f]));
+    setCards((cs) => {
+      let changed = false;
+      const next = cs.map((c) => {
+        const f = c.fileId ? byId.get(c.fileId) : undefined;
+        if (!f || (f.pageCount === c.pageCount && f.firstPage === c.firstPage)) return c;
+        changed = true;
+        return { ...c, pageCount: f.pageCount, firstPage: f.firstPage };
+      });
+      return changed ? next : cs;
+    });
+  }, [order]);
+
+  /** The draft order is created with the first file; every upload shares it. */
+  const ensureOrder = useCallback(() => {
+    orderPromise.current ??= createOrder(shop.id, optionsRef.current).then(
+      (created) => {
+        saveTrackingToken(created.order.id, created.trackingToken);
+        setToken(created.trackingToken);
+        applyOrder(created.order);
+        return { id: created.order.id, token: created.trackingToken };
+      },
+      (err: unknown) => {
+        orderPromise.current = null;
+        throw err;
+      },
+    );
+    return orderPromise.current;
+  }, [applyOrder, shop.id]);
+
+  // ─── Upload one card: signed URL → PUT with progress → server validation ───
+  const startUpload = useCallback(
+    async (key: string) => {
+      const file = files.current.get(key);
+      if (!file) return;
+      const ctrl = new AbortController();
+      aborts.current.set(key, ctrl);
+      patch(key, { status: 'uploading', progress: 0 });
+      try {
+        const { id, token } = await ensureOrder();
+        const upload = await requestUploadUrl(id, file.size, token);
+        const fileId = upload.fileId;
+        if (ctrl.signal.aborted) {
+          void removeFile(id, fileId, token).then(applyOrder, () => undefined);
+          return;
+        }
+        patch(key, { fileId });
+        await uploadToSignedUrl(upload, file, (progress) => patch(key, { progress }), ctrl.signal);
+        patch(key, { status: 'checking', progress: 1 });
+        const validated = await completeUpload(id, upload.fileId, token);
+        applyOrder(validated);
+        patch(key, { status: 'ready' });
+      } catch (err) {
+        if (ctrl.signal.aborted) return; // cancelled by the customer; the card is gone
+        if (err instanceof ApiRequestError && err.code === 'PAGE_RANGE_INVALID') {
+          // The file is fine; only the page range doesn't fit the document any more.
+          patch(key, { status: 'ready' });
+          setRangeError(err.message);
+          const ids = await orderPromise.current;
+          if (ids) void getOrder(ids.id, ids.token).then(applyOrder, () => undefined);
+          return;
+        }
+        patch(key, { status: 'error', error: messageOf(err) });
+      } finally {
+        aborts.current.delete(key);
+      }
+    },
+    [applyOrder, ensureOrder, patch],
+  );
+
+  // Start queued uploads, a few at a time.
+  useEffect(() => {
+    const running = cards.filter((c) => c.status === 'uploading' || c.status === 'checking');
+    const free = PARALLEL_UPLOADS - running.length;
+    if (free <= 0) return;
+    for (const c of cards.filter((c) => c.status === 'queued').slice(0, free)) {
+      if (started.current.has(c.key)) continue;
+      started.current.add(c.key);
+      void startUpload(c.key);
+    }
+  }, [cards, startUpload]);
+
+  // ─── Add / remove / reorder ───
+  const addFiles = (picked: File[]) => {
+    setError(null);
+    const room = maxFiles - cardsRef.current.filter((c) => c.status !== 'error').length;
+    if (picked.length > room) {
+      setError(`An order can have at most ${maxFiles} files. Only the first ${room} were added.`);
+    }
+    const added: FileCard[] = picked.slice(0, Math.max(0, room)).map((file) => {
+      const key = crypto.randomUUID();
+      const kind = kindOf(file);
+      const card: FileCard = {
+        key,
+        name: file.name,
+        kind: kind === 'pdf' ? 'pdf' : kind === 'image' || kind === 'heic' ? 'image' : 'other',
+        thumb: kind === 'image' ? URL.createObjectURL(file) : null,
+        status: 'queued',
+        progress: 0,
+        fileId: null,
+        pageCount: null,
+        firstPage: null,
+        error: null,
+      };
+      if (kind === 'heic') {
+        return {
+          ...card,
+          kind: 'image',
+          status: 'error',
+          error: 'HEIC photos aren’t supported yet. Save it as JPEG and add it again.',
+        };
+      }
+      if (!kind) {
+        return {
+          ...card,
+          status: 'error',
+          error: 'Only PDFs and photos (JPEG, PNG, WebP). Save Word files as PDF first.',
+        };
+      }
+      if (file.size > config.limits.maxUploadBytes) {
+        return { ...card, status: 'error', error: `Too large. The limit is ${maxMb} MB per file.` };
+      }
+      files.current.set(key, file);
+      if (kind === 'pdf') {
+        void pdfThumbnail(file).then(
+          (thumb) => patch(key, { thumb }),
+          () => undefined,
+        );
+      }
+      return card;
+    });
+    setCards((cs) => [...cs, ...added]);
+  };
+
+  const remove = (key: string) => {
+    const card = cardsRef.current.find((c) => c.key === key);
+    if (!card) return;
+    aborts.current.get(key)?.abort();
+    files.current.delete(key);
+    if (card.thumb) URL.revokeObjectURL(card.thumb);
+    setCards((cs) => cs.filter((c) => c.key !== key));
+    if (!card.fileId || card.status === 'error') return;
+    void (async () => {
+      const ids = await orderPromise.current;
+      if (!ids) return;
+      try {
+        const updated = await removeFile(ids.id, card.fileId!, ids.token);
+        applyOrder(updated);
+        // Files left but no price: the page range no longer fits — ask the server why.
+        if (updated.files.length && !updated.quote) setRequoteNonce((n) => n + 1);
+        else setRangeError(null);
+      } catch (err) {
+        setError(messageOf(err));
+      }
+    })();
+  };
+
+  const move = (key: string, to: number) =>
+    setCards((cs) => {
+      const from = cs.findIndex((c) => c.key === key);
+      if (from === -1 || to < 0 || to >= cs.length || from === to) return cs;
+      const next = [...cs];
+      const [card] = next.splice(from, 1);
+      next.splice(to, 0, card!);
+      return next;
+    });
+
+  const saveOrder = () => {
+    void (async () => {
+      const ids = await orderPromise.current;
+      const fileIds = cardsRef.current.flatMap((c) => (c.fileId ? [c.fileId] : []));
+      if (!ids || fileIds.length < 2) return;
+      try {
+        applyOrder(await reorderFiles(ids.id, fileIds, ids.token));
+      } catch (err) {
+        setError(messageOf(err));
+      }
+    })();
+  };
+
   // ─── Options → server re-quote (debounced, stale responses ignored) ───
-  const changeOptions = (patch: Partial<PrintOptions>) => setOptions((o) => ({ ...o, ...patch }));
+  const changeOptions = (p: Partial<PrintOptions>) => setOptions((o) => ({ ...o, ...p }));
+  const orderId = order?.id ?? null;
 
   useEffect(() => {
-    if (!order || !token || phase !== 'ready') return;
+    if (!orderId || !token) return;
     const seq = ++requestSeq.current;
     setRequoting(true);
     const timer = setTimeout(async () => {
       try {
-        const updated = await updateOptions(order.id, options, token);
+        const updated = await updateOptions(orderId, options, token);
         if (seq !== requestSeq.current) return;
-        setOrder(updated);
+        applyOrder(updated);
         setRangeError(null);
-        setError(null);
       } catch (err) {
         if (seq !== requestSeq.current) return;
         if (err instanceof ApiRequestError && err.code === 'PAGE_RANGE_INVALID') {
@@ -149,14 +321,13 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
       }
     }, 400);
     return () => clearTimeout(timer);
-    // Deliberately keyed on options only: re-quote when the customer changes something,
-    // not when the order object itself updates.
-  }, [options]);
+    // Keyed on what the customer changes, not on every order update.
+  }, [options, orderId, token, requoteNonce]);
 
   // ─── Pay ───
   const pay = async () => {
     if (!order || !token) return;
-    setPhase('paying');
+    setPaying(true);
     setError(null);
     try {
       const res = await payOrder(order.id, token);
@@ -165,17 +336,21 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
       setError(messageOf(err));
       // P2.5: the shop changed its prices — show the new server quote before paying again.
       if (err instanceof ApiRequestError && err.code === 'PRICE_CHANGED') {
-        await getOrder(order.id, token).then(setOrder, () => undefined);
+        await getOrder(order.id, token).then(applyOrder, () => undefined);
       }
-      setPhase('ready');
+      setPaying(false);
     }
   };
 
-  const quote = order?.quote ?? null;
-  const canPay =
-    phase === 'ready' &&
+  const uploading = cards.some(isBusy);
+  const readyCount = cards.filter((c) => c.status === 'ready').length;
+  const failedCount = cards.filter((c) => c.status === 'error').length;
+  const quote = readyCount ? (order?.quote ?? null) : null;
+  const canContinue =
     order?.status === 'AWAITING_PAYMENT' &&
     !!quote &&
+    readyCount > 0 &&
+    !uploading &&
     !requoting &&
     !rangeError;
 
@@ -184,34 +359,41 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
       <p className="text-[13px] font-medium text-text-secondary">{shop.name}</p>
       <h1 className="mac-title mt-0.5">{reviewing ? 'Review your order' : 'New order'}</h1>
 
-      {reviewing && quote && order ? (
+      {reviewing && order && token && quote ? (
         <ReviewStep
           shop={shop}
           order={order}
-          fileName={fileName}
-          fileUrl={fileUrl}
+          token={token}
+          cards={cards}
           isDemo={isDemo}
           atCounter={atCounter}
-          paying={phase === 'paying'}
-          canPay={canPay}
+          paying={paying}
+          canPay={canContinue && !paying}
           error={error}
           onEdit={() => setReviewing(false)}
           onPay={pay}
         />
       ) : (
         <>
-          <UploadCard
-            phase={phase}
-            progress={progress}
-            fileName={fileName}
-            pageCount={order?.file?.pageCount ?? null}
+          <FileCards
+            cards={cards}
+            maxFiles={maxFiles}
             maxMb={maxMb}
             maxPages={config.limits.maxPages}
-            onFile={handleFile}
+            disabled={paying}
+            onAdd={addFiles}
+            onRemove={remove}
+            onMove={move}
+            onReorderDone={saveOrder}
           />
           {error && <Notice tone="red">{error}</Notice>}
+          {failedCount > 0 && readyCount > 0 && (
+            <p className="mt-2 px-4 text-[12px] text-text-secondary">
+              Files that can’t be printed aren’t part of the order. Remove them or add a fixed copy.
+            </p>
+          )}
 
-          <Group title="Print options">
+          <Group title="Print options" footer="These apply to all files.">
             <Row label="Copies">
               <Stepper
                 label="copies"
@@ -249,7 +431,15 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
                 onChange={(v) => changeOptions({ duplex: v === 'double' })}
               />
             </Row>
-            <Row label="Pages" hint={rangeError ?? 'Leave empty for all pages, e.g. 1-3, 5'}>
+            <Row
+              label="Pages"
+              hint={
+                rangeError ??
+                (cards.length > 1
+                  ? 'All files count as one document, e.g. 1-3, 5'
+                  : 'Leave empty for all pages, e.g. 1-3, 5')
+              }
+            >
               <TextField
                 label="Page range"
                 value={options.pageRange ?? ''}
@@ -294,7 +484,7 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
                   <span
                     className={cx(
                       'text-[17px] font-semibold tabular-nums',
-                      requoting && 'opacity-40',
+                      (requoting || uploading) && 'opacity-40',
                     )}
                   >
                     {formatPaise(quote.totalPaise)}
@@ -303,19 +493,37 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
               </>
             ) : (
               <Row
-                label={<span className="text-text-secondary">Upload a PDF to see the price</span>}
+                label={
+                  <span className="flex items-center gap-2 text-text-secondary">
+                    {uploading && <Spinner />}
+                    {uploading
+                      ? 'Checking your files…'
+                      : rangeError
+                        ? 'Fix the page range to see the price'
+                        : 'Add a file to see the price'}
+                  </span>
+                }
               />
             )}
           </Group>
 
           <div className="mt-6 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+            {uploading && (
+              <span className="text-center text-[13px] text-text-secondary sm:mr-2">
+                Waiting for uploads to finish…
+              </span>
+            )}
             <button
               type="button"
               className="mac-button disabled:opacity-40"
-              disabled={!canPay}
-              onClick={() => setReviewing(true)}
+              disabled={!canContinue}
+              onClick={() => {
+                setError(null);
+                setReviewing(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             >
-              Continue{quote ? ` · ${formatPaise(quote.totalPaise)}` : ''}
+              Preview & continue{quote ? ` · ${formatPaise(quote.totalPaise)}` : ''}
             </button>
           </div>
         </>
@@ -324,12 +532,12 @@ export function NewOrderFlow({ shop, config }: { shop: ShopSummary; config: Publ
   );
 }
 
-/** Final check before placing the order: file preview, every option, the total, how to pay. */
+/** Final check before placing the order: print preview, every option, the total, how to pay. */
 function ReviewStep({
   shop,
   order,
-  fileName,
-  fileUrl,
+  token,
+  cards,
   isDemo,
   atCounter,
   paying,
@@ -340,8 +548,8 @@ function ReviewStep({
 }: {
   shop: ShopSummary;
   order: PublicOrder;
-  fileName: string | null;
-  fileUrl: string | null;
+  token: string;
+  cards: FileCard[];
   isDemo: boolean;
   atCounter: boolean;
   paying: boolean;
@@ -352,44 +560,30 @@ function ReviewStep({
 }) {
   const quote = order.quote!;
   const o = order.options;
+  const ready = cards.filter((c) => c.status === 'ready');
+  const total = order.file?.pageCount ?? quote.selectedPages;
   return (
     <>
-      {fileUrl && (
-        <div className="mac-card mt-6 overflow-hidden">
-          <object
-            data={fileUrl}
-            type="application/pdf"
-            className="block h-[420px] w-full bg-bg"
-            aria-label="File preview"
-          >
-            <div className="px-4 py-6 text-center text-[14px] text-text-secondary">
-              Preview isn’t available in this browser.{' '}
-              <a
-                href={fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-accent"
-              >
-                Open your file
-              </a>
-            </div>
-          </object>
-        </div>
-      )}
+      <PrintPreview order={order} token={token} />
 
       <Group
         title="Summary"
         footer={
           <button type="button" onClick={onEdit} className="font-medium text-accent">
-            Edit options
+            Edit files or options
           </button>
         }
       >
         <Row label="Shop" hint={shop.address}>
           <span className="text-right text-[15px]">{shop.name}</span>
         </Row>
-        <Row label="File" hint={`${order.file?.pageCount ?? quote.selectedPages} pages in the PDF`}>
-          <span className="max-w-[55vw] truncate text-[15px]">{fileName ?? 'Your PDF'}</span>
+        <Row
+          label={ready.length === 1 ? 'File' : 'Files'}
+          hint={`${total} page${total === 1 ? '' : 's'} in total`}
+        >
+          <span className="block max-w-[50vw] truncate text-right text-[15px] sm:max-w-[320px]">
+            {ready.length === 1 ? ready[0]!.name : `${ready.length} files`}
+          </span>
         </Row>
         <Row label="Pages">
           <span className="text-[15px]">
@@ -455,103 +649,11 @@ function ReviewStep({
       </div>
       {atCounter && (
         <p className="mt-3 text-center text-[13px] text-text-secondary">
-          You get a pickup number right away. The shop checks your file and prints it. Tell them
+          You get a pickup number right away. The shop checks your files and prints them. Tell them
           your number and pay at the counter.
         </p>
       )}
     </>
-  );
-}
-
-function UploadCard({
-  phase,
-  progress,
-  fileName,
-  pageCount,
-  maxMb,
-  maxPages,
-  onFile,
-}: {
-  phase: Phase;
-  progress: number;
-  fileName: string | null;
-  pageCount: number | null;
-  maxMb: number;
-  maxPages: number;
-  onFile: (file: File) => void;
-}) {
-  const [dragging, setDragging] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const busy = phase === 'uploading' || phase === 'validating' || phase === 'paying';
-
-  return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        if (!busy) setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file && !busy) onFile(file);
-      }}
-      className={cx(
-        'mac-card mt-6 flex items-center gap-4 p-5 transition-colors',
-        dragging && 'border-accent bg-accent/5',
-      )}
-    >
-      <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-red/10 text-[11px] font-bold text-red">
-        PDF
-      </div>
-      <div className="min-w-0 flex-1">
-        {fileName ? (
-          <>
-            <div className="truncate text-[15px] font-semibold">{fileName}</div>
-            <div className="mt-0.5 text-[13px] text-text-secondary">
-              {phase === 'uploading' && `Uploading… ${Math.round(progress * 100)}%`}
-              {phase === 'validating' && 'Checking your document…'}
-              {(phase === 'ready' || phase === 'paying') &&
-                pageCount !== null &&
-                `${pageCount} page${pageCount === 1 ? '' : 's'} · ready to print`}
-            </div>
-            {phase === 'uploading' && (
-              <div className="mt-2">
-                <ProgressBar value={progress} />
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="text-[15px] font-semibold">Choose a PDF to print</div>
-            <div className="mt-0.5 text-[13px] text-text-secondary">
-              Drop it here or browse · up to {maxMb} MB, {maxPages} pages
-            </div>
-          </>
-        )}
-      </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf,.pdf"
-        className="sr-only"
-        aria-label="Choose a PDF"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onFile(file);
-          e.target.value = '';
-        }}
-      />
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => inputRef.current?.click()}
-        className="shrink-0 rounded-full border border-separator bg-surface px-4 py-1.5 text-[13px] font-semibold text-accent transition-colors hover:bg-selection disabled:opacity-40"
-      >
-        {busy ? <Spinner /> : fileName ? 'Replace' : 'Browse'}
-      </button>
-    </div>
   );
 }
 

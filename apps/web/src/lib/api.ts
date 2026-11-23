@@ -134,6 +134,41 @@ export const completeUpload = (id: string, fileId: string, token: string): Promi
     token,
   });
 
+/** Remove a file, or cancel one still uploading (ADR-005). */
+export const removeFile = (id: string, fileId: string, token: string): Promise<PublicOrder> =>
+  apiFetch(`/orders/${id}/files/${fileId}`, PublicOrderSchema, { method: 'DELETE', token });
+
+/** Print order of the files; ids not listed keep their order after the listed ones. */
+export const reorderFiles = (id: string, fileIds: string[], token: string): Promise<PublicOrder> =>
+  apiFetch(`/orders/${id}/files/order`, PublicOrderSchema, {
+    method: 'PUT',
+    body: { fileIds },
+    token,
+  });
+
+/**
+ * The stored, printable PDF of one file (an image comes back as its A4 page) — what the shop
+ * will print, for the print preview.
+ */
+export async function fetchFilePdf(
+  id: string,
+  fileId: string,
+  token: string,
+): Promise<ArrayBuffer> {
+  let res: Response;
+  try {
+    res = await fetch(`${FETCH_BASE}/orders/${id}/files/${fileId}/content`, {
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { [TRACKING_TOKEN_HEADER]: token },
+    });
+  } catch {
+    throw new ApiRequestError(0, 'API_UNREACHABLE', 'Can’t load the preview right now.');
+  }
+  if (!res.ok) throw new ApiRequestError(res.status, 'PREVIEW_FAILED', 'Preview not available.');
+  return res.arrayBuffer();
+}
+
 /** No body: the server decides the amount (FR-CUST-08). */
 export const payOrder = (id: string, token: string): Promise<PayResponse> =>
   apiFetch(`/orders/${id}/pay`, PayResponseSchema, { method: 'POST', token });
@@ -153,9 +188,16 @@ export function uploadToSignedUrl(
   upload: UploadUrlResponse,
   file: File,
   onProgress: (fraction: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    if (signal?.aborted) {
+      reject(new ApiRequestError(0, 'UPLOAD_CANCELLED', 'Upload cancelled.'));
+      return;
+    }
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
+    xhr.onabort = () => reject(new ApiRequestError(0, 'UPLOAD_CANCELLED', 'Upload cancelled.'));
     xhr.open(upload.method, upload.uploadUrl);
     for (const [name, value] of Object.entries(upload.headers)) xhr.setRequestHeader(name, value);
     xhr.upload.onprogress = (e) => {

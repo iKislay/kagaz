@@ -12,3 +12,4 @@ export * from './shop-api.js';
 export * from './admin-api.js';
 export * from './realtime.js';
 export * from './billing.js';
+export * from './multi-file.js';

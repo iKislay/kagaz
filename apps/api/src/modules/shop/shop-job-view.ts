@@ -1,11 +1,11 @@
 import { COUNTER_PAYMENT_PROVIDER, type ShopJob } from '@kagaz/shared';
 import { type Prisma } from '../../generated/prisma/client.js';
-import { parseOptions, parseQuote } from '../orders/order-view.js';
+import { PRINTABLE_FILES, parseOptions, parseQuote, totalPages } from '../orders/order-view.js';
 import { pickupDateString } from '../pickup/pickup-number.service.js';
 
 /** Everything needed to render an operator's view of an order. */
 export const SHOP_JOB_INCLUDE = {
-  files: { where: { kind: 'ORIGINAL', status: 'VALID' }, orderBy: { createdAt: 'desc' }, take: 1 },
+  files: PRINTABLE_FILES,
   payments: { orderBy: { createdAt: 'desc' }, take: 1 },
   printJobs: { orderBy: { attempt: 'desc' }, take: 1 },
 } as const satisfies Prisma.OrderInclude;
@@ -21,7 +21,8 @@ export function toShopJob(order: OrderWithShopView): ShopJob {
     publicRef: order.publicRef,
     status: order.status,
     options: parseOptions(order.options),
-    pageCount: order.files[0]?.pageCount ?? null,
+    // All files together (ADR-005): the shop app shows one document.
+    pageCount: order.files.length ? totalPages(order.files) : null,
     printedSides: quote?.printedSides ?? null,
     amountPaise: order.amountPaise,
     simulatedPayment: order.payments[0]?.isSimulated ?? false,

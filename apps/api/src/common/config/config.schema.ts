@@ -49,6 +49,10 @@ export const EnvSchema = z.object({
   MAX_PAGES: int(300),
   MAX_COPIES: int(20),
   MAX_SIDES: int(1000),
+  /** ADR-005: files (PDFs + images) per order; MAX_PAGES applies to the combined document. */
+  MAX_FILES_PER_ORDER: int(20),
+  /** Decoded image size limit (width × height) — decompression-bomb guard on a small instance. */
+  MAX_IMAGE_PIXELS: int(50_000_000),
 
   /** counter = pay at the shop counter at pickup, no gateway (ADR-003). */
   PAYMENT_PROVIDER: z.enum(['demo', 'counter', 'razorpay', 'cashfree']),
@@ -233,6 +237,7 @@ export function toPublicConfig(config: AppConfig): PublicConfig {
       maxPages: config.MAX_PAGES,
       maxCopies: config.MAX_COPIES,
       maxSides: config.MAX_SIDES,
+      maxFiles: config.MAX_FILES_PER_ORDER,
     },
     support: {
       phone: config.SUPPORT_PHONE ?? null,

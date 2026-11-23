@@ -291,15 +291,15 @@ Priority: **P0** = required for the Day 0–1 vertical-slice demo; **P1** = requ
 
 ### 7.5 Files and print packet (FR-FILE)
 
-| ID         | Requirement                                                                                                                                                                                           | Priority                                 |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| FR-FILE-01 | Private bucket only; signed PUT (upload) and GET (download) URLs with short TTL (upload ≤ 10 min, download ≤ 5 min).                                                                                  | P0                                       |
-| FR-FILE-02 | Validate by content: `%PDF-` magic bytes, parse success, not encrypted/password-protected, page count ≥ 1, size ≤ limit, pages ≤ limit. Browser MIME/filename are not trusted.                        | P0                                       |
-| FR-FILE-03 | Compute and store SHA-256 for original and packet.                                                                                                                                                    | P0                                       |
-| FR-FILE-04 | Generate print packet: selected page range × copies **inside** the PDF, duplex spacer pages so each copy starts on a front side, then exactly one pickup slip on its own physical sheet.              | P0 (copies + slip) / P1 (duplex spacers) |
-| FR-FILE-05 | Pickup slip layout (see §8.6).                                                                                                                                                                        | P0                                       |
-| FR-FILE-06 | Retention: delete original and packet objects 24 h after `READY_FOR_PICKUP` (from `readyAt`, ADR-002) or `COLLECTED`, and abandoned drafts / unpaid orders after expiry (default 24 h). Configurable. | P1                                       |
-| FR-FILE-07 | Normalize to A4 (scale-to-fit, preserve aspect ratio) when source pages are not A4.                                                                                                                   | P1                                       |
+| ID         | Requirement                                                                                                                                                                                                                                                     | Priority                                 |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| FR-FILE-01 | Private bucket only; signed PUT (upload) and GET (download) URLs with short TTL (upload ≤ 10 min, download ≤ 5 min).                                                                                                                                            | P0                                       |
+| FR-FILE-02 | Validate by content: `%PDF-` magic bytes, parse success, not encrypted/password-protected, page count ≥ 1, size ≤ limit, pages ≤ limit. Browser MIME/filename are not trusted. Images (JPEG/PNG/WebP, ADR-005) are fully decoded and stored as one A4 PDF page. | P0                                       |
+| FR-FILE-03 | Compute and store SHA-256 for original and packet.                                                                                                                                                                                                              | P0                                       |
+| FR-FILE-04 | Generate print packet: selected page range × copies **inside** the PDF, duplex spacer pages so each copy starts on a front side, then exactly one pickup slip on its own physical sheet.                                                                        | P0 (copies + slip) / P1 (duplex spacers) |
+| FR-FILE-05 | Pickup slip layout (see §8.6).                                                                                                                                                                                                                                  | P0                                       |
+| FR-FILE-06 | Retention: delete original and packet objects 24 h after `READY_FOR_PICKUP` (from `readyAt`, ADR-002) or `COLLECTED`, and abandoned drafts / unpaid orders after expiry (default 24 h). Configurable.                                                           | P1                                       |
+| FR-FILE-07 | Normalize to A4 (scale-to-fit, preserve aspect ratio) when source pages are not A4.                                                                                                                                                                             | P1                                       |
 
 ### 7.6 Payments (FR-PAY)
 
@@ -362,17 +362,17 @@ Priority: **P0** = required for the Day 0–1 vertical-slice demo; **P1** = requ
 
 ### 8.1 Order limits (defaults, configurable per environment and per shop)
 
-| Limit                       | Default  |
-| --------------------------- | -------- |
-| Max upload size             | 25 MB    |
-| Max pages in source PDF     | 300      |
-| Max copies per order        | 20       |
-| Max printed sides per order | 1,000    |
-| Paper size                  | A4 only  |
-| File type                   | PDF only |
-| Unpaid order expiry         | 24 h     |
-| Signed upload URL TTL       | 10 min   |
-| Signed download URL TTL     | 5 min    |
+| Limit                       | Default                                                                          |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| Max upload size             | 25 MB                                                                            |
+| Max pages in source PDF     | 300                                                                              |
+| Max copies per order        | 20                                                                               |
+| Max printed sides per order | 1,000                                                                            |
+| Paper size                  | A4 only                                                                          |
+| File type                   | PDF, JPEG, PNG, WebP; several files per order, printed as one document (ADR-005) |
+| Unpaid order expiry         | 24 h                                                                             |
+| Signed upload URL TTL       | 10 min                                                                           |
+| Signed download URL TTL     | 5 min                                                                            |
 
 ### 8.2 Pricing formula
 
