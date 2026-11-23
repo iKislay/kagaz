@@ -3,6 +3,7 @@ import { type WebhookAck } from '@kagaz/shared';
 import { sha256Hex } from '../../common/crypto/tokens.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { LoginRateLimiter } from '../identity/login-rate-limiter.js';
 import {
   PAYMENT_PROVIDER,
   type PaymentProvider,
@@ -24,6 +25,8 @@ import { RefundsService } from './refunds.service.js';
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
+  /** Invalid-signature deliveries recorded per IP: 20 / 10 min, then 429 without a DB write. */
+  private readonly invalidLimiter = new LoginRateLimiter(21);
 
   constructor(
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
@@ -36,6 +39,7 @@ export class WebhooksService {
     providerName: string,
     rawBody: Buffer | undefined,
     headers: Record<string, string>,
+    clientIp?: string,
   ): Promise<WebhookAck> {
     if (providerName !== this.provider.name) {
       throw new AppError('WEBHOOK_PROVIDER_UNKNOWN', 'Unknown payment provider', 404);
@@ -51,6 +55,14 @@ export class WebhooksService {
     } catch (err) {
       if (!(err instanceof WebhookSignatureError)) throw err;
       this.logger.warn({ provider: providerName, rawHash }, 'webhook signature invalid — rejected');
+      // Unauthenticated writes: bound them per client IP (security review L6 / audit M-2).
+      if (this.invalidLimiter.fail(clientIp ?? 'unknown')) {
+        throw new AppError(
+          'RATE_LIMITED',
+          'Too many invalid webhook deliveries',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
       // Recorded under a synthetic id: an unverified event id must never block the real one.
       await this.prisma.webhookEvent.createMany({
         data: [

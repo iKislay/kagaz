@@ -656,6 +656,8 @@ verify(shopId, input):
 | `DOWNLOAD_URL_TTL_SECONDS`                  | `300`                                           |                                                          |
 | `MAX_UPLOAD_BYTES`                          | `26214400`                                      | 25 MB                                                    |
 | `MAX_PAGES` / `MAX_COPIES` / `MAX_SIDES`    | `300` / `20` / `1000`                           |                                                          |
+| `ORDER_CREATE_LIMIT_PER_IP_HOUR`            | `60`                                            | New orders per client IP per hour (security audit M-1)   |
+| `MAX_UPLOADS_PER_ORDER`                     | `10`                                            | Upload URLs per order (security audit M-1)               |
 | `PAYMENT_PROVIDER`                          | `demo` \| `razorpay` \| `cashfree`              | `demo` forbidden in production                           |
 | `DEMO_WEBHOOK_SECRET`                       | —                                               | Mock webhook signing                                     |
 | `OTP_PROVIDER`                              | `demo`                                          | `demo` forbidden in production                           |

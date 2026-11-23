@@ -21,6 +21,8 @@ const testEnv = {
   DATABASE_URL: testUrl.toString(),
   LOG_LEVEL: 'silent',
   PAYMENT_PROVIDER: 'demo',
+  // Suites place hundreds of orders from 127.0.0.1; the per-IP limit has its own test.
+  ORDER_CREATE_LIMIT_PER_IP_HOUR: '100000',
 };
 // global-setup runs in this process; workers get the same values via test.env.
 Object.assign(process.env, testEnv);

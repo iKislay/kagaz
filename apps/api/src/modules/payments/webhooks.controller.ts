@@ -19,6 +19,11 @@ export class WebhooksController {
       if (typeof value === 'string') headers[name.toLowerCase()] = value;
       else if (Array.isArray(value)) headers[name.toLowerCase()] = value.join(', ');
     }
-    return this.webhooks.receive(provider, req.rawBody, headers);
+    return this.webhooks.receive(
+      provider,
+      req.rawBody,
+      headers,
+      req.ip ?? req.socket?.remoteAddress,
+    );
   }
 }

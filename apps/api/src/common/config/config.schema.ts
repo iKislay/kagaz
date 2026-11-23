@@ -49,6 +49,14 @@ export const EnvSchema = z.object({
   MAX_PAGES: int(300),
   MAX_COPIES: int(20),
   MAX_SIDES: int(1000),
+  /**
+   * New orders per client IP per hour (security audit M-1): pay-at-counter confirms an order
+   * without any payment, so unthrottled scripts could flood a shop's queue. Raise it for local
+   * load runs (`load:orders` places 200 orders from one IP).
+   */
+  ORDER_CREATE_LIMIT_PER_IP_HOUR: int(60),
+  /** Upload URLs one order may request (each can store up to MAX_UPLOAD_BYTES). */
+  MAX_UPLOADS_PER_ORDER: int(10),
 
   /** counter = pay at the shop counter at pickup, no gateway (ADR-003). */
   PAYMENT_PROVIDER: z.enum(['demo', 'counter', 'razorpay', 'cashfree']),
