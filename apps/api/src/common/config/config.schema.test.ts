@@ -28,6 +28,13 @@ describe('loadConfig', () => {
     expect(config.S3_FORCE_PATH_STYLE).toBe(false);
   });
 
+  it('audit M-1: abuse limits default to 60 new orders / IP / hour and 10 uploads / order', () => {
+    const config = loadConfig(base);
+    expect(config.ORDER_CREATE_LIMIT_PER_IP_HOUR).toBe(60);
+    expect(config.MAX_UPLOADS_PER_ORDER).toBe(10);
+    expect(() => loadConfig({ ...base, ORDER_CREATE_LIMIT_PER_IP_HOUR: '0' })).toThrow(ConfigError);
+  });
+
   it('reports every missing variable', () => {
     expect(() => loadConfig({ APP_ENV: 'local' })).toThrow(/DATABASE_URL[\s\S]*S3_BUCKET/);
   });
