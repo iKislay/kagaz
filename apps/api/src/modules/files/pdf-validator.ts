@@ -10,6 +10,11 @@ export const PdfErrorCode = {
   FILE_TOO_LARGE: 'FILE_TOO_LARGE',
   FILE_TOO_MANY_PAGES: 'FILE_TOO_MANY_PAGES',
   FILE_EMPTY: 'FILE_EMPTY',
+  // Multi-file uploads with images (ADR-005)
+  FILE_TYPE_UNSUPPORTED: 'FILE_TYPE_UNSUPPORTED',
+  FILE_HEIC_UNSUPPORTED: 'FILE_HEIC_UNSUPPORTED',
+  IMAGE_CORRUPT: 'IMAGE_CORRUPT',
+  IMAGE_TOO_LARGE: 'IMAGE_TOO_LARGE',
 } as const;
 export type PdfErrorCode = (typeof PdfErrorCode)[keyof typeof PdfErrorCode];
 
@@ -20,6 +25,12 @@ export const PDF_ERROR_MESSAGES: Record<PdfErrorCode, string> = {
   FILE_TOO_LARGE: 'This file is too large.',
   FILE_TOO_MANY_PAGES: 'This PDF has too many pages.',
   FILE_EMPTY: 'This PDF has no pages.',
+  FILE_TYPE_UNSUPPORTED:
+    'This file type can’t be printed. Upload a PDF or a photo (JPEG, PNG or WebP). Save Word files as PDF first.',
+  FILE_HEIC_UNSUPPORTED:
+    'HEIC photos aren’t supported yet. Save the photo as JPEG (or share it from your phone as “Most Compatible”) and upload it again.',
+  IMAGE_CORRUPT: 'This image could not be read. It may be damaged; try saving it again.',
+  IMAGE_TOO_LARGE: 'This image has too many pixels. Resize it (under 50 megapixels) and try again.',
 };
 
 export class PdfValidationError extends Error {

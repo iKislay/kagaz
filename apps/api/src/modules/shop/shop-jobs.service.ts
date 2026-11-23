@@ -12,6 +12,7 @@ import { type DeviceContext, deviceActor } from '../../common/auth/device-auth.g
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type PrintJobStatus } from '../../generated/prisma/client.js';
+import { CombinedDocumentService } from '../files/combined-document.service.js';
 import { StorageService } from '../files/storage.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
 import { RefundsService } from '../payments/refunds.service.js';
@@ -50,6 +51,7 @@ export class ShopJobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly documents: CombinedDocumentService,
     private readonly stateMachine: OrderStateMachine,
     private readonly acceptance: OrderAcceptanceService,
     private readonly refunds: RefundsService,
@@ -71,8 +73,9 @@ export class ShopJobsService {
 
   async detail(device: DeviceContext, orderId: string): Promise<ShopJobDetail> {
     const order = await this.findScoped(device, orderId);
-    const original = order.files[0];
-    const preview = original ? await this.storage.createDownloadUrl(original.objectKey) : null;
+    // One link for all the customer's files, merged in print order (ADR-005).
+    const document = order.files.length ? await this.documents.forOrder(order.id) : null;
+    const preview = document ? await this.storage.createDownloadUrl(document.objectKey) : null;
     return { ...toShopJob(order), previewUrl: preview?.url ?? null };
   }
 

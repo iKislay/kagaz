@@ -83,6 +83,8 @@ enum ActorType {
 enum FileKind {
   ORIGINAL
   PACKET
+  /// All ORIGINAL files of a multi-file order merged in print order (ADR-005); built once paid.
+  COMBINED
 }
 
 enum FileStatus {
@@ -365,6 +367,11 @@ model FileAsset {
   mime      String     @default("application/pdf")
   bytes     Int?
   pageCount Int?       @map("page_count")
+  /// Print order among the order's ORIGINAL files (ADR-005); ties by createdAt.
+  position  Int?
+  /// What the customer uploaded (PDF, JPEG, PNG, WEBP), detected from content. Images are
+  /// stored converted to a one-page A4 PDF.
+  sourceType String?   @map("source_type")
   sha256    String?
   /// Validation error code when status = INVALID.
   error     String?

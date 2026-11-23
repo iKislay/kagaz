@@ -38,6 +38,8 @@ export const LimitsSchema = z.object({
   maxPages: z.int().positive(),
   maxCopies: z.int().positive(),
   maxSides: z.int().positive(),
+  /** Files (PDFs and images) one order can hold. Older APIs don't send it. */
+  maxFiles: z.int().positive().default(20),
 });
 export type Limits = z.infer<typeof LimitsSchema>;
 

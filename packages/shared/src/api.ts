@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 import { PaymentStatus, ShopStatus } from './enums.js';
+import { UPLOAD_SOURCE_TYPES } from './constants.js';
 import { OrderStatusSchema, PrintOptionsSchema, QuoteSchema } from './schemas.js';
 
 const enumValues = <T extends Record<string, string>>(obj: T) =>
@@ -74,6 +75,27 @@ export type UploadUrlResponse = z.infer<typeof UploadUrlResponseSchema>;
 export const UploadCompleteRequestSchema = z.strictObject({ fileId: z.uuid() });
 export type UploadCompleteRequest = z.infer<typeof UploadCompleteRequestSchema>;
 
+/**
+ * PUT /api/orders/:id/files/order — print order of the files. Listed files (pending uploads
+ * included) come first, in this order; any the client didn't list keep their relative order after.
+ */
+export const ReorderFilesRequestSchema = z.strictObject({
+  fileIds: z.array(z.uuid()).min(1).max(100),
+});
+export type ReorderFilesRequest = z.infer<typeof ReorderFilesRequestSchema>;
+
+/** One validated file of an order, in print order. Images are already one A4 PDF page. */
+export const OrderFileViewSchema = z.object({
+  id: z.uuid(),
+  /** 1-based number of this file's first page in the combined document (page ranges use it). */
+  firstPage: z.int().positive(),
+  pageCount: z.int().positive(),
+  bytes: z.int().nonnegative(),
+  /** What the customer uploaded; the stored, printable file is always a PDF. */
+  sourceType: z.enum(UPLOAD_SOURCE_TYPES),
+});
+export type OrderFileView = z.infer<typeof OrderFileViewSchema>;
+
 export const OrderEventViewSchema = z.object({
   status: OrderStatusSchema,
   at: z.string(),
@@ -91,7 +113,10 @@ export const PublicOrderSchema = z.object({
     isDemo: z.boolean(),
   }),
   options: PrintOptionsSchema,
+  /** All files together (total pages = what the price is for); null until one is valid. */
   file: z.object({ pageCount: z.int(), bytes: z.int() }).nullable(),
+  /** Validated files in print order (multi-file orders, ADR-005). */
+  files: z.array(OrderFileViewSchema).default([]),
   quote: QuoteSchema.nullable(),
   amountPaise: z.int().nullable(),
   payment: z

@@ -96,7 +96,14 @@ export function OrderTracker({ orderId }: { orderId: string }) {
       <Timeline order={order} />
 
       <Group title="Order">
-        <Row label="Document" hint={order.file ? `${order.file.pageCount} pages` : undefined}>
+        <Row
+          label={order.files.length > 1 ? 'Files' : 'Document'}
+          hint={
+            order.file
+              ? `${order.files.length > 1 ? `${order.files.length} files · ` : ''}${order.file.pageCount} pages`
+              : undefined
+          }
+        >
           <span className="text-[15px] text-text-secondary">
             {quote ? `${quote.selectedPages} pg × ${quote.copies}` : `× ${order.options.copies}`}
           </span>

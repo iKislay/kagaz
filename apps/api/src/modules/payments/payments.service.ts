@@ -11,7 +11,7 @@ import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { type Payment } from '../../generated/prisma/client.js';
 import { ApprovalService } from '../approval/approval.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
-import { parseOptions } from '../orders/order-view.js';
+import { PRINTABLE_FILES, parseOptions, totalPages } from '../orders/order-view.js';
 import { OrdersService } from '../orders/orders.service.js';
 import { PickupNumberService, pickupDateValue } from '../pickup/pickup-number.service.js';
 import { PricingService } from '../pricing/pricing.service.js';
@@ -164,12 +164,12 @@ export class PaymentsService {
       where: { id: orderId },
       include: {
         payments: { select: { id: true } },
-        files: { where: { kind: 'ORIGINAL', status: 'VALID' }, take: 1 },
+        files: PRINTABLE_FILES,
       },
     });
     if (!order || order.status !== OrderStatus.AWAITING_PAYMENT) return;
     if (order.priceSnapshot !== null || order.payments.length > 0 || !order.quote) return;
-    const pageCount = order.files[0]?.pageCount;
+    const pageCount = totalPages(order.files);
     if (!pageCount) return;
     const quote = QuoteSchema.parse(order.quote);
     const current = await this.pricing.getEffectivePricing(order.shopId);

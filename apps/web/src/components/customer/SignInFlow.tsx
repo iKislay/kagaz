@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PhoneSchema } from '@kagaz/shared';
 import { Group, Notice, Spinner } from '@/components/ui';
-import { ApiRequestError } from '@/lib/api';
+import { ApiRequestError, getPublicConfig } from '@/lib/api';
 import { normalizeIndianPhone, requestOtp, verifyOtp } from '@/lib/customer-api';
 
 const field =
@@ -23,6 +23,15 @@ export function SignInFlow() {
   const [demo, setDemo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Customer sign-in is off in production until an SMS vendor is chosen (ADR-003, D9). */
+  const [signInOff, setSignInOff] = useState(false);
+
+  useEffect(() => {
+    getPublicConfig().then(
+      (c) => setSignInOff(c.otpMode === 'OFF'),
+      () => undefined,
+    );
+  }, []);
 
   const send = async () => {
     const normalized = normalizeIndianPhone(phoneInput);
@@ -67,7 +76,12 @@ export function SignInFlow() {
         signing in — your tracking link always works.
       </p>
 
-      {step === 'phone' ? (
+      {signInOff ? (
+        <Notice tone="orange">
+          Accounts aren’t available yet. You don’t need one: order as a guest and keep the tracking
+          link you get after ordering. It shows your pickup code and progress.
+        </Notice>
+      ) : step === 'phone' ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();

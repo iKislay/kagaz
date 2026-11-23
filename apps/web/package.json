@@ -14,6 +14,7 @@
     "@kagaz/shared": "workspace:^",
     "jsqr": "1.4.0",
     "next": "^16",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19",
     "react-dom": "^19",
     "socket.io-client": "^4.8.1",

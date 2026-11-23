@@ -13,7 +13,7 @@ import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { tenantWhere } from '../../common/prisma/tenant-scope.js';
 import { type Tx } from '../orders/order-state-machine.js';
-import { parseOptions } from '../orders/order-view.js';
+import { PRINTABLE_FILES, parseOptions, totalPages } from '../orders/order-view.js';
 import { AutoAcceptPolicy, type AutoAcceptResult } from './auto-accept.policy.js';
 import { OrderAcceptanceService } from './order-acceptance.service.js';
 
@@ -43,7 +43,7 @@ export class ApprovalService {
       where: { id: orderId, ...tenantWhere() },
       include: {
         shop: true,
-        files: { where: { kind: 'ORIGINAL', status: 'VALID' }, take: 1 },
+        files: PRINTABLE_FILES,
         payments: { where: { provider: COUNTER_PAYMENT_PROVIDER }, select: { id: true }, take: 1 },
       },
     });
@@ -58,14 +58,14 @@ export class ApprovalService {
     });
     const quoteRaw = order.priceSnapshot ?? order.quote;
     const quote = quoteRaw ? QuoteSchema.safeParse(quoteRaw) : null;
-    const file = order.files[0];
+    const pageCount = order.files.length ? totalPages(order.files) : null;
 
     return AutoAcceptPolicy.evaluate(
       {
         options: parseOptions(order.options),
-        pageCount: file?.pageCount ?? null,
+        pageCount,
         printedSides: quote?.success ? quote.data.printedSides : null,
-        fileValid: !!file,
+        fileValid: pageCount !== null,
         payAtCounter: order.payments.length > 0,
       },
       order.shop,
