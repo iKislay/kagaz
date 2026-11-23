@@ -3,6 +3,7 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { type PrintOptions, parsePageRange } from '@kagaz/shared';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
+import { sha256Hex } from '../../common/crypto/tokens.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { StorageService } from '../files/storage.service.js';
@@ -49,6 +50,15 @@ export class PrintPreparationService {
     }
 
     const source = await this.storage.getBuffer(original.objectKey, this.config.MAX_UPLOAD_BYTES);
+    // Print exactly the document that was validated and priced (security audit H-1): never
+    // bytes that changed in storage after upload-complete.
+    if (!original.sha256 || sha256Hex(source) !== original.sha256) {
+      throw new AppError(
+        'FILE_CHANGED',
+        'The customer file changed after it was checked; it will not be printed',
+        HttpStatus.CONFLICT,
+      );
+    }
     if (order.pickupNumber === null || !order.pickupDate) {
       throw new AppError(
         'PICKUP_NUMBER_MISSING',

@@ -31,6 +31,8 @@ import {
 } from './order-view.js';
 
 const PDF = 'application/pdf';
+/** Customer-writable staging area for signed PUTs; only validated copies are ever read. */
+export const UPLOAD_STAGING_PREFIX = 'uploads/';
 /** Options can change until a payment exists for the order. */
 const EDITABLE: readonly OrderStatus[] = [OrderStatus.DRAFT, OrderStatus.AWAITING_PAYMENT];
 
@@ -131,9 +133,23 @@ export class OrdersService {
         HttpStatus.PAYLOAD_TOO_LARGE,
       );
     }
+    // Each URL lets the holder store up to MAX_UPLOAD_BYTES: cap them per order (M-1).
+    const uploads = await this.prisma.fileAsset.count({
+      where: { orderId: order.id, kind: 'ORIGINAL' },
+    });
+    if (uploads >= this.config.MAX_UPLOADS_PER_ORDER) {
+      throw new AppError(
+        'UPLOAD_LIMIT',
+        'Too many uploads for this order. Start a new order instead.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
 
-    // Key never contains the customer's filename (PRD FR-FILE-01).
-    const objectKey = `orders/${order.id}/original/${randomUUID()}.pdf`;
+    // Key never contains the customer's filename (PRD FR-FILE-01). The customer's signed PUT goes
+    // to a staging key; completeUpload copies the validated bytes to a key the customer never
+    // gets a URL for, so a re-PUT after validation can't change what is priced and printed
+    // (security audit 2026-11-24, finding H-1). Bucket lifecycle can expire `uploads/` freely.
+    const objectKey = `${UPLOAD_STAGING_PREFIX}${order.id}/${randomUUID()}.pdf`;
     const file = await this.prisma.fileAsset.create({
       data: { orderId: order.id, kind: 'ORIGINAL', objectKey, mime: PDF, bytes },
     });
@@ -171,10 +187,13 @@ export class OrdersService {
     try {
       if (head.bytes > this.config.MAX_UPLOAD_BYTES) throw new PdfValidationError('FILE_TOO_LARGE');
       const buffer = await this.storage.getBuffer(file.objectKey, this.config.MAX_UPLOAD_BYTES);
-      validated = await validatePdf(buffer, {
-        maxBytes: this.config.MAX_UPLOAD_BYTES,
-        maxPages: this.config.MAX_PAGES,
-      });
+      validated = {
+        buffer,
+        ...(await validatePdf(buffer, {
+          maxBytes: this.config.MAX_UPLOAD_BYTES,
+          maxPages: this.config.MAX_PAGES,
+        })),
+      };
     } catch (err) {
       if (!(err instanceof PdfValidationError)) throw err;
       await this.prisma.fileAsset.update({
@@ -190,18 +209,28 @@ export class OrdersService {
     const options = parseOptions(file.order.options);
     const quote = await this.tryQuote(file.order.shopId, options, validated.pageCount);
 
-    await this.prisma.$transaction(async (tx) => {
+    // The exact bytes that were validated, under a server-only key (H-1).
+    const validatedKey = `orders/${orderId}/original/${randomUUID()}.pdf`;
+    await this.storage.put(validatedKey, validated.buffer, PDF);
+
+    const outcome = await this.prisma.$transaction(async (tx) => {
       const marked = await tx.fileAsset.updateMany({
         where: { id: file.id, status: 'PENDING_UPLOAD' },
         data: {
           status: 'VALID',
+          objectKey: validatedKey,
           bytes: validated.bytes,
           pageCount: validated.pageCount,
           sha256: validated.sha256,
         },
       });
-      if (marked.count !== 1) return; // a concurrent completion won
-      // Any older uploads for this order are superseded.
+      if (marked.count !== 1) return { won: false, superseded: [] as string[] }; // a concurrent completion won
+      // Any older uploads for this order are superseded; their objects are deleted after commit
+      // (security review L3: marking them DELETED alone left customer PDFs in the bucket).
+      const superseded = await tx.fileAsset.findMany({
+        where: { orderId, kind: 'ORIGINAL', id: { not: file.id }, status: 'VALID' },
+        select: { objectKey: true },
+      });
       await tx.fileAsset.updateMany({
         where: { orderId, kind: 'ORIGINAL', id: { not: file.id }, status: 'VALID' },
         data: { status: 'DELETED', deletedAt: new Date() },
@@ -217,7 +246,16 @@ export class OrdersService {
       } else {
         await tx.order.update({ where: { id: orderId }, data: { quote: Prisma.DbNull } });
       }
+      return { won: true, superseded: superseded.map((f) => f.objectKey) };
+    }).catch(async (err: unknown) => {
+      await this.deleteQuietly(validatedKey, file.id);
+      throw err;
     });
+
+    // The staging object (customer-writable until its URL expires) is never read again.
+    const obsolete = [file.objectKey, ...outcome.superseded];
+    if (!outcome.won) obsolete.push(validatedKey);
+    for (const key of obsolete) await this.deleteQuietly(key, file.id);
 
     if (!quote.ok) throw quote.error; // file is valid; customer must fix the options
     return this.getPublic(orderId);
@@ -302,6 +340,12 @@ export class OrdersService {
   }
 
   // ─── Helpers ───
+
+  private async deleteQuietly(objectKey: string, fileId: string): Promise<void> {
+    await this.storage.delete(objectKey).catch((e: unknown) => {
+      this.logger.warn({ err: e, fileId }, 'failed to delete obsolete upload object');
+    });
+  }
 
   private async assertOptionsAllowed(shopId: string, options: PrintOptions): Promise<void> {
     if (options.copies > this.config.MAX_COPIES) {
