@@ -191,10 +191,9 @@ describe('H-2: a shop cannot open itself without Kaggaz activation', () => {
       .set({ ...auth, 'X-Operator-Token': login.body.operatorToken as string })
       .send({ status: 'OPEN' })
       .expect(409);
-    const shops = (await h.http().get('/api/shops').expect(200)).body as {
-      id: string;
-      acceptingOrders: boolean;
-    }[];
+    const { shops } = (await h.http().get('/api/shops').expect(200)).body as {
+      shops: { id: string; acceptingOrders: boolean }[];
+    };
     expect(shops.find((x) => x.id === res.body.shop.id)?.acceptingOrders).toBe(false);
     await h
       .http()
@@ -323,9 +322,38 @@ describe('L-5: staff login is limited per IP across logins (security review L5)'
         .post('/api/admin/auth/login')
         .send({ login: 'someone-else@e2e.local', password: 'wrong-password' })
         .expect(429);
-      expect(res.body.error.code).toBe('RATE_LIMITED');
+      expect(res.body.error.code).toBe('ADMIN_RATE_LIMITED');
     } finally {
       await limited.close();
     }
+  });
+});
+
+describe('L-7: mutating requests only accept JSON bodies (CSRF defence in depth)', () => {
+  it('an HTML-form style body is refused with 415 before reaching a handler', async () => {
+    const shop = await createShop(h.prisma);
+    for (const type of ['application/x-www-form-urlencoded', 'text/plain', 'multipart/form-data']) {
+      const res = await h
+        .http()
+        .post('/api/orders')
+        .set('content-type', type)
+        .send(`shopId=${shop.id}`)
+        .expect(415);
+      expect(res.body.error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+    }
+    await h
+      .http()
+      .post('/api/admin/auth/login')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('login=a@b.c&password=x')
+      .expect(415);
+    // JSON (with charset) and bodiless POSTs still work.
+    await h
+      .http()
+      .post('/api/orders')
+      .set('content-type', 'application/json; charset=utf-8')
+      .send(JSON.stringify({ shopId: shop.id, options: MONO }))
+      .expect(201);
+    await h.http().post('/api/auth/logout').expect(200);
   });
 });

@@ -213,44 +213,46 @@ export class OrdersService {
     const validatedKey = `orders/${orderId}/original/${randomUUID()}.pdf`;
     await this.storage.put(validatedKey, validated.buffer, PDF);
 
-    const outcome = await this.prisma.$transaction(async (tx) => {
-      const marked = await tx.fileAsset.updateMany({
-        where: { id: file.id, status: 'PENDING_UPLOAD' },
-        data: {
-          status: 'VALID',
-          objectKey: validatedKey,
-          bytes: validated.bytes,
-          pageCount: validated.pageCount,
-          sha256: validated.sha256,
-        },
-      });
-      if (marked.count !== 1) return { won: false, superseded: [] as string[] }; // a concurrent completion won
-      // Any older uploads for this order are superseded; their objects are deleted after commit
-      // (security review L3: marking them DELETED alone left customer PDFs in the bucket).
-      const superseded = await tx.fileAsset.findMany({
-        where: { orderId, kind: 'ORIGINAL', id: { not: file.id }, status: 'VALID' },
-        select: { objectKey: true },
-      });
-      await tx.fileAsset.updateMany({
-        where: { orderId, kind: 'ORIGINAL', id: { not: file.id }, status: 'VALID' },
-        data: { status: 'DELETED', deletedAt: new Date() },
-      });
-      if (quote.ok) {
-        await this.stateMachine.transition(tx, {
-          orderId,
-          to: OrderStatus.AWAITING_PAYMENT,
-          from: OrderStatus.DRAFT,
-          actor,
-          data: { quote: quote.quote, amountPaise: quote.quote.totalPaise },
+    const outcome = await this.prisma
+      .$transaction(async (tx) => {
+        const marked = await tx.fileAsset.updateMany({
+          where: { id: file.id, status: 'PENDING_UPLOAD' },
+          data: {
+            status: 'VALID',
+            objectKey: validatedKey,
+            bytes: validated.bytes,
+            pageCount: validated.pageCount,
+            sha256: validated.sha256,
+          },
         });
-      } else {
-        await tx.order.update({ where: { id: orderId }, data: { quote: Prisma.DbNull } });
-      }
-      return { won: true, superseded: superseded.map((f) => f.objectKey) };
-    }).catch(async (err: unknown) => {
-      await this.deleteQuietly(validatedKey, file.id);
-      throw err;
-    });
+        if (marked.count !== 1) return { won: false, superseded: [] as string[] }; // a concurrent completion won
+        // Any older uploads for this order are superseded; their objects are deleted after commit
+        // (security review L3: marking them DELETED alone left customer PDFs in the bucket).
+        const superseded = await tx.fileAsset.findMany({
+          where: { orderId, kind: 'ORIGINAL', id: { not: file.id }, status: 'VALID' },
+          select: { objectKey: true },
+        });
+        await tx.fileAsset.updateMany({
+          where: { orderId, kind: 'ORIGINAL', id: { not: file.id }, status: 'VALID' },
+          data: { status: 'DELETED', deletedAt: new Date() },
+        });
+        if (quote.ok) {
+          await this.stateMachine.transition(tx, {
+            orderId,
+            to: OrderStatus.AWAITING_PAYMENT,
+            from: OrderStatus.DRAFT,
+            actor,
+            data: { quote: quote.quote, amountPaise: quote.quote.totalPaise },
+          });
+        } else {
+          await tx.order.update({ where: { id: orderId }, data: { quote: Prisma.DbNull } });
+        }
+        return { won: true, superseded: superseded.map((f) => f.objectKey) };
+      })
+      .catch(async (err: unknown) => {
+        await this.deleteQuietly(validatedKey, file.id);
+        throw err;
+      });
 
     // The staging object (customer-writable until its URL expires) is never read again.
     const obsolete = [file.objectKey, ...outcome.superseded];
