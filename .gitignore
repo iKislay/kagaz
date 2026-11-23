@@ -41,3 +41,6 @@ infra/demo.env
 # Shop agent installer output (scripts/build-shop-agent-installer.ps1)
 artifacts/
 .tools/
+
+# Claude Code local tooling (worktrees, preview config) — never commit
+.claude/
