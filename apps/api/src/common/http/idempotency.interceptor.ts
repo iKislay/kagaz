@@ -93,7 +93,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
       mergeMap(async (body: unknown) => {
         await this.prisma.idempotencyRecord.update({
           where: { scope_key: { scope, key } },
-          data: { responseStatus: status, responseBody: toJson(body) },
+          data: { responseStatus: status, responseBody: withoutSignedUrls(toJson(body)) },
         });
         return body;
       }),
@@ -179,6 +179,24 @@ function canonical(value: unknown): unknown {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma Json input
 function toJson(body: unknown): any {
   return body === undefined ? {} : (JSON.parse(JSON.stringify(body ?? null)) ?? {});
+}
+
+/**
+ * Signed URLs are bearer secrets and must never be persisted (invariant 11, security review L2):
+ * a replay gets `null` for them and the client fetches a fresh one (e.g. GET /shop/jobs/:id).
+ */
+const SIGNED_URL_FIELDS = new Set(['previewUrl', 'downloadUrl', 'uploadUrl']);
+export function withoutSignedUrls<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(withoutSignedUrls) as T;
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        k,
+        SIGNED_URL_FIELDS.has(k) && typeof v === 'string' ? null : withoutSignedUrls(v),
+      ]),
+    ) as T;
+  }
+  return value;
 }
 
 function isUniqueViolation(err: unknown): boolean {
