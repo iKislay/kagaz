@@ -12,6 +12,7 @@ import { DomainEvent, DomainEventBus } from '../../common/events/domain-events.j
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { tenantWhere } from '../../common/prisma/tenant-scope.js';
+import { currentSubscriptionWhere } from '../billing/entitlement.js';
 import { type Tx } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
 import { AutoAcceptPolicy, type AutoAcceptResult } from './auto-accept.policy.js';
@@ -149,6 +150,23 @@ export class ApprovalService {
         where: { id: shopId },
         select: { approvalMode: true, autoPaused: true, status: true },
       });
+      // Opening to the public is what Kaggaz's activation (a subscription, ADR-004) unlocks.
+      // Without this, a self-signed-up shop could open itself and collect customers' documents
+      // whenever BILLING_ENFORCED is off (security audit 2026-11-24, finding H-2). Closing or
+      // maintenance is always allowed.
+      if (req.status === 'OPEN' && before.status !== 'OPEN') {
+        const current = await tx.subscription.findFirst({
+          where: { shopId, ...currentSubscriptionWhere(new Date()) },
+          select: { id: true },
+        });
+        if (!current) {
+          throw new AppError(
+            'SUBSCRIPTION_INACTIVE',
+            'Your shop can open once Kaggaz activates your subscription. Contact Kaggaz support.',
+            HttpStatus.CONFLICT,
+          );
+        }
+      }
       const after = await tx.shop.update({
         where: { id: shopId },
         data: {
