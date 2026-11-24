@@ -27,6 +27,37 @@ import { RealtimeModule } from './modules/realtime/realtime.module.js';
 const REQUEST_ID_HEADER = 'x-request-id';
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
 
+const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * CSRF defence in depth (security audit 2026-11-24, L-7): every API body is JSON, so a mutating
+ * request with a body of any other type (an HTML form: urlencoded, multipart, text/plain) is
+ * refused before parsing. Cross-origin JSON needs a CORS preflight, which only PUBLIC_WEB_URL
+ * passes; SameSite=Lax cookies alone don't separate kaggaz.in from other *.kaggaz.in sites.
+ */
+export function requireJsonBodies(req: IncomingMessage, res: ServerResponse, next: () => void) {
+  const length = Number(req.headers['content-length'] ?? 0);
+  const hasBody = length > 0 || req.headers['transfer-encoding'] !== undefined;
+  const type = (req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+  // Payment webhooks carry no cookies and gateways pick their own content type.
+  const url = (req as IncomingMessage & { originalUrl?: string }).originalUrl ?? req.url ?? '';
+  const webhook = url.startsWith('/api/webhooks/');
+  if (MUTATING.has(req.method ?? '') && hasBody && !webhook && type !== 'application/json') {
+    res.statusCode = 415;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(
+      JSON.stringify({
+        error: {
+          code: 'UNSUPPORTED_MEDIA_TYPE',
+          message: 'Request bodies must be application/json',
+        },
+      }),
+    );
+    return;
+  }
+  next();
+}
+
 @Module({
   imports: [
     ConfigModule,
@@ -91,6 +122,7 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
 export class AppModule implements NestModule {
   /** Every request gets its own tenant scope; DeviceAuthGuard binds it to the device's shop (P4.1). */
   configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(requireJsonBodies).forRoutes('*');
     consumer
       .apply((_req: unknown, _res: unknown, next: () => void) => runInTenantScope(next))
       .forRoutes('*');

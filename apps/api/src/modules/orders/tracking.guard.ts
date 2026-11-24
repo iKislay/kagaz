@@ -39,7 +39,8 @@ export class TrackingGuard implements CanActivate {
         ? readCookie(req.headers.cookie, trackingCookieName(orderId))
         : undefined);
 
-    const uuid = /^[0-9a-f-]{36}$/i;
+    // Strict UUID: a 36-char string of dashes used to reach Postgres' uuid cast (500).
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (typeof orderId !== 'string' || !uuid.test(orderId)) throw notFound();
     if (token && (await this.orders.findByTrackingToken(orderId, token))) return true;
     const session = await this.sessions.fromRequest(req);

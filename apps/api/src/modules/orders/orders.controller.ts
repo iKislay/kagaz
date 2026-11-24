@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpStatus,
   Inject,
   Param,
   Patch,
@@ -30,7 +31,9 @@ import { type Actor } from '../../common/actor.js';
 import { CustomerSessionService } from '../../common/auth/customer-session.js';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
+import { AppError } from '../../common/http/api-exception.filter.js';
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
+import { LoginRateLimiter } from '../identity/login-rate-limiter.js';
 import { OrdersService } from './orders.service.js';
 import { TrackingGuard } from './tracking.guard.js';
 
@@ -39,11 +42,17 @@ const GUEST: Actor = { type: 'CUSTOMER', id: null };
 
 @Controller('orders')
 export class OrdersController {
+  /** shortcut: in-memory (one API instance), like the login limiters. */
+  private readonly createLimiter: LoginRateLimiter;
+
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly orders: OrdersService,
     private readonly sessions: CustomerSessionService,
-  ) {}
+  ) {
+    // `fail` returns true once the count reaches the max, so allow max + 1 events.
+    this.createLimiter = new LoginRateLimiter(config.ORDER_CREATE_LIMIT_PER_IP_HOUR + 1, 3_600_000);
+  }
 
   @Post()
   async create(
@@ -51,6 +60,15 @@ export class OrdersController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<CreateOrderResponse> {
+    // Unauthenticated and, with pay-at-counter, free to confirm: throttle per client IP (M-1).
+    const ip = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
+    if (this.createLimiter.fail(ip)) {
+      throw new AppError(
+        'RATE_LIMITED',
+        'Too many new orders from this network. Please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
     // Signed-in customers (P2.2) own the order; guests rely on the tracking token alone.
     const session = await this.sessions.fromRequest(req);
     const actor: Actor = session ? { type: 'CUSTOMER', id: session.customerId } : GUEST;

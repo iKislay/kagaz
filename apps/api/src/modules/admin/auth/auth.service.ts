@@ -24,6 +24,8 @@ import {
 export class AdminAuthService {
   private readonly logger = new Logger(AdminAuthService.name);
   private readonly limiter = new LoginRateLimiter();
+  /** Per client IP across logins: 20 failures / 10 min (security review L5). */
+  private readonly ipLimiter = new LoginRateLimiter(20);
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -33,7 +35,7 @@ export class AdminAuthService {
   async login(body: AdminLoginRequest, ip: string) {
     const login = (body.login ?? body.email ?? '').trim();
     const key = `${ip}|${login.toLowerCase()}`;
-    if (this.limiter.isBlocked(key)) throw rateLimited();
+    if (this.limiter.isBlocked(key) || this.ipLimiter.isBlocked(ip)) throw rateLimited();
 
     // /superadmin is for Kaggaz staff only: email logins, ADMIN accounts. Shops use the app.
     const user = login.includes('@')
@@ -55,6 +57,7 @@ export class AdminAuthService {
 
     if (!user || !staff) {
       const blocked = this.limiter.fail(key);
+      this.ipLimiter.fail(ip);
       await this.audit('ADMIN_LOGIN_FAILED', user?.id ?? null, ip, {
         login,
         reason: !user ? 'unknown_login' : !passwordOk ? 'wrong_password' : 'no_staff_role',

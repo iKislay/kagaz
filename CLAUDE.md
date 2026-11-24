@@ -60,6 +60,7 @@ dotnet test  apps/shop-agent/tests/Kagaz.ShopAgent.Tests/Kagaz.ShopAgent.Tests.c
 ```
 
 Scripts default to `http://localhost:$API_PORT/api` (4000 = the live printer server): pass `--api` when testing elsewhere.
+`POST /api/orders` is limited per client IP (`ORDER_CREATE_LIMIT_PER_IP_HOUR`, default 60; `.env.example` sets 1000 so `load:orders` works locally).
 Shop app `appsettings.json` keys: `ApiBaseUrl`, `SafetyPollSeconds`, `TokenRotationDays`, `RealtimeEnabled`, `UpdateFeedUrl`.
 
 Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/SeaweedFS aren't running), `GET /api/config` (drives the web DEMO banner).
@@ -177,3 +178,4 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 - 2026-11-12: shop subscriptions per connected printer, manual payment ledger in /superadmin → Billing ([ADR-004](docs/decisions/ADR-004-subscriptions.md)); enforcement behind `BILLING_ENFORCED`.
 - 2026-11-14: shop address/location are set by the owner in the shop app's first-run setup (never typed by superadmin); `shops.address` nullable, `shops.onboarded_at`. Shop app 0.5.0 targets `net10.0-windows10.0.19041.0`. Installer downloads stream from the API (no R2 redirect).
 - 2026-11-14: opening hours removed (the `opening_hours` column stays, unused). The shop sets Open/Closed/Maintenance itself via `PATCH /api/shop/mode {status}` from the shop app's Settings; the app's approval is just Manual | Auto (a paused Auto shows as Manual).
+- 2026-11-24: security audit ([SECURITY_AUDIT_2026-11-24](docs/security/SECURITY_AUDIT_2026-11-24.md)): uploads are copied to a server-only key after validation; a shop opens (`PATCH /shop/mode {status: OPEN}`) only with a current subscription; mutating API requests must be JSON (415 otherwise; webhooks exempt).

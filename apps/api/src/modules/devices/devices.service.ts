@@ -81,9 +81,21 @@ export class DevicesService {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.user.findUnique({
         where: { phone: req.phone },
-        select: { kind: true, _count: { select: { shopMemberships: true } } },
+        select: {
+          kind: true,
+          passwordHash: true,
+          _count: { select: { shopMemberships: true } },
+        },
       });
-      if (existing && (existing.kind === 'ADMIN' || existing._count.shopMemberships > 0)) {
+      // Never take over an existing login: an unauthenticated sign-up must not reset the password
+      // of an admin, a shop member or a former operator (security audit 2026-11-24, M-3). Only a
+      // password-less customer account is adopted as the owner login.
+      if (
+        existing &&
+        (existing.kind === 'ADMIN' ||
+          existing._count.shopMemberships > 0 ||
+          existing.passwordHash !== null)
+      ) {
         throw new AppError(
           'PHONE_IN_USE',
           'This mobile number already has a Kaggaz account — sign in instead',
