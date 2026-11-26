@@ -146,4 +146,14 @@ public class JobTabMappingTests
 
         Assert.Equal(["a", "b"], JobsViewModel.ForTab(jobs, "Queue").Select(j => j.OrderId));
     }
+
+    [Theory]
+    [InlineData(false, null, "Black & white")]
+    [InlineData(true, null, "Colour")]
+    [InlineData(true, " 2, 5-6 ", "Colour p. 2, 5-6, rest B/W")]
+    public void Display_mode_names_mixed_colour(bool colour, string? colourPages, string expected)
+    {
+        var item = new JobItem(Job("QUEUED") with { Options = new ShopPrintOptions(null, 1, colour, false, "A4", colourPages) });
+        Assert.Equal(expected, item.DisplayMode);
+    }
 }

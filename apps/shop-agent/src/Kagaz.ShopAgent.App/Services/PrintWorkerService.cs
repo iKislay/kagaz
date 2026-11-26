@@ -231,7 +231,8 @@ public sealed class PrintWorkerService : BackgroundService
             try
             {
                 submission = await _engine.PrintAsync(pdfPath,
-                    new PrintRequest(lease.PrinterName, lease.Settings.Colour, lease.Settings.Duplex, lease.Settings.PaperSize, lease.DocumentName),
+                    new PrintRequest(lease.PrinterName, lease.Settings.Colour, lease.Settings.Duplex, lease.Settings.PaperSize, lease.DocumentName,
+                        lease.Settings.GreyscalePages),
                     CancellationToken.None);
             }
             catch (PrintEngineException ex)

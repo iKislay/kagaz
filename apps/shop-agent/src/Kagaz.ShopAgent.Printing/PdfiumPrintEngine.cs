@@ -111,7 +111,7 @@ public sealed class PdfiumPrintEngine : IPrintEngine
         int pageIndex = 0;
         printDoc.PrintPage += (_, args) =>
         {
-            RenderPage(args, docReader, pageIndex, request.Colour);
+            RenderPage(args, docReader, pageIndex, request.PrintsInColour(pageIndex));
             pageIndex++;
             args.HasMorePages = pageIndex < pageCount;
         };

@@ -12,4 +12,18 @@ namespace Kagaz.ShopAgent.Printing;
 /// Document name used for the spooler job. Must be <c>KAGAZ-&lt;publicRef&gt;-A&lt;attempt&gt;</c>
 /// so the spooler job can be located during reconciliation.
 /// </param>
-public record PrintRequest(string PrinterName, bool Colour, bool Duplex, string PaperSize, string DocumentName);
+/// <param name="GreyscalePages">
+/// 0-based pages to render in greyscale on a colour job (mixed-colour orders); null or empty = none.
+/// </param>
+public record PrintRequest(
+    string PrinterName,
+    bool Colour,
+    bool Duplex,
+    string PaperSize,
+    string DocumentName,
+    int[]? GreyscalePages = null)
+{
+    /// <summary>Whether the 0-based packet page <paramref name="pageIndex"/> renders in colour.</summary>
+    public bool PrintsInColour(int pageIndex) =>
+        Colour && (GreyscalePages is null || Array.IndexOf(GreyscalePages, pageIndex) < 0);
+}

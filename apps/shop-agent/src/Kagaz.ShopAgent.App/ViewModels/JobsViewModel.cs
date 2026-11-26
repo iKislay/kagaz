@@ -45,7 +45,9 @@ public sealed partial class JobItem : ObservableObject
 
     public string DisplayPages => ShopJob.PageCount is int pages ? $"{pages} page{(pages == 1 ? "" : "s")}" : "—";
     public string DisplayCopies => $"{Options.Copies} cop{(Options.Copies == 1 ? "y" : "ies")}";
-    public string DisplayMode => Options.Colour ? "Colour" : "Black & white";
+    public string DisplayMode => !Options.Colour ? "Black & white"
+        : string.IsNullOrWhiteSpace(Options.ColourPages) ? "Colour"
+        : $"Colour p. {Options.ColourPages.Trim()}, rest B/W";
     public string DisplaySides => Options.Duplex ? "Double-sided" : "Single-sided";
     public string DisplayRange => string.IsNullOrWhiteSpace(Options.PageRange) ? "All pages" : $"Pages {Options.PageRange}";
     public string DisplayPrintedSides => ShopJob.PrintedSides is int sides ? $"{sides} printed sides" : "—";

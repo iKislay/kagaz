@@ -166,7 +166,8 @@ public record ShopPrinter(
 
 // ─── Jobs ───
 
-public record ShopPrintOptions(string? PageRange, int Copies, bool Colour, bool Duplex, string PaperSize);
+/// <param name="ColourPages">Colour orders only: the pages printed in colour, the rest B/W; null = all colour.</param>
+public record ShopPrintOptions(string? PageRange, int Copies, bool Colour, bool Duplex, string PaperSize, string? ColourPages = null);
 
 public record ShopPrintJob(string Id, int Attempt, string Status, string PrinterId, int? SpoolerJobId, string? Error);
 
@@ -201,7 +202,8 @@ public record AcceptJobRequest(string? PrinterId);
 
 public record RejectJobRequest(string ReasonCode, string? Note);
 
-public record LeaseSettings(bool Colour, bool Duplex, string PaperSize);
+/// <param name="GreyscalePages">0-based packet pages a mixed-colour order prints in B/W (null on older APIs).</param>
+public record LeaseSettings(bool Colour, bool Duplex, string PaperSize, int[]? GreyscalePages = null);
 
 public record LeaseResponse(
     string PrintJobId,
