@@ -151,7 +151,7 @@ function cleanOptions(options: PrintOptions): PrintOptions {
  */
 export function uploadToSignedUrl(
   upload: UploadUrlResponse,
-  file: File,
+  file: Blob,
   onProgress: (fraction: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
