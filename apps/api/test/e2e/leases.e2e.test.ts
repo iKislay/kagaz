@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { type HeartbeatResponse, type ShopJob } from '@kagaz/shared';
+import { type HeartbeatResponse, type LeaseResponse, type ShopJob } from '@kagaz/shared';
 import { DeviceHealthService } from '../../src/modules/devices/device-health.service.js';
 import { PrintLeaseService } from '../../src/modules/printing/print-leases.service.js';
+import { MIXED_COLOUR_MIN_AGENT_VERSION } from '../../src/modules/shop/print-jobs.service.js';
 import { type Harness, createHarness } from './harness.js';
 import {
   acceptedOrder,
@@ -319,5 +320,38 @@ describe('heartbeat + device health (P4.4, contract §1)', () => {
     const list = (await h.http().get('/api/shop/jobs').set(s.auth).expect(200)).body
       .jobs as ShopJob[];
     expect(list.find((j) => j.orderId === created.order.id)?.status).toBe('PRINTING');
+  });
+});
+
+describe('mixed-colour lease', () => {
+  it('lists the B/W packet pages and refuses shop apps that would print them in colour', async () => {
+    const s = await pairedShop(h, { colour: true });
+    const created = await paidOrder(h, s.shop.id, 3, {
+      copies: 1,
+      colour: true,
+      colourPages: '2',
+      duplex: false,
+      paperSize: 'A4',
+    });
+    const job = (await s.human(`jobs/${created.order.id}/accept`).expect(200)).body as ShopJob;
+    const printJobId = job.printJob!.id;
+
+    const old = await s.agent(`print-jobs/${printJobId}/lease`, {}, { 'x-agent-version': '0.6.0' });
+    expect(old.status).toBe(426);
+    expect(old.body.error.code).toBe('AGENT_UPGRADE_REQUIRED');
+    const untouched = await h.prisma.printJob.findUniqueOrThrow({ where: { id: printJobId } });
+    expect(untouched.status).toBe('READY');
+
+    const lease = (
+      await s
+        .agent(
+          `print-jobs/${printJobId}/lease`,
+          {},
+          { 'x-agent-version': MIXED_COLOUR_MIN_AGENT_VERSION },
+        )
+        .expect(200)
+    ).body as LeaseResponse;
+    // Packet: page 1, page 2, page 3, slip → pages 1 and 3 and the slip print B/W.
+    expect(lease.settings).toMatchObject({ colour: true, greyscalePages: [0, 2, 3] });
   });
 });

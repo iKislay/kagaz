@@ -310,7 +310,13 @@ export const LeaseResponseSchema = z.object({
   /** Use as the Windows print document name: KAGAZ-<publicRef>-A<attempt>. */
   documentName: z.string(),
   printerName: z.string(),
-  settings: z.object({ colour: z.boolean(), duplex: z.boolean(), paperSize: z.literal('A4') }),
+  settings: z.object({
+    colour: z.boolean(),
+    duplex: z.boolean(),
+    paperSize: z.literal('A4'),
+    /** 0-based packet pages to print in greyscale on a colour job (mixed-colour orders). */
+    greyscalePages: z.array(z.int().nonnegative()),
+  }),
   downloadUrl: z.string(),
   downloadExpiresAt: z.string(),
   /** SHA-256 of the packet; refuse to print on mismatch. */

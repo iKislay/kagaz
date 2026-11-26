@@ -156,7 +156,7 @@ describe('vertical slice lifecycle (T07, T10, T15)', () => {
     expect(lease).toMatchObject({
       printerName: expect.stringContaining('HP LaserJet'),
       documentName: `KAGAZ-${created.order.publicRef}-A1`,
-      settings: { colour: false, duplex: true, paperSize: 'A4' },
+      settings: { colour: false, duplex: true, paperSize: 'A4', greyscalePages: [] },
       pageCount: 9, // (3 + spacer) × 2 + slip
     });
     const packet = Buffer.from(await (await fetch(lease.downloadUrl)).arrayBuffer());

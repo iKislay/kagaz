@@ -2,11 +2,14 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   type LeaseResponse,
   OrderStatus,
+  type PrintOptions,
   type PrintStatusReport,
   type ShopJob,
   printDocumentName,
+  resolvePageSelection,
 } from '@kagaz/shared';
 import { SYSTEM_ACTOR } from '../../common/actor.js';
+import { isUpgradeRequired } from '../../common/auth/agent-version.guard.js';
 import { type DeviceContext, deviceActor } from '../../common/auth/device-auth.guard.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
@@ -14,6 +17,7 @@ import { type PrintJobStatus, type Prisma } from '../../generated/prisma/client.
 import { StorageService } from '../files/storage.service.js';
 import { OrderStateMachine } from '../orders/order-state-machine.js';
 import { parseOptions } from '../orders/order-view.js';
+import { greyscalePacketPages } from '../printing/packet-builder.js';
 import {
   LEASE_EXPIRED_REASON,
   LEASE_HOLDING,
@@ -31,6 +35,9 @@ const REPORT_FROM: Record<PrintStatusReport['status'], PrintJobStatus[]> = {
   UNCERTAIN: ['LEASED', 'SUBMITTED'],
 };
 
+/** First shop app that renders `settings.greyscalePages` (per-page colour). */
+export const MIXED_COLOUR_MIN_AGENT_VERSION = '0.7.0';
+
 /**
  * Printer leases and print progress (Appendix A.2, CLAUDE.md invariant 8):
  * one active Kaggaz job per physical printer, FIFO per printer, an attempt is never
@@ -45,17 +52,41 @@ export class PrintJobsService {
     private readonly leases: PrintLeaseService,
   ) {}
 
-  async lease(device: DeviceContext, printJobId: string): Promise<LeaseResponse> {
+  /**
+   * @param agentVersion the agent's `X-Agent-Version`; a mixed-colour job is refused (426) to
+   *   shop apps that would ignore `greyscalePages` and print every page in colour.
+   */
+  async lease(
+    device: DeviceContext,
+    printJobId: string,
+    agentVersion?: string,
+  ): Promise<LeaseResponse> {
     const now = new Date();
     const leaseUntil = this.leases.leaseUntil(now);
 
-    const job = await this.prisma.$transaction(async (tx) => {
+    const { job, greyscalePages } = await this.prisma.$transaction(async (tx) => {
       const job = await findShopPrintJob(tx, device.shopId, printJobId);
+      const greyscalePages = await this.greyscalePages(
+        tx,
+        job.orderId,
+        parseOptions(job.order.options),
+      );
+      if (
+        greyscalePages.length > 0 &&
+        isUpgradeRequired(agentVersion, MIXED_COLOUR_MIN_AGENT_VERSION)
+      ) {
+        throw new AppError(
+          'AGENT_UPGRADE_REQUIRED',
+          `This order prints some pages in colour and some in B/W; please update the Kaggaz shop app to ${MIXED_COLOUR_MIN_AGENT_VERSION} or later`,
+          426 as HttpStatus, // 426 Upgrade Required is missing from Nest's HttpStatus enum
+          { minAgentVersion: MIXED_COLOUR_MIN_AGENT_VERSION, appVersion: agentVersion ?? null },
+        );
+      }
 
       // Idempotent re-lease by the holder (e.g. it lost the response): renew only.
       if (job.status === 'LEASED' && job.leasedByDeviceId === device.deviceId) {
         await this.leases.renew(tx, device, [job.id], leaseUntil);
-        return job;
+        return { job, greyscalePages };
       }
       if (job.status !== 'READY') {
         throw new AppError(
@@ -109,7 +140,7 @@ export class PrintJobsService {
         auditAction: 'print.started',
         metadata: { printJobId: job.id, attempt: job.attempt, printerId: printer.id },
       });
-      return job;
+      return { job, greyscalePages };
     });
 
     if (!job.packetFile || !job.checksum || job.packetFile.deletedAt) {
@@ -124,13 +155,31 @@ export class PrintJobsService {
       attempt: job.attempt,
       documentName: printDocumentName(job.order.publicRef, job.attempt),
       printerName: job.printer.printerName,
-      settings: { colour: options.colour, duplex: options.duplex, paperSize: 'A4' },
+      settings: { colour: options.colour, duplex: options.duplex, paperSize: 'A4', greyscalePages },
       downloadUrl: download.url,
       downloadExpiresAt: download.expiresAt.toISOString(),
       sha256: job.checksum,
       pageCount: job.packetFile.pageCount ?? 0,
       leaseUntil: leaseUntil.toISOString(),
     };
+  }
+
+  /** Packet pages a mixed-colour order prints in B/W (empty for single-mode orders). */
+  private async greyscalePages(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    options: PrintOptions,
+  ): Promise<number[]> {
+    if (!options.colour || !options.colourPages?.trim()) return [];
+    const original = await tx.fileAsset.findFirst({
+      where: { orderId, kind: 'ORIGINAL', status: 'VALID' },
+      select: { pageCount: true },
+    });
+    if (!original?.pageCount) {
+      throw new AppError('FILE_MISSING', 'The customer file is no longer available', 409);
+    }
+    const { selected, colour } = resolvePageSelection(options, original.pageCount);
+    return greyscalePacketPages(selected, colour, options.copies, options.duplex);
   }
 
   /**

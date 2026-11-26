@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Inject,
   Param,
@@ -47,7 +48,7 @@ import {
   type UpdateShopProfile,
   UpdateShopProfileSchema,
 } from '@kagaz/shared';
-import { AgentVersionGuard } from '../../common/auth/agent-version.guard.js';
+import { AGENT_VERSION_HEADER, AgentVersionGuard } from '../../common/auth/agent-version.guard.js';
 import {
   CurrentDevice,
   DeviceAuthGuard,
@@ -260,8 +261,9 @@ export class ShopController {
   lease(
     @CurrentDevice() device: DeviceContext,
     @Param('id', Uuid) id: string,
+    @Headers(AGENT_VERSION_HEADER) agentVersion?: string,
   ): Promise<LeaseResponse> {
-    return this.printJobs.lease(device, id);
+    return this.printJobs.lease(device, id, agentVersion);
   }
 
   @Post('print-jobs/:id/status')
