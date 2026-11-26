@@ -2,7 +2,12 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { type AdminOrderDetail, DEMO_REFUND_NOTICE, formatPickupCode } from '@kagaz/shared';
+import {
+  type AdminOrderDetail,
+  DEMO_REFUND_NOTICE,
+  colourModeLabel,
+  formatPickupCode,
+} from '@kagaz/shared';
 import { Pill } from '@/components/ui';
 import { adminApi } from '../../_lib/api';
 import { fmtDateTime, humanize, orderTone, rupees } from '../../_lib/format';
@@ -96,7 +101,7 @@ function Detail({ o }: { o: AdminOrderDetail }) {
               ['Amount', rupees(o.amountPaise)],
               [
                 'Options',
-                `${opts.copies} × ${opts.colour ? 'Colour' : 'B/W'}, ${opts.duplex ? 'double-sided' : 'single-sided'}, ${opts.paperSize}${opts.pageRange ? `, pages ${opts.pageRange}` : ''}`,
+                `${opts.copies} × ${colourModeLabel(opts)}, ${opts.duplex ? 'double-sided' : 'single-sided'}, ${opts.paperSize}${opts.pageRange ? `, pages ${opts.pageRange}` : ''}`,
               ],
               ['Customer', o.customerPhoneMasked ?? '—'],
               ['Created', fmtDateTime(o.createdAt)],

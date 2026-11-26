@@ -12,7 +12,8 @@ export interface SlipData {
   shopName: string;
   pages: number;
   copies: number;
-  colour: boolean;
+  /** e.g. "B/W" or "Colour p. 2, rest B/W" (colourModeLabel). */
+  colourMode: string;
   duplex: boolean;
   printedAt: Date;
   isDemo: boolean;
@@ -75,7 +76,7 @@ export async function drawPickupSlip(doc: PDFDocument, data: SlipData): Promise<
     [
       'Job',
       `${data.pages} page${data.pages === 1 ? '' : 's'} x ${data.copies} cop${data.copies === 1 ? 'y' : 'ies'}` +
-        ` - ${data.colour ? 'Colour' : 'B/W'} - ${data.duplex ? 'Double-sided' : 'Single-sided'}`,
+        ` - ${data.colourMode} - ${data.duplex ? 'Double-sided' : 'Single-sided'}`,
     ],
     ['Printed', formatIst(data.printedAt)],
   ];

@@ -6,6 +6,7 @@ import {
   DEMO_REFUND_NOTICE,
   OrderStatus,
   type PublicOrder,
+  colourModeLabel,
   formatPaise,
   formatPickupDate,
 } from '@kagaz/shared';
@@ -103,7 +104,7 @@ export function OrderTracker({ orderId }: { orderId: string }) {
         </Row>
         <Row label="Print">
           <span className="text-[15px] text-text-secondary">
-            {order.options.colour ? 'Colour' : 'B/W'} ·{' '}
+            {colourModeLabel(order.options)} ·{' '}
             {order.options.duplex ? 'Double-sided' : 'Single-sided'} · A4
           </span>
         </Row>

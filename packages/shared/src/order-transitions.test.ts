@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { OrderStatus } from './enums.js';
 import { ORDER_TRANSITIONS, TERMINAL_ORDER_STATUSES, canTransition } from './order-transitions.js';
-import { PrintOptionsSchema } from './schemas.js';
+import { PrintOptionsSchema, colourModeLabel } from './schemas.js';
 
 describe('order transitions', () => {
   it('covers every status', () => {
@@ -65,5 +65,15 @@ describe('PrintOptionsSchema', () => {
       PrintOptionsSchema.parse({ ...base, colour: true, colourPages: '1-2' }).colourPages,
     ).toBe('1-2');
     expect(() => PrintOptionsSchema.parse({ ...base, colour: false, colourPages: '1' })).toThrow();
+  });
+});
+
+describe('colourModeLabel', () => {
+  it('names B/W, colour and mixed orders', () => {
+    expect(colourModeLabel({ colour: false })).toBe('B/W');
+    expect(colourModeLabel({ colour: true })).toBe('Colour');
+    expect(colourModeLabel({ colour: true, colourPages: '2, 5-6' })).toBe(
+      'Colour p. 2, 5-6, rest B/W',
+    );
   });
 });

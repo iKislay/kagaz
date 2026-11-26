@@ -26,6 +26,13 @@ export const PrintOptionsSchema = z
   });
 export type PrintOptions = z.infer<typeof PrintOptionsSchema>;
 
+/** The colour mode in words: "B/W", "Colour", or "Colour p. 2, 5-6, rest B/W" for a mixed order. */
+export function colourModeLabel(options: Pick<PrintOptions, 'colour' | 'colourPages'>): string {
+  if (!options.colour) return 'B/W';
+  const pages = options.colourPages?.trim();
+  return pages ? `Colour p. ${pages}, rest B/W` : 'Colour';
+}
+
 /** Server-calculated quote; all money in integer paise (PRD §8.2). */
 export const QuoteSchema = z.object({
   selectedPages: z.int().nonnegative(),

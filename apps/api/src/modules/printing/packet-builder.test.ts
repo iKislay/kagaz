@@ -11,7 +11,7 @@ const slip: SlipData = {
   shopName: 'Kaggaz Demo Shop A - College Road',
   pages: 0,
   copies: 0,
-  colour: false,
+  colourMode: 'B/W',
   duplex: false,
   printedAt: new Date('2026-11-05T10:00:00Z'),
   isDemo: true,

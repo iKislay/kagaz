@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { type PrintOptions, parsePageRange } from '@kagaz/shared';
+import { type PrintOptions, colourModeLabel, parsePageRange } from '@kagaz/shared';
 import { APP_CONFIG } from '../../common/config/config.module.js';
 import { type AppConfig } from '../../common/config/config.schema.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
@@ -66,7 +66,7 @@ export class PrintPreparationService {
         shopName: order.shop.name,
         pages: parsePageRange(options.pageRange, original.pageCount).length,
         copies: options.copies,
-        colour: options.colour,
+        colourMode: colourModeLabel(options),
         duplex: options.duplex,
         printedAt: new Date(),
         isDemo: order.shop.isDemo,
