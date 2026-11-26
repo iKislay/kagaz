@@ -58,4 +58,12 @@ describe('PrintOptionsSchema', () => {
       PrintOptionsSchema.parse({ copies: 1, colour: false, duplex: false, paperSize: 'A3' }),
     ).toThrow();
   });
+
+  it('accepts colourPages only on colour orders', () => {
+    const base = { copies: 1, duplex: false };
+    expect(
+      PrintOptionsSchema.parse({ ...base, colour: true, colourPages: '1-2' }).colourPages,
+    ).toBe('1-2');
+    expect(() => PrintOptionsSchema.parse({ ...base, colour: false, colourPages: '1' })).toThrow();
+  });
 });

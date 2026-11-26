@@ -10,13 +10,20 @@ export const AppEnvSchema = z.enum(enumValues(AppEnv));
 export const PaymentModeSchema = z.enum(enumValues(PaymentMode));
 
 /** Customer-selected print options (PRD FR-CUST-06). Limits are enforced again server-side. */
-export const PrintOptionsSchema = z.strictObject({
-  pageRange: z.string().max(200).optional(),
-  copies: z.int().min(1).max(1000),
-  colour: z.boolean(),
-  duplex: z.boolean(),
-  paperSize: z.enum(PAPER_SIZES).default('A4'),
-});
+export const PrintOptionsSchema = z
+  .strictObject({
+    pageRange: z.string().max(200).optional(),
+    copies: z.int().min(1).max(1000),
+    colour: z.boolean(),
+    /** Colour orders only: the selected pages to print in colour, the rest print B/W. Absent = all colour. */
+    colourPages: z.string().max(200).optional(),
+    duplex: z.boolean(),
+    paperSize: z.enum(PAPER_SIZES).default('A4'),
+  })
+  .refine((o) => o.colour || !o.colourPages, {
+    message: 'colourPages needs colour: true',
+    path: ['colourPages'],
+  });
 export type PrintOptions = z.infer<typeof PrintOptionsSchema>;
 
 /** Server-calculated quote; all money in integer paise (PRD §8.2). */
@@ -25,7 +32,15 @@ export const QuoteSchema = z.object({
   copies: z.int().positive(),
   printedSides: z.int().nonnegative(),
   sheets: z.int().nonnegative(),
+  /** Per-side rate; for a mixed-colour order, the B/W rate (colour sides are in `mixedColour`). */
   ratePaise: z.int().nonnegative(),
+  /** Present only when some pages print in colour and others B/W. */
+  mixedColour: z
+    .object({
+      colourSides: z.int().nonnegative(),
+      colourRatePaise: z.int().nonnegative(),
+    })
+    .optional(),
   subtotalPaise: z.int().nonnegative(),
   minimumChargeApplied: z.boolean(),
   totalPaise: z.int().nonnegative(),

@@ -46,3 +46,44 @@ export function parsePageRange(input: string | null | undefined, pageCount: numb
 
   return [...pages].sort((a, b) => a - b);
 }
+
+/** Inverse of {@link parsePageRange}: [5, 1, 2, 3, 3] → "1-3, 5". An empty list gives "". */
+export function formatPageRange(pages: Iterable<number>): string {
+  const sorted = [...new Set(pages)].sort((a, b) => a - b);
+  const segments: string[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const start = sorted[i]!;
+    while (i + 1 < sorted.length && sorted[i + 1] === sorted[i]! + 1) i++;
+    segments.push(sorted[i] === start ? `${start}` : `${start}-${sorted[i]}`);
+  }
+  return segments.join(', ');
+}
+
+export interface PageSelection {
+  /** Pages to print, 1-based ascending. */
+  selected: number[];
+  /** The selected pages printed in colour; every other selected page prints black & white. */
+  colour: ReadonlySet<number>;
+}
+
+/**
+ * Which pages print, and which of them in colour. A colour order without `colourPages` prints
+ * every selected page in colour; a B/W order prints none. `colourPages` may only name selected
+ * pages. Throws PageRangeError on an invalid range.
+ */
+export function resolvePageSelection(
+  options: { pageRange?: string | undefined; colour: boolean; colourPages?: string | undefined },
+  pageCount: number,
+): PageSelection {
+  const selected = parsePageRange(options.pageRange, pageCount);
+  if (!options.colour) return { selected, colour: new Set() };
+  if (!options.colourPages?.trim()) return { selected, colour: new Set(selected) };
+
+  const chosen = new Set(selected);
+  const colour = parsePageRange(options.colourPages, pageCount);
+  const stray = colour.find((p) => !chosen.has(p));
+  if (stray !== undefined) {
+    throw new PageRangeError(`Colour page ${stray} is not one of the pages to print`);
+  }
+  return { selected, colour: new Set(colour) };
+}
