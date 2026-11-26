@@ -286,6 +286,18 @@ export const ShopJobSchema = z.object({
 });
 export type ShopJob = z.infer<typeof ShopJobSchema>;
 
+const EarningsTotalSchema = z.object({ orders: z.int(), amountPaise: z.int() });
+
+/**
+ * GET /api/shop/earnings — value of the shop's printed orders (ready or collected), by pickup
+ * business date (Asia/Kolkata): today and this calendar month so far.
+ */
+export const ShopEarningsSchema = z.object({
+  today: EarningsTotalSchema,
+  month: EarningsTotalSchema,
+});
+export type ShopEarnings = z.infer<typeof ShopEarningsSchema>;
+
 export const ShopJobDetailSchema = ShopJobSchema.extend({
   /** Short-lived signed URL of the customer's original PDF (for preview). */
   previewUrl: z.string().nullable(),

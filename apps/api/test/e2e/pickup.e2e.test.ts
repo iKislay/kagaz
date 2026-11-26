@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { type LeaseResponse, type ShopJob } from '@kagaz/shared';
+import { type LeaseResponse, type ShopEarnings, type ShopJob } from '@kagaz/shared';
 import { Clock } from '../../src/common/clock.js';
 import { makePdf } from '../fixtures/pdfs.js';
 import { type Harness, createHarness, createOrder, uploadPdf } from './harness.js';
@@ -10,6 +10,7 @@ import {
   pairedShop,
   paidOrder,
   printingOrder,
+  readyOrder,
 } from './shop-helpers.js';
 
 /** ADR-002: daily pickup number per shop, assigned at payment; printing finished = ready. */
@@ -212,5 +213,30 @@ describe('ADR-002: printing finished = ready', () => {
     await s.human(`jobs/${created.order.id}/ready`, { confirmed: true }).expect(404);
     await s.human('pickups/verify', { code: 'ABCD2345' }).expect(404);
     expect((await customerView(h, created)).status).toBe('PRINTING');
+  });
+});
+
+describe('shop earnings', () => {
+  it('sums printed orders of today and this month (Asia/Kolkata), for this shop only', async () => {
+    const s = await pairedShop(h);
+    const other = await pairedShop(h);
+    const amount = async (order: Awaited<ReturnType<typeof readyOrder>>) =>
+      (await customerView(h, order.created)).amountPaise!;
+
+    setNow('2026-10-31T10:00:00Z'); // 31 Oct in Kolkata: last month
+    await readyOrder(h, s);
+    setNow('2026-11-02T06:00:00Z');
+    const earlier = await readyOrder(h, s);
+    setNow('2026-11-20T06:00:00Z');
+    const today = await readyOrder(h, s);
+    await acceptedOrder(h, s); // paid but not printed yet: not earned
+    await readyOrder(h, other);
+
+    const earnings = (await h.http().get('/api/shop/earnings').set(s.auth).expect(200))
+      .body as ShopEarnings;
+    expect(earnings).toEqual({
+      today: { orders: 1, amountPaise: await amount(today) },
+      month: { orders: 2, amountPaise: (await amount(today)) + (await amount(earlier)) },
+    });
   });
 });

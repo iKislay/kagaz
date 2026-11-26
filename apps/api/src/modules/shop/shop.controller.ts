@@ -29,6 +29,7 @@ import {
   RejectJobRequestSchema,
   type ResolveJobRequest,
   ResolveJobRequestSchema,
+  type ShopEarnings,
   type ShopJob,
   type ShopJobDetail,
   type ShopMemberList,
@@ -210,6 +211,11 @@ export class ShopController {
     @Query('status', StatusList) status?: OrderStatus[],
   ): Promise<{ jobs: ShopJob[] }> {
     return { jobs: await this.jobs.list(device, status) };
+  }
+
+  @Get('earnings')
+  earnings(@CurrentDevice() device: DeviceContext): Promise<ShopEarnings> {
+    return this.jobs.earnings(device);
   }
 
   @Get('jobs/:orderId')

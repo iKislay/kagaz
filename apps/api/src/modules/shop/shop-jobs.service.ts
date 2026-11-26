@@ -4,10 +4,13 @@ import {
   type RejectJobRequest,
   ResolveAction,
   type ResolveJobRequest,
+  type ShopEarnings,
   type ShopJob,
   type ShopJobDetail,
+  kolkataBusinessDate,
 } from '@kagaz/shared';
 import { type Actor } from '../../common/actor.js';
+import { Clock } from '../../common/clock.js';
 import { type DeviceContext, deviceActor } from '../../common/auth/device-auth.guard.js';
 import { AppError } from '../../common/http/api-exception.filter.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
@@ -16,6 +19,7 @@ import { StorageService } from '../files/storage.service.js';
 import { OrderStateMachine, type Tx } from '../orders/order-state-machine.js';
 import { RefundsService } from '../payments/refunds.service.js';
 import { OrderAcceptanceService } from '../approval/order-acceptance.service.js';
+import { pickupDateValue } from '../pickup/pickup-number.service.js';
 import { PrintLeaseService, releaseLease } from '../printing/print-leases.service.js';
 import { SHOP_JOB_INCLUDE, toShopJob } from './shop-job-view.js';
 import { findShopOrder } from './shop-scope.js';
@@ -54,6 +58,7 @@ export class ShopJobsService {
     private readonly acceptance: OrderAcceptanceService,
     private readonly refunds: RefundsService,
     private readonly leases: PrintLeaseService,
+    private readonly clock: Clock,
   ) {}
 
   async list(device: DeviceContext, statuses?: OrderStatus[]): Promise<ShopJob[]> {
@@ -67,6 +72,28 @@ export class ShopJobsService {
       take: 200,
     });
     return orders.map(toShopJob);
+  }
+
+  /** Printed orders (ADR-002: printing finished = ready) and their value, today and this month. */
+  async earnings(device: DeviceContext): Promise<ShopEarnings> {
+    const today = kolkataBusinessDate(this.clock.now());
+    const total = async (pickupDate: { equals: Date } | { gte: Date }) => {
+      const sum = await this.prisma.order.aggregate({
+        where: {
+          shopId: device.shopId,
+          status: { in: [OrderStatus.READY_FOR_PICKUP, OrderStatus.COLLECTED] },
+          pickupDate,
+        },
+        _count: { _all: true },
+        _sum: { amountPaise: true },
+      });
+      return { orders: sum._count._all, amountPaise: sum._sum.amountPaise ?? 0 };
+    };
+    const [todayTotal, monthTotal] = await Promise.all([
+      total({ equals: pickupDateValue(today) }),
+      total({ gte: pickupDateValue(`${today.slice(0, 8)}01`) }),
+    ]);
+    return { today: todayTotal, month: monthTotal };
   }
 
   async detail(device: DeviceContext, orderId: string): Promise<ShopJobDetail> {

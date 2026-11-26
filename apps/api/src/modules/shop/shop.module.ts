@@ -6,6 +6,7 @@ import { ApprovalModule } from '../approval/approval.module.js';
 import { FilesModule } from '../files/files.module.js';
 import { OrdersModule } from '../orders/orders.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
+import { PickupModule } from '../pickup/pickup.module.js';
 import { PrintPreparationService } from '../printing/print-preparation.service.js';
 import { PricingModule } from '../pricing/pricing.module.js';
 import { PrintingModule } from '../printing/printing.module.js';
@@ -25,6 +26,7 @@ import { PlacesService } from './places.service.js';
     PrintingModule,
     ApprovalModule,
     PricingModule,
+    PickupModule,
   ],
   controllers: [ShopController],
   providers: [
