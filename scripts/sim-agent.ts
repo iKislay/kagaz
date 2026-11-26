@@ -62,7 +62,8 @@ const args = cliArgs({
 
 const API = (args.api ?? defaultApiUrl()).replace(/\/$/, '');
 const SLUG = args.shop;
-const APP_VERSION = 'sim-0.3.0';
+// Never prints, so it can claim the newest lease contract (0.7.0: per-page greyscale).
+const APP_VERSION = '0.7.0-sim';
 const REJECT_RATE = num(args['reject-rate'], 0.03);
 const FAIL_RATE = num(args['fail-rate'], 0.03);
 const MIN_DELAY = num(args['min-delay'], 100);
