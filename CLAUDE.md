@@ -63,7 +63,7 @@ Scripts default to `http://localhost:$API_PORT/api` (4000 = the live printer ser
 Shop app `appsettings.json` keys: `ApiBaseUrl`, `SafetyPollSeconds`, `TokenRotationDays`, `RealtimeEnabled`, `UpdateFeedUrl`.
 
 Quick checks: `GET http://localhost:4000/api/health` (503 + which dependency is down if Postgres/SeaweedFS aren't running), `GET /api/config` (drives the web DEMO banner).
-Shop accounts are created in the Kaggaz Shop app: `POST /api/shop/signup` (shop CLOSED + owner login + this PC), `POST /api/shop/enroll-with-login` (owner connects another PC), `GET/POST/DELETE /api/shop/members` and `GET/PUT /api/shop/pricing` (owner signed in on the PC). First-run setup in the app (owner): `GET/PATCH /api/shop/profile`, `GET /api/shop/places?q=` + `/places/reverse` (Photon/OpenStreetMap, no key), `PUT /api/shop/location` (pin + owner-edited address), `POST /api/shop/profile/complete-setup`. The shop app opens in order: connect PC → sign in → setup → subscription → app (`AppGates`). Support contact on the website comes from `SUPPORT_PHONE` / `SUPPORT_WHATSAPP` / `SUPPORT_EMAIL`.
+Shop accounts are created in the Kaggaz Shop app: `POST /api/shop/signup` (shop CLOSED + owner login + this PC), `POST /api/shop/enroll-with-login` (owner connects another PC), `GET/POST/DELETE /api/shop/members` and `GET/PUT /api/shop/pricing` (owner signed in on the PC); `GET /api/shop/earnings` (printed orders' value today / this month, shown on Today's pickups). First-run setup in the app (owner): `GET/PATCH /api/shop/profile`, `GET /api/shop/places?q=` + `/places/reverse` (Photon/OpenStreetMap, no key), `PUT /api/shop/location` (pin + owner-edited address), `POST /api/shop/profile/complete-setup`. The shop app opens in order: connect PC → sign in → setup → subscription → app (`AppGates`). Support contact on the website comes from `SUPPORT_PHONE` / `SUPPORT_WHATSAPP` / `SUPPORT_EMAIL`.
 
 ### Toolchain notes (versions matter)
 
@@ -99,7 +99,7 @@ These come straight from the PRD. Breaking any of them is a bug, regardless of w
 
 ## Scope guardrails (v1)
 
-Do **not** introduce without an explicit decision: microservices, Kubernetes, Redis/BullMQ, a mobile app, WhatsApp, AI features, auto nearest-shop routing, custom printer drivers, non-PDF uploads, non-A4 paper. PostgreSQL is the durable queue.
+Do **not** introduce without an explicit decision: microservices, Kubernetes, Redis/BullMQ, a mobile app, WhatsApp, AI features, auto nearest-shop routing, custom printer drivers, server-side file conversion, non-A4 paper. Photos and Word files are converted to PDF in the browser ([ADR-006](docs/decisions/ADR-006-browser-file-conversion.md)); the API only ever accepts a PDF. PostgreSQL is the durable queue.
 
 ## Conventions
 
@@ -177,3 +177,4 @@ Every surface — customer website, admin dashboard and the Windows shop app —
 - 2026-11-12: shop subscriptions per connected printer, manual payment ledger in /superadmin → Billing ([ADR-004](docs/decisions/ADR-004-subscriptions.md)); enforcement behind `BILLING_ENFORCED`.
 - 2026-11-14: shop address/location are set by the owner in the shop app's first-run setup (never typed by superadmin); `shops.address` nullable, `shops.onboarded_at`. Shop app 0.5.0 targets `net10.0-windows10.0.19041.0`. Installer downloads stream from the API (no R2 redirect).
 - 2026-11-14: opening hours removed (the `opening_hours` column stays, unused). The shop sets Open/Closed/Maintenance itself via `PATCH /api/shop/mode {status}` from the shop app's Settings; the app's approval is just Manual | Auto (a paused Auto shows as Manual).
+- 2026-11-26: customers add several files (PDF, photos, .docx) converted to one PDF in the browser, preview pages, skip pages and pick colour per page ([ADR-006](docs/decisions/ADR-006-browser-file-conversion.md)); mixed-colour leases need shop app ≥ 0.7.0.
