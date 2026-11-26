@@ -98,3 +98,45 @@ describe('calculateQuote (T03)', () => {
     }
   });
 });
+
+describe('calculateQuote — mixed colour', () => {
+  it('charges colour pages at the colour rate and the rest at the B/W rate', () => {
+    const q = calculateQuote(rates, { ...opts, colour: true, colourPages: '2', copies: 2 }, 3);
+    expect(q).toMatchObject({
+      printedSides: 6,
+      ratePaise: 200,
+      mixedColour: { colourSides: 2, colourRatePaise: 1000 },
+      subtotalPaise: 2 * 1000 + 4 * 200,
+      totalPaise: 2800,
+    });
+  });
+
+  it('uses the duplex rates for both parts when discounted', () => {
+    const discounted = { ...rates, duplexRule: 'DISCOUNTED_SIDE_RATE' as const };
+    const q = calculateQuote(
+      discounted,
+      { ...opts, colour: true, colourPages: '1', duplex: true },
+      2,
+    );
+    expect(q.ratePaise).toBe(150);
+    expect(q.mixedColour).toEqual({ colourSides: 1, colourRatePaise: 800 });
+    expect(q.subtotalPaise).toBe(950);
+  });
+
+  it('is a plain colour quote when every selected page is colour', () => {
+    const q = calculateQuote(
+      rates,
+      { ...opts, colour: true, pageRange: '1-2', colourPages: '1-2' },
+      4,
+    );
+    expect(q.ratePaise).toBe(1000);
+    expect(q.mixedColour).toBeUndefined();
+    expect(q.totalPaise).toBe(2000);
+  });
+
+  it('rejects colour pages outside the page range', () => {
+    expect(() =>
+      calculateQuote(rates, { ...opts, colour: true, pageRange: '1', colourPages: '2' }, 2),
+    ).toThrow(PageRangeError);
+  });
+});
