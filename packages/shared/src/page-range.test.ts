@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PageRangeError,
   formatPageRange,
+  pagePicksToOptions,
   parsePageRange,
   resolvePageSelection,
 } from './page-range.js';
@@ -86,5 +87,34 @@ describe('resolvePageSelection', () => {
     expect(() =>
       resolvePageSelection({ pageRange: '1-2', colour: true, colourPages: '3' }, 4),
     ).toThrow(PageRangeError);
+  });
+});
+
+describe('pagePicksToOptions', () => {
+  const pick = (print: boolean, colour = false) => ({ print, colour });
+
+  it('prints every page B/W by default', () => {
+    expect(pagePicksToOptions([pick(true), pick(true)])).toEqual({ pageRange: '', colour: false });
+  });
+
+  it('lists skipped pages out of the range and mixed colour pages', () => {
+    expect(
+      pagePicksToOptions([pick(true, true), pick(false, true), pick(true), pick(true, true)]),
+    ).toEqual({
+      pageRange: '1, 3-4',
+      colour: true,
+      colourPages: '1, 4',
+    });
+  });
+
+  it('is a plain colour order when every printed page is colour', () => {
+    expect(pagePicksToOptions([pick(true, true), pick(false)])).toEqual({
+      pageRange: '1',
+      colour: true,
+    });
+  });
+
+  it('is null when nothing is picked', () => {
+    expect(pagePicksToOptions([pick(false)])).toBeNull();
   });
 });

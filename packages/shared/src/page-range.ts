@@ -87,3 +87,28 @@ export function resolvePageSelection(
   }
   return { selected, colour: new Set(colour) };
 }
+
+/** The customer's choice for one page of their document. */
+export interface PagePick {
+  print: boolean;
+  colour: boolean;
+}
+
+/**
+ * Per-page picks → print options: `pageRange` "" means every page, `colourPages` is set only for
+ * a mix of colour and B/W pages. Null when no page is picked (nothing to print).
+ */
+export function pagePicksToOptions(
+  picks: readonly PagePick[],
+): { pageRange: string; colour: boolean; colourPages?: string } | null {
+  const printed = picks.flatMap((p, i) => (p.print ? [i + 1] : []));
+  if (printed.length === 0) return null;
+  const colour = printed.filter((n) => picks[n - 1]!.colour);
+  return {
+    pageRange: printed.length === picks.length ? '' : formatPageRange(printed),
+    colour: colour.length > 0,
+    ...(colour.length > 0 && colour.length < printed.length
+      ? { colourPages: formatPageRange(colour) }
+      : {}),
+  };
+}
