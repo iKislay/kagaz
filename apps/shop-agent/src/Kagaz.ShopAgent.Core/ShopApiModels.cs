@@ -166,6 +166,12 @@ public record ShopPrinter(
 
 // ─── Jobs ───
 
+/// <summary>Printed orders and their value (<c>GET /api/shop/earnings</c>).</summary>
+public record EarningsTotal(int Orders, int AmountPaise);
+
+/// <summary>Today's and this month's earnings, by pickup business date (Asia/Kolkata).</summary>
+public record ShopEarnings(EarningsTotal Today, EarningsTotal Month);
+
 /// <param name="ColourPages">Colour orders only: the pages printed in colour, the rest B/W; null = all colour.</param>
 public record ShopPrintOptions(string? PageRange, int Copies, bool Colour, bool Duplex, string PaperSize, string? ColourPages = null);
 

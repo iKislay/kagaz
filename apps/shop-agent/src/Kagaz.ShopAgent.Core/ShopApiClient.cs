@@ -258,6 +258,12 @@ public sealed class ShopApiClient
         return wrapper.Jobs ?? new();
     }
 
+    public async Task<ShopEarnings> GetEarningsAsync(CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, "/shop/earnings", null, ct);
+        return await ReadAsync<ShopEarnings>(response, ct);
+    }
+
     public async Task<ShopJob> GetJobAsync(string orderId, CancellationToken ct = default)
     {
         using var response = await SendAsync(HttpMethod.Get, $"/shop/jobs/{Uri.EscapeDataString(orderId)}", null, ct);

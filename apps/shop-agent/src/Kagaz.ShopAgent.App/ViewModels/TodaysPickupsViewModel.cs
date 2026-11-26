@@ -11,10 +11,13 @@ namespace Kagaz.ShopAgent.App.ViewModels;
 /// newest first, so the operator can answer "copies for number 7?" at a glance. There is no
 /// verification call: it reads the same <c>GET /api/shop/jobs</c> refresh as the Jobs page.
 /// Typing in the filter box narrows the list by number ("7" → #7 first, then #70–#79) or by ref.
+/// Each refresh also fetches the shop's earnings (printed orders today and this month).
 /// </summary>
 public sealed partial class TodaysPickupsViewModel : ObservableObject
 {
+    private static readonly CultureInfo India = new("en-IN");
     private readonly JobsViewModel? _jobs;
+    private readonly ShopApiClient? _api;
     private List<JobItem> _today = new();
 
     [ObservableProperty]
@@ -26,11 +29,24 @@ public sealed partial class TodaysPickupsViewModel : ObservableObject
     [ObservableProperty]
     private string? _lastUpdated;
 
+    /// <summary>"Earned ₹1,240.00 today · ₹18,400.00 this month"; null until the first answer.</summary>
+    [ObservableProperty]
+    private string? _earningsText;
+
     /// <param name="jobs">The live job source; null in tests (feed it with <see cref="Load"/>).</param>
-    public TodaysPickupsViewModel(JobsViewModel? jobs = null)
+    /// <param name="api">Fetches earnings on each refresh; null in tests (feed it with <see cref="LoadEarnings"/>).</param>
+    public TodaysPickupsViewModel(JobsViewModel? jobs = null, ShopApiClient? api = null)
     {
         _jobs = jobs;
-        if (jobs is not null) jobs.Refreshed += list => Load(list, PickupLabel.Today());
+        _api = api;
+        if (jobs is not null)
+        {
+            jobs.Refreshed += list =>
+            {
+                Load(list, PickupLabel.Today());
+                _ = RefreshEarningsAsync();
+            };
+        }
     }
 
     public ObservableCollection<JobItem> Pickups { get; } = new();
@@ -56,6 +72,24 @@ public sealed partial class TodaysPickupsViewModel : ObservableObject
         OnPropertyChanged(nameof(TotalToday));
         OnPropertyChanged(nameof(ReadyCount));
         OnPropertyChanged(nameof(CountsText));
+    }
+
+    public void LoadEarnings(ShopEarnings earnings) =>
+        EarningsText = $"Earned {Money(earnings.Today.AmountPaise)} today · {Money(earnings.Month.AmountPaise)} this month";
+
+    private static string Money(int paise) => (paise / 100m).ToString("C", India);
+
+    private async Task RefreshEarningsAsync()
+    {
+        if (_api is null) return;
+        try
+        {
+            LoadEarnings(await _api.GetEarningsAsync());
+        }
+        catch (ApiException)
+        {
+            // Keep the last figures; the jobs refresh already reports connection problems.
+        }
     }
 
     partial void OnFilterChanged(string value)

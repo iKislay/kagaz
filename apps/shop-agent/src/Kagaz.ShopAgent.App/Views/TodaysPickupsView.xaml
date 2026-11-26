@@ -22,6 +22,9 @@
             </Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock Text="Today's pickups" Style="{StaticResource TitleText}" />
+                <TextBlock Text="{Binding EarningsText}" Style="{StaticResource HeadlineText}" Margin="0,6,0,0" TextWrapping="Wrap"
+                           AutomationProperties.Name="Earnings"
+                           Visibility="{Binding EarningsText, Converter={StaticResource NullToVisibility}}" />
                 <TextBlock Style="{StaticResource SubtitleText}" Margin="0,4,0,16" TextWrapping="Wrap">
                     <Run Text="{Binding CountsText, Mode=OneWay}" />
                     <Run Text="{Binding LastUpdated, Mode=OneWay}" />

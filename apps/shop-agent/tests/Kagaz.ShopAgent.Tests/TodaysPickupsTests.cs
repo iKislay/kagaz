@@ -135,4 +135,14 @@ public class TodaysPickupsTests
         Assert.Null(TodaysPickupsViewModel.ExactNumber(""));
         Assert.Null(TodaysPickupsViewModel.ExactNumber(null));
     }
+
+    [Fact]
+    public void Shows_earnings_in_rupees()
+    {
+        var vm = new TodaysPickupsViewModel();
+        Assert.Null(vm.EarningsText);
+        vm.LoadEarnings(new ShopEarnings(new EarningsTotal(3, 124000), new EarningsTotal(40, 1840050)));
+        var india = new System.Globalization.CultureInfo("en-IN");
+        Assert.Equal($"Earned {1240m.ToString("C", india)} today · {18400.50m.ToString("C", india)} this month", vm.EarningsText);
+    }
 }
