@@ -36,7 +36,7 @@ const REPORT_FROM: Record<PrintStatusReport['status'], PrintJobStatus[]> = {
 };
 
 /** First shop app that renders `settings.greyscalePages` (per-page colour). */
-export const MIXED_COLOUR_MIN_AGENT_VERSION = '0.7.0';
+export const MIXED_COLOUR_MIN_AGENT_VERSION = '0.8.0';
 
 /**
  * Printer leases and print progress (Appendix A.2, CLAUDE.md invariant 8):

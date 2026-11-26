@@ -336,7 +336,7 @@ describe('mixed-colour lease', () => {
     const job = (await s.human(`jobs/${created.order.id}/accept`).expect(200)).body as ShopJob;
     const printJobId = job.printJob!.id;
 
-    const old = await s.agent(`print-jobs/${printJobId}/lease`, {}, { 'x-agent-version': '0.6.0' });
+    const old = await s.agent(`print-jobs/${printJobId}/lease`, {}, { 'x-agent-version': '0.7.0' });
     expect(old.status).toBe(426);
     expect(old.body.error.code).toBe('AGENT_UPGRADE_REQUIRED');
     const untouched = await h.prisma.printJob.findUniqueOrThrow({ where: { id: printJobId } });

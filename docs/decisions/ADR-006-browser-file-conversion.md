@@ -17,7 +17,7 @@
    colour; the rest print B/W. Pricing charges each part at its own rate (`Quote.mixedColour`).
    The packet is still one PDF and one spooler job (invariant 7) in colour mode; the lease's
    `settings.greyscalePages` lists the packet pages the shop app renders in greyscale.
-4. Shop apps older than **0.7.0** would ignore `greyscalePages` and print those pages in colour, so leasing a
+4. Shop apps older than **0.8.0** (0.7.0 shipped on 2026-11-22 without it) would ignore `greyscalePages` and print those pages in colour, so leasing a
    mixed-colour job from them answers `426 AGENT_UPGRADE_REQUIRED` and the job waits in the queue.
 
 ## Consequences
@@ -27,4 +27,4 @@
   into page-high slices, which may split a line. Older `.doc` files are refused (save as `.docx` or PDF).
 - No new server dependency or memory cost; the web bundle loads pdf.js, docx-preview and html2canvas-pro
   only when needed.
-- Releasing mixed colour requires shop app 0.7.0 to be published before customers place such orders.
+- Releasing mixed colour requires shop app 0.8.0 to be published before customers place such orders.
