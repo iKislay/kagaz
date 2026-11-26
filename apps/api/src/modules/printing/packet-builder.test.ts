@@ -1,7 +1,7 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { makePdf } from '../../../test/fixtures/pdfs.js';
-import { buildPrintPacket } from './packet-builder.js';
+import { SPACER, buildPrintPacket, greyscalePacketPages, packetLayout } from './packet-builder.js';
 import { type SlipData } from './slip.js';
 
 const slip: SlipData = {
@@ -105,5 +105,24 @@ describe('buildPrintPacket (Appendix A.1, T10 logic)', () => {
     expect(Math.round(w!)).toBe(842);
     expect(Math.round(h!)).toBe(595);
     await task.destroy();
+  });
+});
+
+describe('packetLayout', () => {
+  it('repeats the pages per copy and pads odd copies when double-sided', () => {
+    expect(packetLayout([2, 4, 5], 2, true)).toEqual([2, 4, 5, SPACER, 2, 4, 5, SPACER]);
+    expect(packetLayout([1, 2], 2, false)).toEqual([1, 2, 1, 2]);
+  });
+});
+
+describe('greyscalePacketPages', () => {
+  it('lists B/W pages, spacers and the slip of a mixed order', () => {
+    // layout: 1 2 3 _ 1 2 3 _ | slip(8)
+    expect(greyscalePacketPages([1, 2, 3], new Set([2]), 2, true)).toEqual([0, 2, 3, 4, 6, 7, 8]);
+  });
+
+  it('is empty for single-mode orders', () => {
+    expect(greyscalePacketPages([1, 2], new Set(), 1, false)).toEqual([]);
+    expect(greyscalePacketPages([1, 2], new Set([1, 2]), 1, false)).toEqual([]);
   });
 });

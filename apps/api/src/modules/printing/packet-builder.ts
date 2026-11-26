@@ -49,21 +49,13 @@ export async function buildPrintPacket(
   packet.setProducer('Kaggaz');
 
   const embedded = await packet.embedPages(selected.map((n) => source.getPage(n - 1)));
+  const byPage = new Map(selected.map((n, i) => [n, embedded[i]!]));
 
-  let spacerPages = 0;
-  for (let copy = 0; copy < options.copies; copy++) {
-    for (const page of embedded) drawFitted(packet, page);
-    if (options.duplex && selected.length % 2 === 1) {
-      packet.addPage(A4_PORTRAIT);
-      spacerPages++;
-    }
+  const layout = packetLayout(selected, options.copies, options.duplex);
+  for (const entry of layout) {
+    if (entry === SPACER) packet.addPage(A4_PORTRAIT);
+    else drawFitted(packet, byPage.get(entry)!);
   }
-  // Safety net: the slip must start a new sheet (front side) when printing double-sided.
-  if (options.duplex && packet.getPageCount() % 2 === 1) {
-    packet.addPage(A4_PORTRAIT);
-    spacerPages++;
-  }
-
   await drawPickupSlip(packet, slip);
 
   const bytes = await packet.save();
@@ -73,8 +65,45 @@ export async function buildPrintPacket(
     pageCount: packet.getPageCount(),
     slipIndex: packet.getPageCount() - 1,
     contentPages: selected.length * options.copies,
-    spacerPages,
+    spacerPages: layout.filter((entry) => entry === SPACER).length,
   };
+}
+
+/** A blank page in the packet layout. */
+export const SPACER = null;
+/** One packet page before the slip: a customer page number (1-based) or a blank spacer. */
+export type PacketEntry = number | typeof SPACER;
+
+/**
+ * Packet page order before the pickup slip (which is always the next, last page): the selected
+ * pages once per copy, a spacer after each odd-length copy when double-sided so every copy starts
+ * on a front side, and a final spacer if needed so the slip also starts a new sheet.
+ */
+export function packetLayout(selected: number[], copies: number, duplex: boolean): PacketEntry[] {
+  const layout: PacketEntry[] = [];
+  for (let copy = 0; copy < copies; copy++) {
+    layout.push(...selected);
+    if (duplex && selected.length % 2 === 1) layout.push(SPACER);
+  }
+  // Safety net: the slip must start a new sheet (front side) when printing double-sided.
+  if (duplex && layout.length % 2 === 1) layout.push(SPACER);
+  return layout;
+}
+
+/**
+ * 0-based packet pages to render in greyscale for a mixed-colour order: every B/W customer page,
+ * spacer and the slip. Empty when the whole job is one mode (the job's colour setting covers it).
+ */
+export function greyscalePacketPages(
+  selected: number[],
+  colour: ReadonlySet<number>,
+  copies: number,
+  duplex: boolean,
+): number[] {
+  if (colour.size === 0 || colour.size === selected.length) return [];
+  const layout = packetLayout(selected, copies, duplex);
+  const pages = layout.flatMap((entry, i) => (entry !== SPACER && colour.has(entry) ? [] : [i]));
+  return [...pages, layout.length];
 }
 
 function drawFitted(doc: PDFDocument, src: PDFEmbeddedPage): void {
